@@ -49,10 +49,20 @@ export interface Settings {
 
 const isSecurePage = typeof location !== 'undefined' && location.protocol === 'https:';
 
+/**
+ * Relay host to start with: the host of the page (Glowing Bear is often
+ * served by the machine running WeeChat), else localhost (e.g. file://).
+ */
+export function pageHost(
+    hostname = typeof location !== 'undefined' ? location.hostname : '',
+): string {
+    return hostname || 'localhost';
+}
+
 export const DEFAULT_SETTINGS: Settings = {
     theme: 'dark',
-    hostField: 'localhost',
-    host: 'localhost',
+    hostField: pageHost(),
+    host: pageHost(),
     port: 9001,
     path: 'api',
     tls: isSecurePage,

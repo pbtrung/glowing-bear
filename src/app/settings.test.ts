@@ -3,6 +3,7 @@ import {
     DEFAULT_SETTINGS,
     loadSettings,
     hashSettings,
+    pageHost,
     parseHashParams,
     parseHostField,
 } from './settings';
@@ -122,6 +123,16 @@ describe('URL parameters', () => {
         expect(hashSettings(saved, { host: 'evil.example' }).changes.password).toBe('');
         expect(hashSettings(saved, { port: '9002' }).changes.password).toBe('');
         expect(hashSettings(saved, { path: 'x' }).changes.password).toBe('');
+    });
+});
+
+describe('default relay host', () => {
+    it('is the host of the page', () => {
+        expect(pageHost('chat.example.org')).toBe('chat.example.org');
+        expect(pageHost('[::1]')).toBe('[::1]');
+        expect(parseHostField(pageHost('[::1]'))?.host).toBe('[::1]');
+        // file:// pages have none
+        expect(pageHost('')).toBe('localhost');
     });
 });
 

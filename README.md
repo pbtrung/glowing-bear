@@ -43,7 +43,7 @@ nginx, Apache, …).
 2. Open Glowing Bear, enter the WeeChat host, port and password, and click
    **Connect**.
 
-The host field also accepts `host:port` and `host:port/path` (for relays behind a
+The host field starts with the host of the page (handy when Glowing Bear is served by the machine running WeeChat), and also accepts `host:port` and `host:port/path` (for relays behind a
 reverse proxy; the default path is `api`). The fields can be prefilled from the URL,
 e.g. `#host=my.domain.com&port=9001&autoconnect=true` (also `path` and `password`).
 The URL fragment is removed once read, `autoconnect` only applies to that visit, and a

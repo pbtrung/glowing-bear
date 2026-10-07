@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyBuffers, applyNicklist, initialState } from '../lib/state/reducers';
+import { parseRichText, plainText } from '../lib/relay/colors';
 import type { ApiBuffer, ApiNick, ApiNickGroup } from '../lib/relay/types';
 import { groupTitle, initial, nameHue, nickSections, promptNick } from './nicks';
 
@@ -110,6 +111,14 @@ describe('nicklist display', () => {
             part('v', ['cwf-yellow']),
         ]);
         expect(texts(promptNick([part('~&gbuser')]))).toEqual(['gbuser']);
+        // As WeeChat sends it for an IRC channel, colors and bar codes included
+        expect(
+            plainText(
+                promptNick(
+                    parseRichText('\x19F05@\x1c\x19F03ukx8\x19bD(\x19bF+i\x19bD)'),
+                ),
+            ),
+        ).toBe('ukx8');
         expect(texts(promptNick([part('gbuser (+i)')]))).toEqual(['gbuser']);
         // Nick characters that look like symbols stay
         expect(texts(promptNick([part('[yasmin]')]))).toEqual(['[yasmin]']);

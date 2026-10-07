@@ -222,6 +222,13 @@ const MATCHERS: Array<{ regex: RegExp; fn: (m: RegExpMatchArray) => Style }> = [
         regex: /^E/,
         fn: () => optionStyle('emphasis'),
     },
+    {
+        // bar codes: "b" + F (bar_fg), D (bar_delim), B (bar_bg), _ - # (input),
+        // i l (items), s (spacer); used in bar items like the input prompt, and
+        // with no meaning outside WeeChat's bars
+        regex: /^b[FDB_\-#ils]/,
+        fn: () => NO_CHANGE,
+    },
 ];
 
 /** Style set by a text element following a \x19 code, and the remaining text */

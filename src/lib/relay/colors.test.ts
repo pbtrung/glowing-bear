@@ -70,6 +70,16 @@ describe('WeeChat color codes', () => {
         ]);
     });
 
+    it('ignores bar codes (b + F, D, B, _, -, #, i, l, s)', () => {
+        // The input prompt of an IRC channel: prefix, nick, then (modes) in
+        // the bar delimiter color
+        const prompt = '\x19F05@\x1c\x19F03ukx8\x19bD(\x19bF+i\x19bD)';
+        expect(stripColors(prompt)).toBe('@ukx8(+i)');
+        expect(stripColors('\x19bBa\x19b_b\x19b-c\x19b#d\x19bie\x19blf\x19bsg')).toBe(
+            'abcdefg',
+        );
+    });
+
     it('sets and removes attributes (\\x1a / \\x1b)', () => {
         const parts = parseRichText('a\x1a*b\x1b*c');
         expect(parts.map((p) => p.text)).toEqual(['a', 'b', 'c']);

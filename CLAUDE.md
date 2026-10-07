@@ -19,7 +19,7 @@ npm test                 # karma + jasmine unit tests (single run; uses webpack 
 npm run protractor       # e2e tests — REQUIRES Glowing Bear on :8000 AND WeeChat relay on :9001
 npm run format           # prettier --write . (88 columns; *.html is excluded)
 npm run format:check     # prettier --check .
-./run_tests.sh           # what CI runs: format check + lint + unit tests
+./run_tests.sh           # full check suite: format check + lint + unit tests
 ```
 
 Single-test runs: there is no built-in filter flag; edit `test/unit/main.test.js` to import only the spec you want, or use Jasmine's `fdescribe` / `fit` to focus.

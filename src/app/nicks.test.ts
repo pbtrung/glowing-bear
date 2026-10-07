@@ -35,7 +35,7 @@ function buffer() {
             number: 1,
             type: 'formatted',
             local_variables: { type: 'channel' },
-        } as ApiBuffer,
+        } as unknown as ApiBuffer,
     ]);
     return applyNicklist(state, 1, {
         ...group(0, 'root', [nick(9, 0, 'rootnick')]),

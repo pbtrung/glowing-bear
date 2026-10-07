@@ -1,5 +1,10 @@
 'use strict';
 
+/*
+ * Handlers for data received from the WeeChat relay "api" protocol: responses
+ * to the requests made by the connection service, and events pushed by
+ * WeeChat once synchronization is enabled (see eventHandlers below).
+ */
 var weechat = angular.module('weechat');
 
 weechat.factory('handlers', [
@@ -10,48 +15,20 @@ weechat.factory('handlers', [
     'notifications',
     'bufferResume',
     function ($rootScope, $log, models, plugins, notifications, bufferResume) {
-        var handleVersionInfo = function (message) {
-            var content = message.objects[0].content;
-            var version = content.value;
-            // Store the WeeChat version in models
-            // this eats things like 1.3-dev -> [1,3]
-            models.version = version.split('.').map(function (c) {
+        /*
+         * Handle the response of GET /api/version
+         */
+        var handleVersionInfo = function (version) {
+            models.versionInfo = version;
+            // this eats things like 4.2.0-dev -> [4,2,0]
+            models.version = version.weechat_version.split('.').map(function (c) {
                 return parseInt(c);
             });
         };
 
-        var handleConfValue = function (message) {
-            var infolist = message.objects[0].content;
-            for (var i = 0; i < infolist.length; i++) {
-                var key, val;
-                var item = infolist[i];
-                for (var j = 0; j < item.length; j++) {
-                    var confitem = item[j];
-                    if (confitem.full_name) {
-                        key = confitem.full_name;
-                    }
-                    if (confitem.value) {
-                        val = confitem.value;
-                    }
-                }
-                if (key && val) {
-                    $log.debug('Setting wconfig "' + key + '" to value "' + val + '"');
-                    models.wconfig[key] = val;
-                }
-            }
-        };
-        const handleBufferCleared = function (message) {
-            var bufferMessage = message.objects[0].content[0];
-            var bufferId = bufferMessage.pointers[0];
-            let buffer = models.getBuffer(bufferId);
-            $log.debug('Handle buffer cleared: ' + buffer.fullName);
-            buffer.clear();
-        };
-
-        var handleBufferClosing = function (message) {
-            var bufferMessage = message.objects[0].content[0];
-            var bufferId = bufferMessage.pointers[0];
-            models.closeBuffer(bufferId);
+        var handleConfValue = function (name, value) {
+            $log.debug('Setting wconfig "' + name + '" to value "' + value + '"');
+            models.wconfig[name] = value;
         };
 
         // inject a fake buffer line for date change if needed
@@ -61,443 +38,302 @@ weechat.factory('handlers', [
             old_date,
             new_date,
         ) {
-            if (buffer.bufferType === 1) {
-                // Don't add date change messages to free buffers
+            if (buffer.bufferType === 1 || !buffer.dayChange) {
+                // Don't add date change messages to free buffers, or when
+                // WeeChat doesn't display them for this buffer
                 return;
             }
+            old_date = new Date(old_date.getTime());
+            new_date = new Date(new_date.getTime());
             old_date.setHours(0, 0, 0, 0);
             new_date.setHours(0, 0, 0, 0);
             // Check if the date changed
-            if (old_date.valueOf() !== new_date.valueOf()) {
-                if (manually) {
-                    // if the message that caused this date change to be sent
-                    // would increment buffer.lastSeen, we should increment as
-                    // well.
-                    ++buffer.lastSeen;
-                }
-                var old_date_plus_one = new Date(old_date.getTime());
-                old_date_plus_one.setDate(old_date_plus_one.getDate() + 1);
-                // it's not always true that a date with time 00:00:00
-                // plus one day will be time 00:00:00
-                old_date_plus_one.setHours(0, 0, 0, 0);
-
-                var content = '\u001943'; // this colour corresponds to chat_day_change
-                // Add day of the week
-                if ($rootScope.supports_formatting_date) {
-                    content += new_date.toLocaleDateString(window.navigator.language, {
-                        weekday: 'long',
-                    });
-                } else {
-                    // Gross code that only does English dates ew gross
-                    var dow_to_word = [
-                        'Sunday',
-                        'Monday',
-                        'Tuesday',
-                        'Wednesday',
-                        'Thursday',
-                        'Friday',
-                        'Saturday',
-                    ];
-                    content += dow_to_word[new_date.getDay()];
-                }
-                // if you're testing different date formats,
-                // make sure to test different locales such as "en-US",
-                // "en-US-u-ca-persian" (which has different weekdays, year 0, and an ERA)
-                // "ja-JP-u-ca-persian-n-thai" (above, diff numbering, diff text)
-                var extra_date_format = {
-                    day: 'numeric',
-                    month: 'long',
-                };
-                if (new_date.getFullYear() !== old_date.getFullYear()) {
-                    extra_date_format.year = 'numeric';
-                }
-                content += ' (';
-                if ($rootScope.supports_formatting_date) {
-                    content += new_date.toLocaleDateString(
-                        window.navigator.language,
-                        extra_date_format,
-                    );
-                } else {
-                    // ew ew not more gross code
-                    var month_to_word = [
-                        'January',
-                        'February',
-                        'March',
-                        'April',
-                        'May',
-                        'June',
-                        'July',
-                        'August',
-                        'September',
-                        'October',
-                        'November',
-                        'December',
-                    ];
-                    content +=
-                        month_to_word[new_date.getMonth()] +
-                        ' ' +
-                        new_date.getDate().toString();
-                    if (extra_date_format.year === 'numeric') {
-                        content += ', ' + new_date.getFullYear().toString();
-                    }
-                }
-                // Result should be something like
-                // Friday (November 27)
-                // or if the year is different,
-                // Friday (November 27, 2015)
-
-                // Comparing dates in javascript is beyond tedious
-                if (old_date_plus_one.valueOf() !== new_date.valueOf()) {
-                    var date_diff =
-                        Math.round((new_date - old_date) / (24 * 60 * 60 * 1000)) + 1;
-                    if (date_diff < 0) {
-                        date_diff = -1 * date_diff;
-                        if (date_diff === 1) {
-                            content += ', 1 day before';
-                        } else {
-                            content += ', ' + date_diff + ' days before';
-                        }
-                    } else {
-                        content += ', ' + date_diff + ' days later';
-                    }
-                    // Result: Friday (November 27, 5 days later)
-                }
-                content += ')';
-
-                var line = {
-                    buffer: buffer.id,
-                    date: new_date,
-                    prefix: '\u001943\u2500',
-                    tags_array: [],
-                    displayed: true,
-                    highlight: 0,
-                    message: content,
-                };
-                var new_message = new models.BufferLine(line);
-                buffer.addLine(new_message);
-            }
-        };
-
-        var handleLine = function (line, manually) {
-            var message = new models.BufferLine(line);
-            var buffer = models.getBuffer(message.buffer);
-            buffer.requestedLines++;
-            // Only react to line if its displayed
-            if (message.displayed) {
-                // Check for date change
-                if (buffer.lines.length > 0) {
-                    var old_date = new Date(buffer.lines[buffer.lines.length - 1].date),
-                        new_date = new Date(message.date);
-                    injectDateChangeMessageIfNeeded(
-                        buffer,
-                        manually,
-                        old_date,
-                        new_date,
-                    );
-                }
-
-                message = plugins.PluginManager.contentForMessage(message);
-                buffer.addLine(message);
-
-                if (manually) {
-                    buffer.lastSeen++;
-                }
-
-                if (buffer.active && !manually) {
-                    $rootScope.scrollWithBuffer();
-                }
-
-                if (!manually && (!buffer.active || !$rootScope.isWindowFocused())) {
-                    var server = models.getServerForBuffer(buffer);
-
-                    if (
-                        buffer.notify > 1 &&
-                        message.tags.includes('notify_message') &&
-                        !message.tags.includes('notify_none')
-                    ) {
-                        buffer.unread++;
-                        server.unread++;
-                        $rootScope.$emit('notificationChanged');
-                    }
-
-                    if (
-                        buffer.notify !== 0 &&
-                        (message.highlight || message.tags.includes('notify_private'))
-                    ) {
-                        buffer.notification++;
-                        server.unread++;
-                        notifications.createHighlight(buffer, message);
-                        $rootScope.$emit('notificationChanged');
-                    }
-                }
-            }
-        };
-
-        var handleBufferInfo = function (message) {
-            var bufferInfos = message.objects[0].content;
-            // buffers objects
-            for (var i = 0; i < bufferInfos.length; i++) {
-                var bufferId = bufferInfos[i].pointers[0];
-                var buffer = models.getBuffer(bufferId);
-                if (buffer !== undefined) {
-                    // We already know this buffer
-                    handleBufferUpdate(buffer, bufferInfos[i]);
-                } else {
-                    buffer = new models.Buffer(bufferInfos[i]);
-                    if (buffer.type === 'server') {
-                        models.registerServer(buffer);
-                    } else {
-                        var server = models.getServerForBuffer(buffer);
-                        server.unread += buffer.unread + buffer.notification;
-                    }
-                    models.addBuffer(buffer);
-                    // Switch to first buffer on startup
-                    var shouldResume = bufferResume.shouldResume(buffer);
-                    if (shouldResume) {
-                        models.setActiveBuffer(buffer.id);
-                    }
-                }
-            }
-            // If there was no buffer to autmatically load, go to the first one.
-            if (!bufferResume.wasAbleToResume()) {
-                var first = bufferInfos[0].pointers[0];
-                models.setActiveBuffer(first);
-            }
-        };
-
-        var handleBufferUpdate = function (buffer, message) {
-            if (message.pointers[0] !== buffer.id) {
-                // this is information about some other buffer!
+            if (old_date.valueOf() === new_date.valueOf()) {
                 return;
             }
-
-            // weechat properties -- short name can be changed
-            buffer.shortName = message.short_name;
-            buffer.trimmedName = buffer.shortName.replace(/^[#&+]/, '');
-            // Use color from short name
-            buffer.nameClasses = models.parseRichText(message.short_name)[0].classes;
-            buffer.title = message.title;
-            buffer.number = message.number;
-            buffer.hidden = message.hidden;
-
-            // reset unread counts, hotlist info will arrive shortly
-            var server = models.getServerForBuffer(buffer);
-            server.unread -= buffer.unread + buffer.notification;
-            buffer.notification = 0;
-            buffer.unread = 0;
-            buffer.lastSeen = -1;
-
-            if (message.local_variables.type !== undefined) {
-                buffer.type = message.local_variables.type;
-                buffer.indent = ['channel', 'private'].indexOf(buffer.type) >= 0;
+            if (manually) {
+                // if the message that caused this date change to be sent
+                // would increment buffer.lastSeen, we should increment as
+                // well.
+                ++buffer.lastSeen;
             }
+            var old_date_plus_one = new Date(old_date.getTime());
+            old_date_plus_one.setDate(old_date_plus_one.getDate() + 1);
+            // it's not always true that a date with time 00:00:00
+            // plus one day will be time 00:00:00
+            old_date_plus_one.setHours(0, 0, 0, 0);
 
-            if (message.notify !== undefined) {
-                buffer.notify = message.notify;
-            }
-        };
-
-        var handleBufferLineAdded = function (message) {
-            message.objects[0].content.forEach(function (l) {
-                handleLine(l, false);
+            var content = '\u001943'; // this colour corresponds to chat_day_change
+            // Add day of the week
+            content += new_date.toLocaleDateString(window.navigator.language, {
+                weekday: 'long',
             });
-        };
-
-        var handleBufferOpened = function (message) {
-            var bufferMessage = message.objects[0].content[0];
-            var buffer = new models.Buffer(bufferMessage);
-            if (buffer.type === 'server') {
-                models.registerServer(buffer);
-            } else {
-                var server = models.getServerForBuffer(buffer);
-                server.unread += buffer.unread + buffer.notification;
+            // if you're testing different date formats,
+            // make sure to test different locales such as "en-US",
+            // "en-US-u-ca-persian" (which has different weekdays, year 0, and an ERA)
+            // "ja-JP-u-ca-persian-n-thai" (above, diff numbering, diff text)
+            var extra_date_format = {
+                day: 'numeric',
+                month: 'long',
+            };
+            if (new_date.getFullYear() !== old_date.getFullYear()) {
+                extra_date_format.year = 'numeric';
             }
-            models.addBuffer(buffer);
-        };
+            content +=
+                ' (' +
+                new_date.toLocaleDateString(
+                    window.navigator.language,
+                    extra_date_format,
+                );
+            // Result should be something like
+            // Friday (November 27)
+            // or if the year is different,
+            // Friday (November 27, 2015)
 
-        var handleBufferTitleChanged = function (message) {
-            var obj = message.objects[0].content[0];
-            var buffer = obj.pointers[0];
-            var old = models.getBuffer(buffer);
-            old.fullName = obj.full_name;
-            old.title = models.parseRichText(obj.title);
-            old.number = obj.number;
-
-            old.rtitle = '';
-            for (var i = 0; i < old.title.length; ++i) {
-                old.rtitle += old.title[i].text;
-            }
-        };
-
-        var handleBufferRenamed = function (message) {
-            var obj = message.objects[0].content[0];
-            var buffer = obj.pointers[0];
-            var old = models.getBuffer(buffer);
-            old.fullName = obj.full_name;
-            old.shortName = obj.short_name;
-            // Use color from short name
-            old.nameClasses = models.parseRichText(obj.short_name)[0].classes;
-            // If it's a channel, trim away the prefix (#, &, or +). If that is empty and the buffer
-            // has a short name, use a space (because the prefix will be displayed separately, and we don't want
-            // prefix + fullname, which would happen otherwise). Else, use null so that full_name is used
-            old.trimmedName =
-                obj.short_name.replace(/^[#&+]/, '') || (obj.short_name ? ' ' : null);
-            old.prefix =
-                ['#', '&', '+'].indexOf(obj.short_name.charAt(0)) >= 0
-                    ? obj.short_name.charAt(0)
-                    : '';
-
-            // After a buffer openes we get the name change event from relay protocol
-            // Here we check our outgoing commands that openes a buffer and switch
-            // to it if we find the buffer name it the list
-            var position = models.outgoingQueries.indexOf(old.shortName);
-            if (position >= 0) {
-                models.outgoingQueries.splice(position, 1);
-                models.setActiveBuffer(old.id);
-            }
-        };
-
-        var handleBufferMoved = function (message) {
-            var obj = message.objects[0].content[0];
-            var buffer = obj.pointers[0];
-            var old = models.getBuffer(buffer);
-
-            var old_number = old.number;
-            var new_number = obj.number;
-
-            Object.entries(models.getBuffers()).forEach(function ([key, buffer]) {
-                if (buffer.number > old_number && buffer.number <= new_number) {
-                    buffer.number -= 1;
+            // Comparing dates in javascript is beyond tedious
+            if (old_date_plus_one.valueOf() !== new_date.valueOf()) {
+                var date_diff =
+                    Math.round((new_date - old_date) / (24 * 60 * 60 * 1000)) + 1;
+                if (date_diff < 0) {
+                    date_diff = -1 * date_diff;
+                    if (date_diff === 1) {
+                        content += ', 1 day before';
+                    } else {
+                        content += ', ' + date_diff + ' days before';
+                    }
+                } else {
+                    content += ', ' + date_diff + ' days later';
                 }
-
-                if (buffer.number < old_number && buffer.number >= new_number) {
-                    buffer.number += 1;
-                }
-            });
-
-            old.number = new_number;
-        };
-
-        var handleBufferHidden = function (message) {
-            var obj = message.objects[0].content[0];
-            var buffer = obj.pointers[0];
-            var old = models.getBuffer(buffer);
-            old.hidden = true;
-        };
-
-        var handleBufferUnhidden = function (message) {
-            var obj = message.objects[0].content[0];
-            var buffer = obj.pointers[0];
-            var old = models.getBuffer(buffer);
-            old.hidden = false;
-        };
-
-        var handleBufferLocalvarChanged = function (message) {
-            var obj = message.objects[0].content[0];
-            var buffer = obj.pointers[0];
-            var old = models.getBuffer(buffer);
-
-            var localvars = obj.local_variables;
-            if (old !== undefined && localvars !== undefined) {
-                // Update indentation status
-                old.type = localvars.type;
-                old.indent = ['channel', 'private'].indexOf(localvars.type) >= 0;
-                // Update serverSortKey and related variables
-                old.plugin = localvars.plugin;
-                old.server = localvars.server;
-                old.serverSortKey =
-                    old.plugin +
-                    '.' +
-                    old.server +
-                    (old.type === 'server' ? '' : '.' + old.shortName);
-                old.pinned = localvars.pinned === 'true';
+                // Result: Friday (November 27, 5 days later)
             }
-        };
+            content += ')';
 
-        var handleBufferTypeChanged = function (message) {
-            var obj = message.objects[0].content[0];
-            var buffer = obj.pointers[0];
-            //var old = models.getBuffer(buffer);
-            // 0 = formatted (normal); 1 = free
-            buffer.bufferType = obj.type;
+            var line = {
+                id: -1,
+                buffer: buffer.id,
+                date: new_date,
+                prefix: '\u001943─',
+                tags: [],
+                displayed: true,
+                highlight: false,
+                notify_level: -1,
+                message: content,
+            };
+            buffer.addLine(new models.BufferLine(line));
         };
 
         /*
-         * Handle answers to (lineinfo) messages
+         * Handle a line of a buffer.
          *
-         * (lineinfo) messages are specified by this client. It is request after bufinfo completes
+         * @param line line object sent by the relay, with an extra "buffer"
+         *             property holding the buffer id
+         * @param manually true if the line was explicitly requested (history),
+         *                 false if it was pushed by WeeChat (new message)
          */
-        var handleLineInfo = function (message, manually) {
-            var lines = message.objects[0].content.reverse();
+        var handleLine = function (line, manually) {
+            var buffer = models.getBuffer(line.buffer);
+            if (buffer === undefined) {
+                return;
+            }
+            var message = new models.BufferLine(line);
+
+            if (buffer.bufferType === 1) {
+                // Free content: lines are addressed by their index (y)
+                buffer.setFreeLine(message);
+                return;
+            }
+
+            buffer.requestedLines++;
+            // Only react to line if its displayed
+            if (!message.displayed) {
+                return;
+            }
+            // Check for date change
+            if (buffer.lines.length > 0) {
+                var old_date = buffer.lines[buffer.lines.length - 1].date;
+                injectDateChangeMessageIfNeeded(
+                    buffer,
+                    manually,
+                    old_date,
+                    message.date,
+                );
+            }
+
+            message = plugins.PluginManager.contentForMessage(message);
+            buffer.addLine(message);
+
+            if (manually) {
+                buffer.lastSeen++;
+            }
+
+            if (buffer.active && !manually) {
+                $rootScope.scrollWithBuffer();
+            }
+
+            if (!manually && (!buffer.active || !$rootScope.isWindowFocused())) {
+                var server = models.getServerForBuffer(buffer);
+
+                // notify_level: -1 = no notify, 0 = low, 1 = message,
+                // 2 = private, 3 = highlight
+                var isPrivate = message.notifyLevel === 2;
+                var isHighlight = message.highlight || message.notifyLevel === 3;
+
+                if (buffer.notify !== 0 && (isHighlight || isPrivate)) {
+                    buffer.notification++;
+                    server.unread++;
+                    notifications.createHighlight(buffer, message);
+                    $rootScope.$emit('notificationChanged');
+                } else if (buffer.notify > 1 && message.notifyLevel === 1) {
+                    buffer.unread++;
+                    server.unread++;
+                    $rootScope.$emit('notificationChanged');
+                }
+            }
+        };
+
+        /*
+         * Fill the nicklist of a buffer.
+         *
+         * @param buffer the buffer
+         * @param root root nick group sent by the relay (with sub-groups and
+         *             nicks)
+         */
+        var fillNicklist = function (buffer, root) {
+            buffer.clearNicklist();
+            var addGroup = function (group, isRoot) {
+                var g = new models.NickGroup(group);
+                var key = isRoot ? 'root' : g.name;
+                buffer.nicklist[key] = g;
+                buffer.nickGroups[g.id] = key;
+                (group.nicks || []).forEach(function (n) {
+                    buffer.addNick(key, new models.Nick(n));
+                });
+                (group.groups || []).forEach(function (sub) {
+                    addGroup(sub, false);
+                });
+            };
+            addGroup(root, true);
+        };
+
+        /*
+         * Handle the response of GET /api/buffers/{id}/nicks
+         */
+        var handleNicklist = function (bufferId, root) {
+            var buffer = models.getBuffer(bufferId);
+            if (buffer === undefined) {
+                return;
+            }
+            fillNicklist(buffer, root);
+            //check if nicklist should be hidden or not
+            $rootScope.$emit('nickListChanged');
+        };
+
+        var addNewBuffer = function (message) {
+            var buffer = new models.Buffer(message);
+            if (buffer.type === 'server') {
+                models.registerServer(buffer);
+            }
+            models.addBuffer(buffer);
+            return buffer;
+        };
+
+        /*
+         * Handle the response of GET /api/buffers
+         */
+        var handleBufferInfo = function (buffers) {
+            buffers.forEach(function (message) {
+                var buffer = models.getBuffer(message.id);
+                if (buffer !== undefined) {
+                    // We already know this buffer
+                    models.updateBuffer(buffer, message);
+                    // reset unread counts, hotlist info will arrive shortly
+                    var server = models.getServerForBuffer(buffer);
+                    server.unread -= buffer.unread + buffer.notification;
+                    buffer.notification = 0;
+                    buffer.unread = 0;
+                    buffer.lastSeen = -1;
+                } else {
+                    buffer = addNewBuffer(message);
+                    // Switch to first buffer on startup
+                    if (bufferResume.shouldResume(buffer)) {
+                        models.setActiveBuffer(buffer.id);
+                    }
+                }
+            });
+            // If there was no buffer to automatically load, go to the first one.
+            if (!bufferResume.wasAbleToResume() && buffers.length > 0) {
+                models.setActiveBuffer(buffers[0].id);
+            }
+        };
+
+        /*
+         * Handle lines requested for a buffer
+         * (GET /api/buffers/{id}/lines), oldest line first.
+         */
+        var handleLineInfo = function (buffer, lines, manually) {
             if (manually === undefined) {
                 manually = true;
             }
             lines.forEach(function (l) {
+                l.buffer = buffer.id;
                 handleLine(l, manually);
             });
-            if (message.objects[0].content.length > 0) {
-                // fiddle out the buffer ID and take the last line's date
-                var last_line =
-                    message.objects[0].content[message.objects[0].content.length - 1];
-                var buffer = models.getBuffer(last_line.buffer);
-                if (buffer.lines.length > 0) {
-                    var last_date = new Date(
-                        buffer.lines[buffer.lines.length - 1].date,
-                    );
-                    injectDateChangeMessageIfNeeded(
-                        buffer,
-                        true,
-                        last_date,
-                        new Date(),
-                    );
+            if (buffer.lines.length > 0 && buffer.bufferType === 0) {
+                var last_date = buffer.lines[buffer.lines.length - 1].date;
+                injectDateChangeMessageIfNeeded(buffer, true, last_date, new Date());
+            }
+            // Use the read marker of WeeChat the first time lines are loaded
+            if (buffer.lastReadLineId >= 0) {
+                for (var i = buffer.lines.length - 1; i >= 0; i--) {
+                    if (
+                        buffer.lines[i] &&
+                        buffer.lines[i].id === buffer.lastReadLineId
+                    ) {
+                        buffer.lastSeen = i;
+                        buffer.lastReadLineId = -1;
+                        break;
+                    }
                 }
             }
         };
 
         /*
-         * Handle answers to hotlist request
+         * Handle the response of GET /api/hotlist
          */
-        var handleHotlistInfo = function (message) {
+        var handleHotlistInfo = function (hotlist) {
             // Hotlist includes only buffers with unread counts so first we
             // iterate all our buffers and resets the counts.
-            Object.entries(models.getBuffers()).forEach(function ([key, buffer]) {
+            Object.values(models.getBuffers()).forEach(function (buffer) {
                 buffer.unread = 0;
                 buffer.notification = 0;
             });
-            Object.entries(models.getServers()).forEach(function ([key, server]) {
+            Object.values(models.getServers()).forEach(function (server) {
                 server.unread = 0;
             });
-            if (message.objects.length > 0) {
-                var hotlist = message.objects[0].content;
-                hotlist.forEach(function (l) {
-                    var buffer = models.getBuffer(l.buffer);
-                    // If buffer is active in gb, but not active in WeeChat the
-                    // hotlist in WeeChat will increase but we should ignore that
-                    // in gb.
-                    if (buffer.active) {
-                        return;
-                    }
-                    // 1 is message
-                    buffer.unread = l.count[1];
-                    // 2 is private
-                    // Use += so count[2] or count[3] doesn't overwrite each other
-                    buffer.notification += l.count[2];
-                    // 3 is highlight
-                    // Use += so count[2] or count[3] doesn't overwrite each other
-                    buffer.notification += l.count[3];
-                    /* Since there is unread messages, we can guess
-                     * what the last read line is and update it accordingly
-                     */
-                    var unreadSum = l.count.reduce(function (memo, num) {
-                        return memo + num;
-                    }, 0);
-                    buffer.lastSeen = buffer.lines.length - 1 - unreadSum;
+            hotlist.forEach(function (l) {
+                var buffer = models.getBuffer(l.buffer_id);
+                // If buffer is active in gb, but not active in WeeChat the
+                // hotlist in WeeChat will increase but we should ignore that
+                // in gb.
+                if (buffer === undefined || buffer.active) {
+                    return;
+                }
+                // 1 is message
+                buffer.unread = l.count[1];
+                // 2 is private, 3 is highlight
+                buffer.notification = l.count[2] + l.count[3];
+                /* Since there is unread messages, we can guess
+                 * what the last read line is and update it accordingly
+                 */
+                var unreadSum = l.count.reduce(function (memo, num) {
+                    return memo + num;
+                }, 0);
+                buffer.lastSeen = buffer.lines.length - 1 - unreadSum;
 
-                    // update server buffer. Don't incude index 0 -> not unreadSum
-                    models.getServerForBuffer(buffer).unread +=
-                        l.count[1] + l.count[2] + l.count[3];
-                });
-            }
+                // update server buffer. Don't incude index 0 -> not unreadSum
+                models.getServerForBuffer(buffer).unread +=
+                    l.count[1] + l.count[2] + l.count[3];
+            });
             // the unread badges in the bufferlist doesn't update if we don't do this
             setTimeout(function () {
                 $rootScope.$apply();
@@ -506,106 +342,236 @@ weechat.factory('handlers', [
         };
 
         /*
-         * Handle nicklist event
-         *
-         * This event can either fill or clear a nicklist. It is always a complete nicklist.
+         * Events pushed by WeeChat. Each receives the event message:
+         * {event_name, buffer_id, body_type, body}
          */
-        var handleNicklist = function (message) {
-            var nicklist = message.objects[0].content;
-            var group = 'root';
 
-            //clear the nicklists in case we are clearing
-            if (nicklist.length == 1) {
-                models.getBuffer(nicklist[0].pointers[0]).clearNicklist();
+        var getEventBuffer = function (event) {
+            return models.getBuffer(event.buffer_id);
+        };
+
+        // Switch to buffers we opened ourselves (e.g. /query)
+        var checkOutgoingQuery = function (buffer) {
+            var position = models.outgoingQueries.indexOf(buffer.shortName);
+            if (position >= 0) {
+                models.outgoingQueries.splice(position, 1);
+                models.setActiveBuffer(buffer.id);
             }
+        };
 
-            //fill the nicklist
-            nicklist.forEach(function (n) {
-                var buffer = models.getBuffer(n.pointers[0]);
+        var handleBufferOpened = function (event) {
+            if (models.getBuffer(event.buffer_id) !== undefined) {
+                return;
+            }
+            var buffer = addNewBuffer(event.body);
+            if (event.body.lines && event.body.lines.length > 0) {
+                handleLineInfo(buffer, event.body.lines, true);
+            }
+            if (event.body.nicklist_root) {
+                fillNicklist(buffer, event.body.nicklist_root);
+            }
+            checkOutgoingQuery(buffer);
+        };
 
-                //buffer nicklist
-                if (n.group === 1) {
-                    var g = new models.NickGroup(n);
-                    group = g.name;
-                    buffer.nicklist[group] = g;
-                } else {
-                    var nick = new models.Nick(n);
-                    buffer.addNick(group, nick);
+        // Events whose body is the full buffer: just update its properties
+        var handleBufferChanged = function (event) {
+            var buffer = getEventBuffer(event);
+            if (buffer === undefined || !event.body) {
+                return;
+            }
+            models.updateBuffer(buffer, event.body);
+        };
+
+        var handleBufferRenamed = function (event) {
+            var buffer = getEventBuffer(event);
+            if (buffer === undefined) {
+                return;
+            }
+            models.updateBuffer(buffer, event.body);
+            // After a buffer opens we get the name change event from WeeChat.
+            // Here we check our outgoing commands that open a buffer and
+            // switch to it if we find the buffer name in the list
+            checkOutgoingQuery(buffer);
+        };
+
+        var handleBufferMoved = function (event) {
+            var buffer = getEventBuffer(event);
+            if (buffer === undefined) {
+                return;
+            }
+            var old_number = buffer.number;
+            var new_number = event.body.number;
+
+            Object.values(models.getBuffers()).forEach(function (other) {
+                if (other === buffer) {
+                    return;
+                }
+                if (other.number > old_number && other.number <= new_number) {
+                    other.number -= 1;
+                }
+                if (other.number < old_number && other.number >= new_number) {
+                    other.number += 1;
                 }
             });
 
-            //check if nicklist should be hidden or not
-            $rootScope.$emit('nickListChanged');
+            models.updateBuffer(buffer, event.body);
         };
-        /*
-         * Handle nicklist diff event
-         */
-        var handleNicklistDiff = function (message) {
-            var nicklist = message.objects[0].content;
-            var group;
-            nicklist.forEach(function (n) {
-                var buffer = models.getBuffer(n.pointers[0]);
-                var d = n._diff;
-                if (n.group === 1) {
-                    group = n.name;
-                    if (group === undefined) {
-                        var g = new models.NickGroup(n);
-                        buffer.nicklist[group] = g;
-                        group = g.name;
-                    }
-                } else {
-                    var nick = new models.Nick(n);
-                    if (d === 43) {
-                        // +
-                        buffer.addNick(group, nick);
-                    } else if (d === 45) {
-                        // -
-                        buffer.delNick(group, nick);
-                    } else if (d === 42) {
-                        // *
-                        buffer.updateNick(group, nick);
-                    }
+
+        var handleBufferCleared = function (event) {
+            var buffer = getEventBuffer(event);
+            if (buffer === undefined) {
+                return;
+            }
+            $log.debug('Handle buffer cleared: ' + buffer.fullName);
+            buffer.clear();
+            buffer.allLinesFetched = true;
+        };
+
+        var handleBufferClosed = function (event) {
+            models.closeBuffer(event.buffer_id);
+            $rootScope.$emit('notificationChanged');
+        };
+
+        var handleBufferLineAdded = function (event) {
+            var line = angular.extend({}, event.body, { buffer: event.buffer_id });
+            handleLine(line, false);
+        };
+
+        var handleBufferLineDataChanged = function (event) {
+            var buffer = getEventBuffer(event);
+            if (buffer === undefined) {
+                return;
+            }
+            var line = angular.extend({}, event.body, { buffer: event.buffer_id });
+            var message = new models.BufferLine(line);
+            if (buffer.bufferType === 0) {
+                message = plugins.PluginManager.contentForMessage(message);
+            }
+            buffer.replaceLine(message);
+        };
+
+        var nickGroupKey = function (buffer, groupId) {
+            return buffer.nickGroups[groupId];
+        };
+
+        var handleNicklistGroupAdded = function (event) {
+            var buffer = getEventBuffer(event);
+            if (buffer === undefined || !buffer.nicklistRequested()) {
+                return;
+            }
+            var group = new models.NickGroup(event.body);
+            buffer.nicklist[group.name] = group;
+            buffer.nickGroups[group.id] = group.name;
+        };
+
+        var handleNicklistGroupChanged = function (event) {
+            var buffer = getEventBuffer(event);
+            if (buffer === undefined) {
+                return;
+            }
+            var key = nickGroupKey(buffer, event.body.id);
+            if (key !== undefined && buffer.nicklist[key]) {
+                buffer.nicklist[key].visible = event.body.visible !== false;
+            }
+        };
+
+        var handleNicklistGroupRemoving = function (event) {
+            var buffer = getEventBuffer(event);
+            if (buffer === undefined) {
+                return;
+            }
+            var key = nickGroupKey(buffer, event.body.id);
+            if (key !== undefined && key !== 'root') {
+                delete buffer.nicklist[key];
+                delete buffer.nickGroups[event.body.id];
+            }
+        };
+
+        var nickEventHandler = function (action) {
+            return function (event) {
+                var buffer = getEventBuffer(event);
+                if (buffer === undefined) {
+                    return;
                 }
-            });
+                var key = nickGroupKey(buffer, event.body.parent_group_id);
+                if (key === undefined) {
+                    return;
+                }
+                buffer[action](key, new models.Nick(event.body));
+                $rootScope.$emit('nickListChanged');
+            };
         };
 
-        var handleCompletion = function (message) {
-            var completionInfo = message.objects[0].content[0];
-
-            return completionInfo;
+        var handleUpgrade = function () {
+            $rootScope.weechatUpgrading = true;
+            // The WebSocket compression state doesn't survive the upgrade:
+            // the connection service reconnects once WeeChat is back
+            $rootScope.$emit('relayUpgrade');
         };
+
+        var handleUpgradeEnded = function () {
+            $rootScope.weechatUpgrading = false;
+            // Buffers and lines may have changed: fetch everything again
+            $rootScope.$emit('relayResync');
+        };
+
+        var handleQuit = function () {
+            $log.info('WeeChat is quitting');
+            $rootScope.weechatQuit = true;
+        };
+
+        var ignoreEvent = function () {};
 
         var eventHandlers = {
-            _buffer_cleared: handleBufferCleared,
-            _buffer_closing: handleBufferClosing,
-            _buffer_line_added: handleBufferLineAdded,
-            _buffer_localvar_added: handleBufferLocalvarChanged,
-            _buffer_localvar_removed: handleBufferLocalvarChanged,
-            _buffer_localvar_changed: handleBufferLocalvarChanged,
-            _buffer_moved: handleBufferMoved,
-            _buffer_opened: handleBufferOpened,
-            _buffer_title_changed: handleBufferTitleChanged,
-            _buffer_type_changed: handleBufferTypeChanged,
-            _buffer_renamed: handleBufferRenamed,
-            _buffer_hidden: handleBufferHidden,
-            _buffer_unhidden: handleBufferUnhidden,
-            _nicklist: handleNicklist,
-            _nicklist_diff: handleNicklistDiff,
+            buffer_opened: handleBufferOpened,
+            buffer_type_changed: handleBufferChanged,
+            buffer_moved: handleBufferMoved,
+            buffer_merged: handleBufferChanged,
+            buffer_unmerged: handleBufferChanged,
+            buffer_hidden: handleBufferChanged,
+            buffer_unhidden: handleBufferChanged,
+            buffer_renamed: handleBufferRenamed,
+            buffer_title_changed: handleBufferChanged,
+            buffer_modes_changed: handleBufferChanged,
+            buffer_notify_changed: handleBufferChanged,
+            buffer_time_for_each_line_changed: handleBufferChanged,
+            buffer_prefix_for_each_line_changed: handleBufferChanged,
+            buffer_day_change_changed: handleBufferChanged,
+            buffer_localvar_added: handleBufferChanged,
+            buffer_localvar_changed: handleBufferChanged,
+            buffer_localvar_removed: handleBufferChanged,
+            buffer_cleared: handleBufferCleared,
+            buffer_closing: handleBufferChanged,
+            buffer_closed: handleBufferClosed,
+            buffer_line_added: handleBufferLineAdded,
+            buffer_line_data_changed: handleBufferLineDataChanged,
+            input_prompt_changed: handleBufferChanged,
+            input_text_changed: handleBufferChanged,
+            input_text_cursor_moved: handleBufferChanged,
+            nicklist_group_added: handleNicklistGroupAdded,
+            nicklist_group_changed: handleNicklistGroupChanged,
+            nicklist_group_removing: handleNicklistGroupRemoving,
+            nicklist_nick_added: nickEventHandler('addNick'),
+            nicklist_nick_changed: nickEventHandler('updateNick'),
+            nicklist_nick_removing: nickEventHandler('delNick'),
+            upgrade: handleUpgrade,
+            upgrade_ended: handleUpgradeEnded,
+            quit: handleQuit,
+            // Date changes are shown by injecting lines when needed
+            day_changed: ignoreEvent,
         };
-
-        $rootScope.$on('onMessage', function (event, message) {
-            if (message.id in eventHandlers) {
-                eventHandlers[message.id](message);
-            } else {
-                $log.debug('Unhandled event received: ' + message.id);
-            }
-        });
 
         var handleEvent = function (event) {
-            if (event.id in eventHandlers) {
-                eventHandlers[event.id](event);
+            if (event.event_name in eventHandlers) {
+                eventHandlers[event.event_name](event);
+            } else {
+                $log.debug('Unhandled event received: ' + event.event_name);
             }
         };
+
+        $rootScope.$on('onMessage', function (angularEvent, message) {
+            handleEvent(message);
+        });
 
         return {
             handleVersionInfo: handleVersionInfo,
@@ -615,7 +581,6 @@ weechat.factory('handlers', [
             handleHotlistInfo: handleHotlistInfo,
             handleNicklist: handleNicklist,
             handleBufferInfo: handleBufferInfo,
-            handleCompletion: handleCompletion,
         };
     },
 ]);

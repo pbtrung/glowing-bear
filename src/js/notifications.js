@@ -48,6 +48,13 @@ weechat.factory('notifications', [
 
         var showNotification = function (buffer, title, body) {
             $log.info('Showing notification', title);
+            if (
+                typeof Notification === 'undefined' ||
+                Notification.permission !== 'granted'
+            ) {
+                // Desktop notifications are not allowed
+                return;
+            }
             if (serviceworker) {
                 navigator.serviceWorker.ready.then(function (registration) {
                     registration.showNotification(title, {

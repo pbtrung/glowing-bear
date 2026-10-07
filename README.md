@@ -1,10 +1,10 @@
 # Glowing Bear
 
 Glowing Bear is a web frontend for the [WeeChat](https://weechat.org) IRC client. It
-runs entirely in your browser and connects directly to WeeChat's relay plugin over
-WebSockets, so there is no backend service to run. It adds conveniences on top of
-WeeChat, such as embedded images and videos, desktop notifications, and a layout
-that works on phones and tablets.
+runs entirely in your browser and connects directly to WeeChat's relay plugin, using
+the JSON `api` protocol over WebSockets, so there is no backend service to run. It
+adds conveniences on top of WeeChat, such as embedded images and videos, desktop
+notifications, and a layout that works on phones and tablets.
 
 ## Install
 
@@ -23,26 +23,29 @@ nginx, Apache, …).
 
 ## Usage
 
-1. In WeeChat (2.9 or later), set up a relay:
+1. In WeeChat (4.1 or later), set a password and add an `api` relay:
 
    ```
    /set relay.network.password YOURPASSWORD
-   /relay add weechat 9001
+   /relay add api 9001
    ```
 
    This relay is **unencrypted**. For anything beyond local testing, use TLS:
 
    ```
    /relay tlscertkey
-   /relay add tls.weechat 9001
+   /relay add tls.api 9001
    ```
+
+   TOTP (`relay.network.totp_secret`) is not supported: browsers can't send it on
+   the WebSocket connection.
 
 2. Open Glowing Bear, enter the WeeChat host, port and password, and click
    **Connect**.
 
 The host field also accepts `host:port` and `host:port/path` (for relays behind a
-reverse proxy). The fields can be prefilled from the URL, e.g.
-`#host=my.domain.com&port=9001&autoconnect=true`.
+reverse proxy; the default path is `api`). The fields can be prefilled from the URL,
+e.g. `#host=my.domain.com&port=9001&autoconnect=true`.
 
 To install Glowing Bear as an app, use your browser's "Install" or "Add to Home
 screen" option.

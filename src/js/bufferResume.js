@@ -21,7 +21,7 @@
             // Store the current buffer as having been accessed.  We can later retrieve it and compare
             //   we recieve info from weechat to determine if we should switch to it.
             resumer.record = function (activeBuffer) {
-                var subSetting = settings.currentlyViewedBuffers;
+                var subSetting = settings.currentlyViewedBuffers || {};
                 subSetting[key] = activeBuffer.id;
                 settings.currentlyViewedBuffers = subSetting;
             };
@@ -29,7 +29,7 @@
             // See if the requested buffer information matches the last recorded access.  If so,
             //   the handler should switch to this buffer.
             resumer.shouldResume = function (buffer) {
-                var savedBuffer = settings.currentlyViewedBuffers[key];
+                var savedBuffer = (settings.currentlyViewedBuffers || {})[key];
                 if (!savedBuffer) {
                     return false;
                 }

@@ -110,7 +110,7 @@ weechat.controller('WeechatCtrl', [
             theme: 'dark',
             hostField: 'localhost',
             port: 9001,
-            path: 'weechat',
+            path: 'api',
             tls: window.location.protocol === 'https:',
             savepassword: false,
             autoconnect: false,
@@ -140,6 +140,15 @@ weechat.controller('WeechatCtrl', [
         //check if the value might still be in the host key instead of the hostField key
         if (!settings.hostField && settings.host) {
             settings.hostField = settings.host;
+        }
+
+        // The "weechat" relay protocol was replaced by "api", which is served
+        // on /api: migrate the default path saved by older versions
+        if (settings.path === 'weechat') {
+            settings.path = 'api';
+        }
+        if (/\/weechat$/.test(settings.hostField || '')) {
+            settings.hostField = settings.hostField.replace(/\/weechat$/, '/api');
         }
 
         $rootScope.countWatchers = function () {
@@ -612,7 +621,7 @@ weechat.controller('WeechatCtrl', [
             // the messages in this buffer before you switched to the new one
             // this is only needed with new type of clearing since in the old
             // way WeeChat itself takes care of that part
-            if (settings.hotlistsync && models.version[0] >= 1) {
+            if (settings.hotlistsync) {
                 connection.sendHotlistClear();
             }
 
@@ -778,13 +787,13 @@ weechat.controller('WeechatCtrl', [
             if ((parts = regexHost.exec(settings.hostField)) !== null) {
                 //host only
                 settings.host = parts[1];
-                settings.path = 'weechat';
+                settings.path = 'api';
                 $rootScope.portDisabled = false;
             } else if ((parts = regexHostPort.exec(settings.hostField)) !== null) {
                 //host:port
                 settings.host = parts[1];
                 settings.port = parts[2];
-                settings.path = 'weechat';
+                settings.path = 'api';
                 $rootScope.portDisabled = true;
             } else if ((parts = regexHostPortPath.exec(settings.hostField)) !== null) {
                 //host:port/path
@@ -829,7 +838,14 @@ weechat.controller('WeechatCtrl', [
         };
 
         $scope.connect = function () {
-            document.getElementById('audioNotificationInitializer').play(); // Plays some silence, this will enable autoplay for notifications
+            // Plays some silence, this will enable autoplay for notifications.
+            // Browsers refuse it without a user interaction (e.g. autoconnect).
+            var silence = document
+                .getElementById('audioNotificationInitializer')
+                .play();
+            if (silence) {
+                silence.catch(function () {});
+            }
             notifications.requestNotificationPermission();
             $rootScope.tlsError = false;
             $rootScope.securityError = false;
@@ -1017,18 +1033,18 @@ weechat.controller('WeechatCtrl', [
         //XXX not sure whether this belongs here
         $rootScope.switchToActivityBuffer = function () {
             // Find next buffer with activity and switch to it
-            var sortedBuffers = Object.entries($scope.getBuffers()).sort(
+            var sortedBuffers = Object.values($scope.getBuffers()).sort(
                 sortBy('number'),
             );
             // Try to find buffer with notification
-            for (const [bufferid, buffer] of sortedBuffers) {
+            for (const buffer of sortedBuffers) {
                 if (buffer.notification > 0) {
                     $scope.setActiveBuffer(buffer.id);
                     return; // return instead of break so that the second for loop isn't executed
                 }
             }
             // No notifications, find first buffer with unread lines instead
-            for (const [bufferid, buffer] of sortedBuffers) {
+            for (const buffer of sortedBuffers) {
                 if (buffer.unread > 0 && !buffer.hidden) {
                     $scope.setActiveBuffer(buffer.id);
                     return;

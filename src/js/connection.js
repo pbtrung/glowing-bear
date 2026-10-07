@@ -1,11 +1,43 @@
-// (function() {
 'use strict';
 
-import * as weeChat from './weechat';
+/*
+ * Connection to WeeChat using the relay "api" protocol (WeeChat >= 4.1).
+ *
+ * Connecting is done in two steps:
+ *   1. POST /api/handshake (HTTP, no authentication) to agree on the
+ *      password hash algorithm;
+ *   2. open the WebSocket on /api, authenticated through a sub-protocol,
+ *      fetch buffers and hotlist, then enable synchronization so WeeChat
+ *      pushes events.
+ * If the WebSocket is refused, GET /api/version (HTTP, authenticated) tells
+ * us why, e.g. a wrong password: the WebSocket API gives no details at all.
+ */
 
-// var weechat = angular.module('weechat');
+import {
+    base64,
+    buildCredentials,
+    describeAuthError,
+    relayUrls,
+    supportedHashAlgos,
+    websocketProtocols,
+} from './relay-auth';
+import { weechatTimeFormatToAngular } from './time-format';
 
-// weechat.factory('connection',
+// WeeChat options we use, with their default values (used if they can't be
+// fetched: the /api/options resource is newer than WeeChat 4.10)
+var WEECHAT_OPTIONS = {
+    'weechat.look.buffer_time_format': '%H:%M:%S',
+    'weechat.completion.nick_completer': ':',
+    'weechat.completion.nick_add_space': 'on',
+};
+
+// Interval between keepalive pings, and how long we wait for the answer
+var PING_INTERVAL = 30000;
+var PING_TIMEOUT = 15000;
+
+// Interval between hotlist refreshes
+var HOTLIST_INTERVAL = 60000;
+
 export const connectionFactory = [
     '$rootScope',
     '$log',
@@ -13,17 +45,216 @@ export const connectionFactory = [
     'models',
     'settings',
     'ngWebsockets',
-    'utils',
-    function ($rootScope, $log, handlers, models, settings, ngWebsockets, utils) {
-        var protocol = new weeChat.Protocol();
+    function ($rootScope, $log, handlers, models, settings, ngWebsockets) {
+        var request = ngWebsockets.request;
 
         var connectionData = [];
         var reconnectTimer;
         var hotlistInterval;
-        var handleClose;
+        var pingInterval;
+        var pingTimeout;
 
         // Global connection lock to prevent multiple connections from being opened
         var locked = false;
+
+        var resetErrors = function () {
+            $rootScope.passwordError = false;
+            $rootScope.authErrorMessage = '';
+            $rootScope.errorMessage = false;
+            $rootScope.tlsError = false;
+            $rootScope.securityError = false;
+            $rootScope.hashAlgorithmDisagree = false;
+            $rootScope.totpUnsupported = false;
+            $rootScope.weechatQuit = false;
+        };
+
+        var stopTimers = function () {
+            clearInterval(hotlistInterval);
+            clearInterval(pingInterval);
+            clearTimeout(pingTimeout);
+        };
+
+        var parseJsonResponse = function (response) {
+            return response
+                .json()
+                .catch(function () {
+                    return {};
+                })
+                .then(function (json) {
+                    return { status: response.status, ok: response.ok, json: json };
+                });
+        };
+
+        /*
+         * Step 1: handshake, to agree on a password hash algorithm
+         */
+        var handshake = function (urls) {
+            // No Content-Type header: this keeps it a "simple" CORS request
+            return fetch(urls.http + '/handshake', {
+                method: 'POST',
+                body: JSON.stringify({ password_hash_algo: supportedHashAlgos() }),
+            })
+                .then(parseJsonResponse)
+                .then(function (res) {
+                    if (!res.ok) {
+                        var err = new Error('Handshake failed: HTTP ' + res.status);
+                        err.relayError = res.json.error;
+                        throw err;
+                    }
+                    return res.json;
+                });
+        };
+
+        /*
+         * Step 2: check credentials, returns the WeeChat version
+         */
+        var checkCredentials = function (urls, credentials) {
+            return fetch(urls.http + '/version', {
+                headers: { Authorization: 'Basic ' + base64(credentials) },
+            })
+                .then(parseJsonResponse)
+                .then(function (res) {
+                    if (res.status === 401) {
+                        var err = new Error('Authentication failed');
+                        err.authError = res.json.error;
+                        throw err;
+                    }
+                    if (!res.ok) {
+                        throw new Error('Version request failed: HTTP ' + res.status);
+                    }
+                    return res.json;
+                });
+        };
+
+        /*
+         * Fetch the value of a WeeChat option (GET /api/options/{name})
+         */
+        var fetchConfValue = function (name) {
+            return ngWebsockets
+                .send(request('GET', '/api/options/' + encodeURIComponent(name)))
+                .then(
+                    function (response) {
+                        var value = response.body.value;
+                        if (typeof value === 'boolean') {
+                            value = value ? 'on' : 'off';
+                        }
+                        return value === null ? WEECHAT_OPTIONS[name] : value;
+                    },
+                    function () {
+                        return WEECHAT_OPTIONS[name];
+                    },
+                )
+                .then(function (value) {
+                    handlers.handleConfValue(name, value);
+                });
+        };
+
+        var updateTimeFormat = function () {
+            $rootScope.angularTimeFormat = weechatTimeFormatToAngular(
+                models.wconfig['weechat.look.buffer_time_format'],
+            );
+        };
+
+        var requestHotlist = function () {
+            return ngWebsockets.send(request('GET', '/api/hotlist')).then(function (r) {
+                handlers.handleHotlistInfo(r.body);
+            });
+        };
+
+        var requestBuffers = function () {
+            return ngWebsockets
+                .send(request('GET', '/api/buffers?colors=weechat'))
+                .then(function (r) {
+                    handlers.handleBufferInfo(r.body);
+                });
+        };
+
+        var requestScripts = function () {
+            return ngWebsockets.send(request('GET', '/api/scripts')).then(
+                function (r) {
+                    models.scripts = r.body || [];
+                    return models.scripts;
+                },
+                function () {
+                    return models.scripts;
+                },
+            );
+        };
+
+        /*
+         * Send a ping; close the connection if WeeChat doesn't answer in
+         * time, which triggers a reconnection.
+         */
+        var ping = function () {
+            if (!ngWebsockets.isOpen()) {
+                return;
+            }
+            clearTimeout(pingTimeout);
+            pingTimeout = setTimeout(function () {
+                $log.warn('No answer to ping, closing connection');
+                ngWebsockets.abort('ping timeout');
+            }, PING_TIMEOUT);
+            ngWebsockets
+                .send(request('POST', '/api/ping', { data: String(Date.now()) }))
+                .then(function () {
+                    clearTimeout(pingTimeout);
+                });
+        };
+
+        /*
+         * Fetch buffers, hotlist and options, then enable synchronization.
+         * Requests are processed in order by WeeChat, so we don't miss events
+         * between the buffer list and the sync.
+         */
+        var initialSync = function () {
+            // Use defaults until (and unless) the real values arrive
+            angular.forEach(WEECHAT_OPTIONS, function (value, name) {
+                if (models.wconfig[name] === undefined) {
+                    models.wconfig[name] = value;
+                }
+            });
+            updateTimeFormat();
+
+            var buffersLoaded = requestBuffers();
+            requestHotlist();
+            ngWebsockets.send(
+                request('POST', '/api/sync', {
+                    sync: true,
+                    nicks: true,
+                    input: false,
+                    colors: 'weechat',
+                }),
+            );
+            fetchConfValue('weechat.look.buffer_time_format').then(updateTimeFormat);
+            fetchConfValue('weechat.completion.nick_completer');
+            fetchConfValue('weechat.completion.nick_add_space');
+            requestScripts();
+            return buffersLoaded;
+        };
+
+        var resync = function () {
+            if (!$rootScope.connected) {
+                return;
+            }
+            var active = models.getActiveBuffer();
+            var activeId = active ? active.id : null;
+            models.reinitialize();
+            requestBuffers().then(function () {
+                if (activeId !== null) {
+                    models.setActiveBuffer(activeId);
+                }
+                requestHotlist();
+            });
+        };
+        $rootScope.$on('relayResync', resync);
+
+        // WeeChat is upgrading: frames received after the upgrade can't be
+        // decompressed with the current WebSocket, so close it. This triggers
+        // a reconnection, which reloads everything once WeeChat is back.
+        $rootScope.$on('relayUpgrade', function () {
+            $log.info('WeeChat is upgrading, reconnecting');
+            ngWebsockets.abort('upgrade');
+        });
 
         // Takes care of the connection and websocket hooks
         var connect = function (
@@ -32,443 +263,173 @@ export const connectionFactory = [
             path,
             passwd,
             tls,
-            noCompression,
             successCallback,
             failCallback,
         ) {
-            $rootScope.passwordError = false;
-            $rootScope.oldWeechatError = false;
-            $rootScope.hashAlgorithmDisagree = false;
-            connectionData = [host, port, path, passwd, tls, noCompression];
-
-            // https://github.com/glowing-bear/glowing-bear/issues/1157
-            var isSecureContext = window.isSecureContext;
-
-            var proto = tls ? 'wss' : 'ws';
-            // If host is an IPv6 literal wrap it in brackets
-            if (
-                host.indexOf(':') !== -1 &&
-                host[0] !== '[' &&
-                host[host.length - 1] !== ']'
-            ) {
-                host = '[' + host + ']';
+            if (locked) {
+                // We already have an open connection
+                $log.debug('Aborting connection (lock in use)');
+                return;
             }
-            var url = proto + '://' + host + ':' + port + '/' + path;
-            $log.debug('Connecting to URL: ', url);
+            locked = true;
+
+            resetErrors();
+            connectionData = [host, port, path, passwd, tls];
+            var urls = relayUrls(host, port, path, tls);
+            $log.debug('Connecting to relay: ', urls.http);
+
+            var fail = function (err) {
+                $log.error('Unable to connect to relay', err);
+                locked = false;
+                stopTimers();
+                $rootScope.$emit('relayDisconnect');
+                if (failCallback) {
+                    failCallback();
+                }
+                $rootScope.$applyAsync();
+            };
+
+            // Browsers block unencrypted connections from pages served over https
+            if (window.location.protocol === 'https:' && !tls) {
+                $rootScope.securityError = true;
+                $rootScope.errorMessage = true;
+                fail(new Error('Unencrypted relay on a secure page'));
+                return;
+            }
+
+            // The WebSocket handshake gives no details when it's refused:
+            // ask the HTTP API why. This is only done on failure, so that
+            // the WebSocket is never opened after an HTTP request (a client
+            // reusing that keep-alive connection for the upgrade would fail).
+            var diagnose = function (credentials, evt) {
+                checkCredentials(urls, credentials)
+                    .then(function () {
+                        $rootScope.errorMessage = true;
+                        $rootScope.tlsError = !!tls && evt.code === 1006;
+                    })
+                    .catch(function (err) {
+                        if (err.authError !== undefined) {
+                            $rootScope.passwordError = true;
+                            $rootScope.authErrorMessage = describeAuthError(
+                                err.authError,
+                            );
+                        } else {
+                            $rootScope.errorMessage = true;
+                            $rootScope.tlsError = !!tls;
+                        }
+                    })
+                    .then(function () {
+                        fail(new Error('WebSocket refused: ' + evt.code));
+                    });
+            };
+
+            handshake(urls)
+                .then(function (result) {
+                    if (result.totp) {
+                        // TOTP is sent in the x-weechat-totp header, which
+                        // browsers can't set on a WebSocket
+                        $rootScope.totpUnsupported = true;
+                        throw new Error('TOTP is enabled in WeeChat');
+                    }
+                    if (!result.password_hash_algo) {
+                        $rootScope.hashAlgorithmDisagree = true;
+                        throw new Error('No common password hash algorithm');
+                    }
+                    return buildCredentials(
+                        passwd,
+                        result.password_hash_algo,
+                        result.password_hash_iterations,
+                    );
+                })
+                .then(function (credentials) {
+                    openWebSocket(urls, credentials, successCallback, fail, diagnose);
+                })
+                .catch(function (err) {
+                    if (
+                        !$rootScope.totpUnsupported &&
+                        !$rootScope.hashAlgorithmDisagree
+                    ) {
+                        // Network error: relay not reachable, invalid
+                        // certificate, not an "api" relay, ...
+                        $rootScope.errorMessage = true;
+                        $rootScope.tlsError = !!tls;
+                    }
+                    fail(err);
+                });
+        };
+
+        /*
+         * Step 3: open the WebSocket and load data
+         */
+        var openWebSocket = function (
+            urls,
+            credentials,
+            successCallback,
+            fail,
+            diagnose,
+        ) {
+            var opened = false;
 
             var onopen = function () {
-                var _performHandshake = function () {
-                    return new Promise(function (resolve) {
-                        // If SecureContext use pbkdf2+sha512 hash, otherwise plain text
-                        // If handshake times out, inform the user their WeeChat is too old
-
-                        var WAIT_TIME_OLD_WEECHAT = 2000; //ms
-                        var handShakeTimeout = setTimeout(function () {
-                            $rootScope.oldWeechatError = true;
-                            $rootScope.$emit('relayDisconnect');
-                            $rootScope.$digest(); // Have to do this otherwise change detection doesn't see the error.
-                            throw new Error(
-                                'Handshake timed out. Verify Weechat Version.',
-                            );
-                        }, WAIT_TIME_OLD_WEECHAT);
-
-                        if (isSecureContext) {
-                            ngWebsockets
-                                .send(
-                                    weeChat.Protocol.formatHandshake({
-                                        password_hash_algo: 'pbkdf2+sha512',
-                                        compression: noCompression ? 'off' : 'zlib',
-                                    }),
-                                )
-                                .then(function (message) {
-                                    clearTimeout(handShakeTimeout);
-                                    resolve(message);
-                                });
-                        } else {
-                            ngWebsockets
-                                .send(
-                                    weeChat.Protocol.formatHandshake({
-                                        password_hash_algo: 'plain',
-                                        compression: noCompression ? 'off' : 'zlib',
-                                    }),
-                                )
-                                .then(function (message) {
-                                    clearTimeout(handShakeTimeout);
-                                    resolve(message);
-                                });
-                        }
-                    });
-                };
-
-                var _askTotp = function (useTotp) {
-                    return new Promise(function (resolve) {
-                        // totpRequested comes from the handshake response
-                        if (useTotp) {
-                            // Ask the user to input his TOTP
-                            var totp = prompt('Please enter your TOTP Token');
-                            resolve(totp);
-                        } else {
-                            // User does not use TOTP, don't ask
-                            resolve(null);
-                        }
-                    });
-                };
-
-                // Initializes the connection using PBKDF2+SHA512 password hashing
-                var salt;
-                var _initializeConnection = function (passwd, nonce, iterations, totp) {
-                    return window.crypto.subtle
-                        .importKey(
-                            'raw',
-                            utils.stringToUTF8Array(passwd),
-                            { name: 'PBKDF2' }, //{name: 'HMAC', hash: 'SHA-512'},
-                            false,
-                            ['deriveBits'],
-                        )
-                        .then(function (key) {
-                            var clientnonce = window.crypto.getRandomValues(
-                                new Uint8Array(16),
-                            );
-                            //nonce:clientnonce, 3A is a ':' in ASCII
-                            salt = utils.concatenateTypedArrays(
-                                nonce,
-                                new Uint8Array([0x3a]),
-                                clientnonce,
-                            );
-                            return window.crypto.subtle.deriveBits(
-                                {
-                                    name: 'PBKDF2',
-                                    hash: 'SHA-512',
-                                    salt: salt,
-                                    iterations: iterations,
-                                },
-                                key,
-                                512,
-                            );
-                        })
-                        .then(function (hash) {
-                            ngWebsockets.send(
-                                weeChat.Protocol.formatInit(
-                                    'pbkdf2+sha512:' +
-                                        utils.bytetoHexString(salt) +
-                                        ':' +
-                                        iterations +
-                                        ':' +
-                                        utils.bytetoHexString(hash),
-                                    totp,
-                                ),
-                            );
-
-                            // Wait a little bit until the init is sent
-                            return new Promise(function (resolve) {
-                                setTimeout(function () {
-                                    resolve();
-                                }, 5);
-                            });
-                        });
-                };
-
-                var _requestHotlist = function () {
-                    return ngWebsockets.send(
-                        weeChat.Protocol.formatHdata({
-                            path: 'hotlist:gui_hotlist(*)',
-                            keys: [],
-                        }),
-                    );
-                };
-
-                var _requestBufferInfos = function () {
-                    return ngWebsockets.send(
-                        weeChat.Protocol.formatHdata({
-                            path: 'buffer:gui_buffers(*)',
-                            keys: [
-                                'local_variables,notify,number,full_name,short_name,title,hidden,type',
-                            ],
-                        }),
-                    );
-                };
-
-                var _requestSync = function () {
-                    return ngWebsockets.send(weeChat.Protocol.formatSync({}));
-                };
-
-                var _parseWeechatTimeFormat = function () {
-                    // helper function to get a custom delimiter span
-                    var _timeDelimiter = function (delim) {
-                        return (
-                            '\'<span class="cof-chat_time_delimiters cob-chat_time_delimiters coa-chat_time_delimiters">' +
-                            delim +
-                            "</span>'"
-                        );
-                    };
-
-                    // Fetch the buffer time format from weechat
-                    var timeFormat = models.wconfig['weechat.look.buffer_time_format'];
-
-                    // Weechat uses strftime, with time specifiers such as %I:%M:%S for 12h time
-                    // The time formatter we use, AngularJS' date filter, uses a different format
-                    // Where %I:%M:%S would be represented as hh:mm:ss
-                    // Here, we detect what format the user has set in Weechat and slot it into
-                    // one of four formats, (short|long) (12|24)-hour time
-                    var angularFormat = '';
-
-                    var timeDelimiter = _timeDelimiter(':');
-
-                    var left12 = 'hh' + timeDelimiter + 'mm';
-                    var right12 = "'&nbsp;'a";
-
-                    var short12 = left12 + right12;
-                    var long12 = left12 + timeDelimiter + 'ss' + right12;
-
-                    var short24 = 'HH' + timeDelimiter + 'mm';
-                    var long24 = short24 + timeDelimiter + 'ss';
-
-                    if (
-                        timeFormat.indexOf('%H') > -1 ||
-                        timeFormat.indexOf('%k') > -1
-                    ) {
-                        // 24h time detected
-                        if (timeFormat.indexOf('%S') > -1) {
-                            // show seconds
-                            angularFormat = long24;
-                        } else {
-                            // don't show seconds
-                            angularFormat = short24;
-                        }
-                    } else if (
-                        timeFormat.indexOf('%I') > -1 ||
-                        timeFormat.indexOf('%l') > -1 ||
-                        timeFormat.indexOf('%p') > -1 ||
-                        timeFormat.indexOf('%P') > -1
-                    ) {
-                        // 12h time detected
-                        if (timeFormat.indexOf('%S') > -1) {
-                            // show seconds
-                            angularFormat = long12;
-                        } else {
-                            // don't show seconds
-                            angularFormat = short12;
-                        }
-                    } else if (timeFormat.indexOf('%r') > -1) {
-                        // strftime doesn't have an equivalent for short12???
-                        angularFormat = long12;
-                    } else if (timeFormat.indexOf('%T') > -1) {
-                        angularFormat = long24;
-                    } else if (timeFormat.indexOf('%R') > -1) {
-                        angularFormat = short24;
-                    } else {
-                        angularFormat = short24;
-                    }
-
-                    // Assemble date format
-                    var date_components = [];
-
-                    // Check for day of month in time format
-                    var day_pos = Math.max(
-                        timeFormat.indexOf('%d'),
-                        timeFormat.indexOf('%e'),
-                    );
-                    date_components.push([day_pos, 'dd']);
-
-                    // month of year?
-                    var month_pos = timeFormat.indexOf('%m');
-                    date_components.push([month_pos, 'MM']);
-
-                    // year as well?
-                    var year_pos = Math.max(
-                        timeFormat.indexOf('%y'),
-                        timeFormat.indexOf('%Y'),
-                    );
-                    if (timeFormat.indexOf('%y') > -1) {
-                        date_components.push([year_pos, 'yy']);
-                    } else if (timeFormat.indexOf('%Y') > -1) {
-                        date_components.push([year_pos, 'yyyy']);
-                    }
-
-                    // if there is a date, assemble it in the right order
-                    date_components.sort();
-                    var format_array = [];
-                    for (var i = 0; i < date_components.length; i++) {
-                        if (date_components[i][0] == -1) continue;
-                        format_array.push(date_components[i][1]);
-                    }
-                    if (format_array.length > 0) {
-                        // TODO: parse delimiter as well? For now, use '/' as it is
-                        // more common internationally than '-'
-                        var date_format = format_array.join(_timeDelimiter('/'));
-                        angularFormat =
-                            date_format + _timeDelimiter('&nbsp;') + angularFormat;
-                    }
-
-                    $rootScope.angularTimeFormat = angularFormat;
-                };
-
-                var passwordMethod;
-                var totpRequested;
-                var nonce;
-                var iterations;
-
-                _performHandshake()
-                    .then(
-                        // Wait for weechat to respond or handshake times out
-                        function (message) {
-                            var content = message.objects[0].content;
-                            passwordMethod = content.password_hash_algo;
-                            totpRequested = content.totp === 'on';
-                            nonce = utils.hexStringToByte(content.nonce);
-                            iterations = content.password_hash_iterations;
-
-                            if (
-                                (isSecureContext &&
-                                    passwordMethod != 'pbkdf2+sha512') ||
-                                (!isSecureContext && passwordMethod != 'plain')
-                            ) {
-                                $rootScope.hashAlgorithmDisagree = true;
-                                $rootScope.$emit('relayDisconnect');
-                                $rootScope.$digest(); // Have to do this otherwise change detection doesn't see the error.
-                                throw new Error(
-                                    'No supported password hash algorithm returned (secure context only pbkdf2+sha512 / insecure only plain).',
-                                );
-                            }
-                        },
-                    )
-                    .then(function () {
-                        return _askTotp(totpRequested).then(function (totp) {
-                            if (passwordMethod == 'pbkdf2+sha512') {
-                                return _initializeConnection(
-                                    passwd,
-                                    nonce,
-                                    iterations,
-                                    totp,
-                                );
-                            } else if (passwordMethod == 'plain') {
-                                // Non-secure context: send plain password using the 2.9+ init format
-                                ngWebsockets.send(
-                                    weeChat.Protocol.formatInit(
-                                        'plain:' + passwd,
-                                        totp,
-                                    ),
-                                );
-                                return new Promise(function (resolve) {
-                                    setTimeout(function () {
-                                        resolve();
-                                    }, 5);
-                                });
-                            }
-                        });
+                opened = true;
+                $log.info('Connected to relay');
+                ngWebsockets
+                    .send(request('GET', '/api/version'))
+                    .then(function (response) {
+                        handlers.handleVersionInfo(response.body);
+                        $rootScope.weechatUpgrading = false;
+                        $rootScope.connected = true;
+                        $rootScope.waseverconnected = true;
+                        return initialSync();
                     })
                     .then(function () {
-                        // The Init was sent, weechat will not respond
-                        // Wait until either the connection closes
-                        // Or try to send version and see if weechat responds
-                        return ngWebsockets.send(
-                            weeChat.Protocol.formatInfo({
-                                name: 'version',
-                            }),
-                        );
+                        if (settings.hotlistsync) {
+                            // Refresh the hotlist every so often so that this
+                            // client will have unread counts (mostly) in sync
+                            // with other clients or terminal usage directly.
+                            clearInterval(hotlistInterval);
+                            hotlistInterval = setInterval(function () {
+                                if ($rootScope.connected) {
+                                    requestHotlist();
+                                }
+                            }, HOTLIST_INTERVAL);
+                        }
+                        clearInterval(pingInterval);
+                        pingInterval = setInterval(ping, PING_INTERVAL);
+                        if (successCallback) {
+                            successCallback();
+                        }
                     })
-                    .then(
-                        function (version) {
-                            // From now on we are assumed initialized
-                            // We don't know for sure because weechat does not respond
-                            // All we know is the socket wasn't closed afer waiting a little bit
-                            console.log('Succesfully connected');
-                            $rootScope.waseverconnected = true;
-                            handlers.handleVersionInfo(version);
-
-                            // Send all the other commands required for initialization
-                            _requestBufferInfos().then(function (bufinfo) {
-                                handlers.handleBufferInfo(bufinfo);
-                            });
-
-                            _requestHotlist().then(function (hotlist) {
-                                handlers.handleHotlistInfo(hotlist);
-                            });
-                            if (settings.hotlistsync) {
-                                // Schedule hotlist syncing every so often so that this
-                                // client will have unread counts (mostly) in sync with
-                                // other clients or terminal usage directly.
-                                // Clear any interval left over from a previous connection
-                                // before registering a new one to avoid stacking on reconnect.
-                                clearInterval(hotlistInterval);
-                                hotlistInterval = setInterval(function () {
-                                    if ($rootScope.connected) {
-                                        _requestHotlist().then(function (hotlist) {
-                                            handlers.handleHotlistInfo(hotlist);
-                                        });
-                                    }
-                                }, 60000); // Sync hotlist every 60 second
-                            }
-
-                            // Fetch weechat time format for displaying timestamps
-                            fetchConfValue(
-                                'weechat.look.buffer_time_format',
-                                function () {
-                                    // Will set models.wconfig['weechat.look.buffer_time_format']
-                                    _parseWeechatTimeFormat();
-                                },
-                            );
-
-                            // Fetch nick completion config
-                            fetchConfValue('weechat.completion.nick_completer');
-                            fetchConfValue('weechat.completion.nick_add_space');
-
-                            _requestSync();
-                            $log.info('Connected to relay');
-                            $rootScope.connected = true;
-                            if (successCallback) {
-                                successCallback();
-                            }
-                        },
-
-                        //Sending version failed
-                        function () {
-                            handleWrongPassword();
-                        },
-                    );
+                    .catch(function (err) {
+                        $log.error('Initial synchronization failed', err);
+                        ngWebsockets.disconnect();
+                    });
             };
 
             var onclose = function (evt) {
                 /*
                  * Handles websocket disconnection
                  */
-                $log.info('Disconnected from relay');
-                $rootScope.$emit('relayDisconnect');
+                $log.info('Disconnected from relay', evt.code, evt.reason);
+                var wasConnected = $rootScope.connected && !$rootScope.reconnecting;
+                stopTimers();
+                ngWebsockets.failCallbacks('disconnection');
                 locked = false;
-                if ($rootScope.userdisconnect || !$rootScope.waseverconnected) {
-                    handleClose(evt);
+                $rootScope.$emit('relayDisconnect');
+                if ($rootScope.userdisconnect) {
                     $rootScope.userdisconnect = false;
+                    $rootScope.connected = false;
+                } else if (wasConnected) {
+                    // Keep the UI (with the reconnect banner) while we
+                    // try to reconnect
+                    reconnect();
+                } else if ($rootScope.reconnecting || opened) {
+                    fail(new Error('WebSocket closed: ' + evt.code));
                 } else {
-                    reconnect(evt);
+                    // The WebSocket was refused: find out why
+                    diagnose(credentials, evt);
                 }
-                handleWrongPassword();
-            };
-
-            handleClose = function (evt) {
-                if (tls && evt && evt.code === 1006) {
-                    // A password error doesn't trigger onerror, but certificate issues do. Check time of last error.
-                    if (
-                        typeof $rootScope.lastError !== 'undefined' &&
-                        Date.now() - $rootScope.lastError < 1000
-                    ) {
-                        // abnormal disconnect by client, most likely tls error
-                        $rootScope.tlsError = true;
-                        $rootScope.$apply();
-                    }
-                }
-            };
-
-            var handleWrongPassword = function () {
-                // Connection got closed, lets check if we ever was connected successfully
-                if (
-                    !$rootScope.waseverconnected &&
-                    !$rootScope.errorMessage &&
-                    !$rootScope.oldWeechatError &&
-                    !$rootScope.hashAlgorithmDisagree
-                ) {
-                    $rootScope.passwordError = true;
-                    $rootScope.$apply();
-                }
+                $rootScope.$applyAsync();
             };
 
             var onerror = function (evt) {
@@ -477,50 +438,23 @@ export const connectionFactory = [
                  * the relay.
                  */
                 $log.error('Relay error', evt);
-                locked = false; // release connection lock
-                $rootScope.lastError = Date.now();
-
-                if (evt.type === 'error' && this.readyState !== 1) {
-                    ngWebsockets.failCallbacks('error');
-                    $rootScope.errorMessage = true;
-                }
             };
 
-            if (locked) {
-                // We already have an open connection
-                $log.debug('Aborting connection (lock in use)');
-                return;
-            }
-            locked = true;
-
             try {
-                ngWebsockets.connect(url, protocol, {
-                    binaryType: 'arraybuffer',
+                ngWebsockets.connect(urls.ws, websocketProtocols(credentials), {
                     onopen: onopen,
                     onclose: onclose,
                     onerror: onerror,
                 });
             } catch (e) {
-                locked = false;
                 $log.debug('Websocket caught DOMException:', e);
-                $rootScope.lastError = Date.now();
                 $rootScope.errorMessage = true;
                 $rootScope.securityError = true;
-                $rootScope.$emit('relayDisconnect');
-
-                if (failCallback) {
-                    failCallback();
-                }
+                fail(e);
             }
         };
 
         var attemptReconnect = function (bufferId, timeout) {
-            // won't work if totp is mandatory
-            if (settings.useTotp) {
-                $log.info('Not reconnecting because totp will be expired.');
-                return;
-            }
-
             $log.info('Attempting to reconnect...');
             var d = connectionData;
             connect(
@@ -529,9 +463,6 @@ export const connectionFactory = [
                 d[2],
                 d[3],
                 d[4],
-                false,
-                '',
-                d[5],
                 function () {
                     $rootScope.reconnecting = false;
                     // on success, update active buffer
@@ -543,17 +474,15 @@ export const connectionFactory = [
                     if (timeout >= 600000) {
                         // If timeout is ten minutes or more, give up
                         $log.info('Failed to reconnect, giving up');
-                        handleClose();
+                        $rootScope.reconnecting = false;
+                        $rootScope.connected = false;
                     } else {
                         $log.info(
                             'Failed to reconnect, scheduling next attempt in',
                             timeout / 1000,
                             'seconds',
                         );
-                        // Clear previous timer, if exists
-                        if (reconnectTimer !== undefined) {
-                            clearTimeout(reconnectTimer);
-                        }
+                        clearTimeout(reconnectTimer);
                         reconnectTimer = setTimeout(function () {
                             // exponential timeout increase
                             attemptReconnect(bufferId, timeout * 1.5);
@@ -563,24 +492,20 @@ export const connectionFactory = [
             );
         };
 
-        var reconnect = function (evt) {
+        var reconnect = function () {
             if (connectionData.length < 5) {
                 // something is wrong
                 $log.error('Cannot reconnect, connection information is missing');
                 return;
             }
 
+            var active = models.getActiveBuffer();
+            var bufferId = active ? active.id : null,
+                timeout = 3000; // start with a three-second timeout
+
             // reinitialise everything, clear all buffers
-            // TODO: this can be further extended in the future by looking
-            // at the last line in ever buffer and request more buffers from
-            // WeeChat based on that
             models.reinitialize();
             $rootScope.reconnecting = true;
-            // Have to do this to get the reconnect banner to show
-            $rootScope.$apply();
-
-            var bufferId = models.getActiveBuffer().id,
-                timeout = 3000; // start with a three-second timeout
 
             clearTimeout(reconnectTimer);
             reconnectTimer = setTimeout(function () {
@@ -591,61 +516,54 @@ export const connectionFactory = [
         var disconnect = function () {
             $log.info('Disconnecting from relay');
             $rootScope.userdisconnect = true;
-            clearInterval(hotlistInterval);
-            ngWebsockets.send(weeChat.Protocol.formatQuit());
-            // In case the backend doesn't repond we will close from our end
-            var closeTimer = setTimeout(function () {
-                ngWebsockets.disconnect();
-                // We pretend we are not connected anymore
-                // The connection can time out on its own
-                ngWebsockets.failCallbacks('disconnection');
-                $rootScope.connected = false;
-                locked = false; // release the connection lock
-                $rootScope.$emit('relayDisconnect');
-                $rootScope.$apply();
-            });
+            $rootScope.reconnecting = false;
+            clearTimeout(reconnectTimer);
+            stopTimers();
+            ngWebsockets.disconnect();
+            ngWebsockets.failCallbacks('disconnection');
+            $rootScope.connected = false;
+            locked = false; // release the connection lock
+            $rootScope.$emit('relayDisconnect');
         };
 
         /*
-         * Format and send a weechat message
+         * Send text or a command to a buffer (POST /api/input)
          *
+         * @param message the text or command
+         * @param buffer target buffer (defaults to the active buffer)
          * @returns the angular promise
          */
-        var sendMessage = function (message) {
-            ngWebsockets.send(
-                weeChat.Protocol.formatInput({
-                    buffer: models.getActiveBufferReference(),
-                    data: message,
+        var sendMessage = function (message, buffer) {
+            buffer = buffer || models.getActiveBuffer();
+            return ngWebsockets.send(
+                request('POST', '/api/input', {
+                    buffer_id: buffer.id,
+                    command: message,
                 }),
             );
         };
 
         var sendCoreCommand = function (command) {
-            ngWebsockets.send(
-                weeChat.Protocol.formatInput({
-                    buffer: 'core.weechat',
-                    data: command,
+            return ngWebsockets.send(
+                request('POST', '/api/input', {
+                    buffer_name: 'core.weechat',
+                    command: command,
                 }),
             );
         };
 
         var sendHotlistClear = function () {
-            if (models.version[0] >= 1) {
-                // WeeChat >= 1 supports clearing hotlist with this command
-                sendMessage('/buffer set hotlist -1');
-                // Also move read marker
-                sendMessage('/input set_unread_current_buffer');
-            } else {
-                // If user wants to sync hotlist with weechat
-                // we will send a /buffer bufferName command every time
-                // the user switches a buffer. This will ensure that notifications
-                // are cleared in the buffer the user switches to
-                sendCoreCommand('/buffer ' + models.getActiveBuffer().fullName);
+            var buffer = models.getActiveBuffer();
+            if (!buffer) {
+                return;
             }
+            // Remove the buffer from the hotlist and move the read marker
+            sendMessage('/buffer set hotlist -1', buffer);
+            sendMessage('/input set_unread_current_buffer', buffer);
         };
 
         var sendHotlistClearAll = function () {
-            sendMessage('/input hotlist_clear');
+            sendCoreCommand('/hotlist clear');
         };
 
         var requestNicklist = function (bufferId, callback) {
@@ -655,29 +573,13 @@ export const connectionFactory = [
             }
             ngWebsockets
                 .send(
-                    weeChat.Protocol.formatNicklist({
-                        buffer: '0x' + bufferId,
-                    }),
+                    request(
+                        'GET',
+                        '/api/buffers/' + bufferId + '/nicks?colors=weechat',
+                    ),
                 )
-                .then(function (nicklist) {
-                    handlers.handleNicklist(nicklist);
-                    if (callback !== undefined) {
-                        callback();
-                    }
-                });
-        };
-
-        var fetchConfValue = function (name, callback) {
-            ngWebsockets
-                .send(
-                    weeChat.Protocol.formatInfolist({
-                        name: 'option',
-                        pointer: 0,
-                        args: name,
-                    }),
-                )
-                .then(function (i) {
-                    handlers.handleConfValue(i);
+                .then(function (response) {
+                    handlers.handleNicklist(bufferId, response.body);
                     if (callback !== undefined) {
                         callback();
                     }
@@ -696,22 +598,19 @@ export const connectionFactory = [
 
             // Indicator that we are loading lines, hides "load more lines" link
             $rootScope.loadingLines = true;
-            // Send hdata request to fetch lines for this particular buffer
             return ngWebsockets
                 .send(
-                    weeChat.Protocol.formatHdata({
-                        // "0x" is important, otherwise it won't work
-                        path:
-                            'buffer:0x' +
+                    request(
+                        'GET',
+                        '/api/buffers/' +
                             buffer.id +
-                            '/own_lines/last_line(-' +
+                            '/lines?lines=-' +
                             numLines +
-                            ')/data',
-                        keys: [],
-                    }),
+                            '&colors=weechat',
+                    ),
                 )
-                .then(function (lineinfo) {
-                    //XXX move to handlers?
+                .then(function (response) {
+                    var lines = response.body || [];
                     // delete old lines and add new ones
                     var oldLength = buffer.lines.length;
                     // whether we already had all unread lines
@@ -723,17 +622,15 @@ export const connectionFactory = [
                     // increments it. This is needed to also count newly arriving lines while we're
                     // already connected.
                     buffer.requestedLines = 0;
-                    // Count number of lines recieved
-                    var linesReceivedCount = lineinfo.objects[0].content.length;
 
                     // Parse the lines
-                    handlers.handleLineInfo(lineinfo, true);
+                    handlers.handleLineInfo(buffer, lines, true);
 
                     // Correct the read marker for the lines that were counted twice
                     buffer.lastSeen -= oldLength;
 
                     // We requested more lines than we got, no more lines.
-                    if (linesReceivedCount < numLines) {
+                    if (lines.length < numLines) {
                         buffer.allLinesFetched = true;
                     }
                     $rootScope.loadingLines = false;
@@ -742,9 +639,19 @@ export const connectionFactory = [
                     var scrollToReadmarker = !hadAllUnreadLines && buffer.lastSeen >= 0;
                     // Scroll to correct position
                     $rootScope.scrollWithBuffer(scrollToReadmarker, true);
+                })
+                .catch(function (err) {
+                    $log.error('Unable to fetch lines', err);
+                    $rootScope.loadingLines = false;
                 });
         };
 
+        /*
+         * Ask WeeChat to complete the input (POST /api/completion)
+         *
+         * @return promise resolving to {context, base_word, position_replace,
+         *         add_space, list}
+         */
         var requestCompletion = function (bufferId, position, data) {
             // Prevent requesting completion if bufferId is invalid
             if (!bufferId) {
@@ -753,16 +660,14 @@ export const connectionFactory = [
 
             return ngWebsockets
                 .send(
-                    weeChat.Protocol.formatCompletion({
-                        buffer: '0x' + bufferId,
+                    request('POST', '/api/completion', {
+                        buffer_id: bufferId,
+                        command: data,
                         position: position,
-                        data: data,
                     }),
                 )
-                .then(function (message) {
-                    return new Promise(function (resolve) {
-                        resolve(handlers.handleCompletion(message));
-                    });
+                .then(function (response) {
+                    return response.body;
                 });
         };
 
@@ -775,9 +680,9 @@ export const connectionFactory = [
             sendHotlistClearAll: sendHotlistClearAll,
             fetchMoreLines: fetchMoreLines,
             requestNicklist: requestNicklist,
+            requestScripts: requestScripts,
             attemptReconnect: attemptReconnect,
             requestCompletion: requestCompletion,
         };
     },
 ];
-// })();

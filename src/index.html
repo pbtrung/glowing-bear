@@ -37,7 +37,7 @@
       </h2>
       <div class="alert alert-warning" ng-show="show_tls_warning" ng-cloak><strong>You're using Glowing Bear over an unencrypted connection (http://). This is not recommended!</strong> We recommend using our secure hosted version at <a href="https://www.glowing-bear.org/">https://www.glowing-bear.org/</a>, or <a href="https://latest.glowing-bear.org/">https://latest.glowing-bear.org</a> for the latest development version. If your relay is on your local network, that is unfortunately impossible, but be aware of the implications.</div>
       <div class="alert alert-danger" ng-show="errorMessage" ng-cloak>
-        <strong>Connection error</strong> The client was unable to connect to the WeeChat relay
+        <strong>Connection error</strong> The client was unable to connect to the WeeChat relay. Check the host and port, and that an "api" relay is set up in WeeChat 4.1 or later (<code>/relay add api {{ settings.port || 9001 }}</code>).
       </div>
       <div class="alert alert-danger" ng-show="tlsError" ng-cloak>
         <strong>Secure connection error</strong> A secure connection with the WeeChat relay could not be initiated. This is most likely because your browser does not trust your relay's certificate. Please read the encryption instructions below!
@@ -45,11 +45,11 @@
       <div class="alert alert-danger" ng-show="securityError" ng-cloak>
         <strong>Secure connection error</strong> Unable to connect to unencrypted relay when you are connecting to Glowing Bear over HTTPS. Please use an encrypted relay or load the page without using HTTPS.
       </div>
-      <div class="alert alert-danger" ng-show="oldWeechatError" ng-cloak>
-        <strong>Weechat version error</strong> Weechat connected but did not respond to a handshake. This likely means your WeeChat version is older than 2.9. Please update WeeChat.
+      <div class="alert alert-danger" ng-show="totpUnsupported" ng-cloak>
+        <strong>TOTP not supported</strong> TOTP is enabled in WeeChat (<code>relay.network.totp_secret</code>), but browsers can't send the TOTP on the WebSocket connection used by the "api" relay. Disable TOTP to use Glowing Bear.
       </div>
       <div class="alert alert-danger" ng-show="hashAlgorithmDisagree" ng-cloak>
-        <strong>Hash algorithm error</strong> Weechat and glowing bear did not agree on a hashing algorithm, please do /set relay.network.password_hash_algo "pbkdf2+sha512" or "plain" (when using http-only) in weechat.
+        <strong>Hash algorithm error</strong> WeeChat and Glowing Bear did not agree on a password hash algorithm. Allow at least one of them in WeeChat, for example <code>/set relay.network.password_hash_algo "pbkdf2+sha512,plain"</code> (only "plain" works when Glowing Bear is not loaded over https:// or from localhost).
       </div>
       <div class="panel-group accordion">
         <div class="panel" data-state="active" ng-show=false>
@@ -102,7 +102,7 @@
                     </div>
                   </div>
                   <div class="alert alert-danger" ng-show="passwordError" ng-cloak>
-                    Error: wrong password or token
+                    Error: {{ authErrorMessage || 'wrong password' }}
                   </div>
                   <div class="checkbox">
                     <label class="control-label" for="tls">
@@ -138,7 +138,7 @@
           </div>
           <div id="collapseTwo" class="panel-collapse collapse">
             <div class="panel-body">
-              <p><span class="label label-danger">WeeChat version 2.9 or later is required.</p>
+              <p><span class="label label-danger">WeeChat version 4.1 or later is required.</p>
               <h3>Use TLS encryption</h3>
               <p>To start using Glowing Bear, follow the instructions below to set up an encrypted relay. All communication goes directly between your browser and your WeeChat relay! This means that your server must be accessible. We never see any of your data or your password, and you don't need to trust a "cloud". All settings, including your password, are saved locally in your own browser between sessions.</p>
               <div class="alert alert-warning" ng-show="show_tls_warning"><strong>You're using Glowing Bear over an unencrypted connection (http://). This is not recommended!</strong> We recommend using our secure hosted version at <a href="https://www.glowing-bear.org/">https://www.glowing-bear.org/</a>, or <a href="https://latest.glowing-bear.org/">https://latest.glowing-bear.org</a> for the latest and greatest development version. You can still follow the instructions below to set up an encrypted relay, though.</div>
@@ -153,14 +153,11 @@ chown -R <strong>username</strong>:<strong>username</strong> ~<strong>username</
 <pre>
 /set relay.network.password y0ur_StRonG-pa$sw0rd:of*choice
 /relay tlscertkey
-/relay add tls.weechat {{ settings.port || 9001 }}
+/relay add tls.api {{ settings.port || 9001 }}
 </pre>
               <p>Your certificate needs to be renewed every couple of months. Either follow the instructions for automatic renewal at <a href="https://certbot.eff.org/">https://certbot.eff.org</a>, or run <code>certbot renew</code> manually when renewal is due. <strong>Important:</strong> You'll need to follow the instructions for copying the certificate to the right place again, and re-run <code>/relay tlscertkey</code> in WeeChat.</p>
-              <h3>Use TOTP (Time-based One-Time Password)</h3>
-              <p><a href="https://blog.weechat.org/post/2019/01/14/Support-of-TOTP">Configure</a> WeeChat for TOTP. The secret key has to be a base 32 string.</p>
-              <pre>/secure set relay_totp_secret xxxxx
-/set relay.network.totp_secret "${sec.data.relay_totp_secret}"</pre>
-              <p>Open an authenticator app and create an entry with the same secret. In Glowing Bear check the checkbox for "use Time-based One-Time Password" and fill in the one time password as you see it in the authenticator app.</p>
+              <h3>TOTP (Time-based One-Time Password)</h3>
+              <p>WeeChat expects the TOTP in an HTTP header that browsers can't send on WebSocket connections, so TOTP can't be used with Glowing Bear. Make sure <code>relay.network.totp_secret</code> is empty.</p>
 
             </div>
           </div>
@@ -213,7 +210,7 @@ chown -R <strong>username</strong>:<strong>username</strong> ~<strong>username</
                   <li><b>scheme</b>: The scheme must never be input. The scheme is "ws" if TLS isn't used and it is "wss" if TLS is used.</li>
                   <li><b>host</b>: Can be an IPv4, IPv6 or a FQDN. IPv6 addresses must be wrapped in square brackets.</li>
                   <li><b>port</b>: can be specified in the host field or the seperate port field. However if the path is specified in the host field the port must also be specified.</li>
-                  <li><b>path</b>: by defautl this is "weechat". In case <a href="https://github.com/glowing-bear/glowing-bear/wiki/Proxying-WeeChat-relay-with-a-web-server">a proxy</a> is used the path can be changed by entering it in the host field.</li>
+                  <li><b>path</b>: by default this is "api". In case <a href="https://github.com/glowing-bear/glowing-bear/wiki/Proxying-WeeChat-relay-with-a-web-server">a proxy</a> is used the path can be changed by entering it in the host field.</li>
                 </ul>
               <p>
                 Examples of correct input for the host field are:
@@ -221,22 +218,22 @@ chown -R <strong>username</strong>:<strong>username</strong> ~<strong>username</
                 <ul>
                   <li>192.168.0.1</li>
                   <li>192.168.0.1:8000</li>
-                  <li>192.168.0.1:8000/weechat2</li>
+                  <li>192.168.0.1:8000/relay/api</li>
                   <li>[2001:db8:85a3::8a2e:370:7334]</li>
                   <li>[2001:db8:85a3::8a2e:370:7334]:8000</li>
-                  <li>[2001:db8:85a3::8a2e:370:7334]:8000/weechat2</li>
+                  <li>[2001:db8:85a3::8a2e:370:7334]:8000/relay/api</li>
                   <li>yourhost.yourdomain.com</li>
                   <li>yourhost.yourdomain.com:8000</li>
-                  <li>yourhost.yourdomain.com:8000/weechat2</li>
+                  <li>yourhost.yourdomain.com:8000/relay/api</li>
                 </ul>
                 <p>
                   Incorrect input for the host field:
                 </p>
                 <ul>
                   <li><span class="text-danger">ws://192.168.0.1</span> (do not specify the scheme)</li>
-                  <li><span class="text-danger">192.168.0.1/weechat2</span> (must specify port when specifying path)</li>
-                  <li><span class="text-danger">[2001:db8:85a3::8a2e:370:7334]/weechat2</span> (must specify port when specifying path)</li>
-                  <li><span class="text-danger">yourhost.yourdomain.com/weechat2</span> (must specify port when specifying path)</li>
+                  <li><span class="text-danger">192.168.0.1/relay/api</span> (must specify port when specifying path)</li>
+                  <li><span class="text-danger">[2001:db8:85a3::8a2e:370:7334]/relay/api</span> (must specify port when specifying path)</li>
+                  <li><span class="text-danger">yourhost.yourdomain.com/relay/api</span> (must specify port when specifying path)</li>
                   <li><span class="text-danger">2001:db8:85a3::8a2e:370:7334</span> (must wrap IPv6 address in square brackets)</li>
                   <li><span class="text-danger">2001:db8:85a3::8a2e:370:7334:8000</span> (must wrap IPv6 address in square brackets)</li>
                 </ul>
@@ -246,7 +243,7 @@ chown -R <strong>username</strong>:<strong>username</strong> ~<strong>username</
                   We do not recommend passing the password in this way as it will be visible in plain text and stored in history/bookmarks but it is possible. Special characters should be <a href="https://www.w3schools.com/tags/ref_urlencode.asp">URL encoded</a>.
                 </p>
                 <p>
-                  If we want just the path for example: <code>https://glowing-bear.org/#path=weechat2</code>
+                  If we want just the path for example: <code>https://glowing-bear.org/#path=relay/api</code>
                 </p>
                 <p>
                   An example: <code>https://glowing-bear.org/#host=my.domain.com&port=8000&password=hunter2&autoconnect=true</code>

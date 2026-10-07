@@ -91,13 +91,8 @@ weechat.directive('inputBar', function () {
                 };
 
                 $scope.completeNick = function () {
-                    if (
-                        ((models.version[0] == 2 && models.version[1] >= 9) ||
-                            models.version[0] > 2) &&
-                        $scope.command.startsWith('/')
-                    ) {
-                        // We are completing a command, another function will do
-                        // this on WeeChat 2.9 and later
+                    if ($scope.command.startsWith('/')) {
+                        // We are completing a command, completeCommand does this
                         return;
                     }
 
@@ -150,14 +145,6 @@ weechat.directive('inputBar', function () {
                 var commandCompletionPositionInList;
                 var commandCompletionInputChanged;
                 $scope.completeCommand = function (direction) {
-                    if (
-                        models.version[0] < 2 ||
-                        (models.version[0] == 2 && models.version[1] < 9)
-                    ) {
-                        // Command completion is only supported on WeeChat 2.9+
-                        return;
-                    }
-
                     if (!$scope.command.startsWith('/')) {
                         // We are not completing a command, maybe a nick?
                         return;
@@ -407,7 +394,7 @@ weechat.directive('inputBar', function () {
                     }
 
                     // New style clearing requires this, old does not
-                    if (settings.hotlistsync && models.version[0] >= 1) {
+                    if (settings.hotlistsync) {
                         connection.sendHotlistClear();
                     }
 

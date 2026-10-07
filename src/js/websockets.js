@@ -1,141 +1,184 @@
 'use strict';
 
+/*
+ * WebSocket transport for the WeeChat relay "api" protocol.
+ *
+ * Requests are JSON objects {request, body, request_id}; responses carry the
+ * same request_id back, which is used to resolve the promise returned by
+ * send(). Messages with code 0 are events pushed by WeeChat (after a sync
+ * request) and are emitted on $rootScope as 'onMessage'.
+ */
 var websockets = angular.module('ngWebsockets', []);
 
 websockets.factory('ngWebsockets', [
     '$rootScope',
     '$q',
     function ($rootScope, $q) {
-        var protocol = null;
-
         var ws = null;
         var callbacks = {};
         var currentCallBackId = 0;
 
         /*
-         * Fails every currently subscribed callback for the
-         * given reason
+         * Fails every currently subscribed callback for the given reason
          *
          * @param reason reason for failure
          */
         var failCallbacks = function (reason) {
-            for (var i in callbacks) {
-                callbacks[i].cb.reject(reason);
+            for (var id in callbacks) {
+                callbacks[id].reject(reason);
             }
+            callbacks = {};
+        };
+
+        var nextRequestId = function () {
+            currentCallBackId = (currentCallBackId + 1) % 100000;
+            return 'gb' + currentCallBackId;
         };
 
         /*
-         * Returns the current callback id
+         * Build a request object.
+         *
+         * @param method HTTP method (GET, POST, ...)
+         * @param path resource path, e.g. "/api/buffers?lines=-100"
+         * @param body optional request body
          */
-        var getCurrentCallBackId = function () {
-            currentCallBackId += 1;
-
-            if (currentCallBackId > 1000) {
-                currentCallBackId = 0;
+        var request = function (method, path, body) {
+            var req = { request: method + ' ' + path };
+            if (body !== undefined) {
+                req.body = body;
             }
-
-            return currentCallBackId;
+            return req;
         };
 
-        /* Send a message to the websocket and returns a promise.
-         * See: http://docs.angularjs.org/api/ng.$q
+        /*
+         * Send a request and return a promise resolved with the response
+         * (rejected with the response if its code is an HTTP error).
          *
-         * @param message message to send
+         * @param req request object (see request())
          * @returns a promise
          */
-        var send = function (message) {
-            var cb = createCallback(message);
-
-            message = protocol.setId(cb.id, message);
-
-            ws.send(message);
-            return cb.promise;
-        };
-
-        /*
-         * Create a callback, adds it to the callback list
-         * and return it.
-         */
-        var createCallback = function () {
+        var send = function (req) {
             var defer = $q.defer();
-            var cbId = getCurrentCallBackId();
-
-            callbacks[cbId] = {
-                time: new Date(),
-                cb: defer,
-            };
-
-            defer.id = cbId;
-
-            return defer;
+            var id = nextRequestId();
+            callbacks[id] = defer;
+            req = angular.extend({}, req, { request_id: id });
+            try {
+                ws.send(JSON.stringify(req));
+            } catch (e) {
+                delete callbacks[id];
+                defer.reject(e);
+            }
+            return defer.promise;
         };
 
         /*
-         * Send all messages to the websocket and returns a promise that is resolved
-         * when all message are resolved.
-         *
-         * @param messages list of messages
-         * @returns a promise
+         * Send several requests and return a promise resolved when all
+         * responses have arrived.
          */
-        var sendAll = function (messages) {
-            var promises = [];
-            for (var i in messages) {
-                var promise = send(messages[i]);
-                promises.push(promise);
-            }
-            return $q.all(promises);
+        var sendAll = function (reqs) {
+            return $q.all(reqs.map(send));
         };
 
         var onmessage = function (evt) {
-            /*
-             * Receives a message on the websocket
-             */
-            var message = protocol.parse(evt.data);
-            if (message.id in callbacks) {
-                // see if it's bound to one of the callbacks
-                var promise = callbacks[message.id];
-                promise.cb.resolve(message);
-                delete callbacks[message.id];
-            } else {
-                // otherwise emit it
-                $rootScope.$emit('onMessage', message);
+            var messages;
+            try {
+                messages = JSON.parse(evt.data);
+            } catch (e) {
+                // The stream is corrupted (this happens with compressed
+                // frames after a /upgrade of WeeChat): reconnect
+                console.error('Unable to parse relay message, reconnecting', e);
+                abort('corrupted stream');
+                return;
             }
+            if (!Array.isArray(messages)) {
+                messages = [messages];
+            }
+            messages.forEach(function (message) {
+                var id = message.request_id;
+                if (message.code !== 0 && id && id in callbacks) {
+                    var defer = callbacks[id];
+                    delete callbacks[id];
+                    if (message.code >= 400) {
+                        defer.reject(message);
+                    } else {
+                        defer.resolve(message);
+                    }
+                } else if (message.code === 0) {
+                    $rootScope.$emit('onMessage', message);
+                } else if (message.code >= 400) {
+                    console.warn('Relay error response', message);
+                }
+            });
             // Make sure all UI is updated with new data
             $rootScope.$apply();
         };
 
-        var connect = function (url, protocol_, properties) {
+        /*
+         * Open the websocket.
+         *
+         * @param url websocket URL
+         * @param protocols sub-protocols (used for authentication)
+         * @param properties event handlers (onopen, onclose, onerror)
+         */
+        var connect = function (url, protocols, properties) {
             if (ws !== null && ws.readyState !== WebSocket.CLOSED) {
+                ws.onopen = null;
                 ws.onclose = null;
                 ws.onerror = null;
                 ws.onmessage = null;
                 ws.close();
             }
-            ws = new WebSocket(url);
-            protocol = protocol_;
+            failCallbacks('reconnect');
+            ws = new WebSocket(url, protocols);
             for (var property in properties) {
                 ws[property] = properties[property];
             }
-
-            if ('onmessage' in properties) {
-                ws.onmessage = function (event) {
-                    properties.onmessage(event);
-                    onmessage(event);
-                };
-            } else {
-                ws.onmessage = onmessage;
-            }
+            ws.onmessage = onmessage;
         };
 
         var disconnect = function () {
-            ws.close();
+            if (ws !== null) {
+                ws.close();
+            }
+        };
+
+        /*
+         * Drop the connection without waiting for the closing handshake
+         * (which never completes if the relay doesn't answer), and run the
+         * close handler right away.
+         */
+        var abort = function (reason) {
+            if (ws === null) {
+                return;
+            }
+            var onclose = ws.onclose;
+            ws.onopen = null;
+            ws.onclose = null;
+            ws.onerror = null;
+            ws.onmessage = null;
+            try {
+                ws.close();
+            } catch (e) {
+                // already closed
+            }
+            ws = null;
+            if (onclose) {
+                onclose({ code: 4000, reason: reason || 'aborted' });
+            }
+        };
+
+        var isOpen = function () {
+            return ws !== null && ws.readyState === WebSocket.OPEN;
         };
 
         return {
+            request: request,
             send: send,
             sendAll: sendAll,
             connect: connect,
             disconnect: disconnect,
+            abort: abort,
+            isOpen: isOpen,
             failCallbacks: failCallbacks,
         };
     },

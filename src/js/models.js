@@ -4,18 +4,27 @@
  */
 'use strict';
 
-import * as weeChat from './weechat';
+import { rawText2Rich } from './weechat-colors';
 import { sortBy } from './misc';
 
 var models = angular.module('weechatModels', []);
+
+// Buffer "notify" property as sent by the relay, mapped to WeeChat's levels
+var NOTIFY_LEVELS = { none: 0, highlight: 1, message: 2, all: 3 };
 
 models.service('models', [
     '$rootScope',
     '$filter',
     'bufferResume',
     function ($rootScope, $filter, bufferResume) {
-        // WeeChat version
+        // WeeChat version, e.g. [4, 10, 1]
         this.version = null;
+
+        // Full response of GET /api/version
+        this.versionInfo = null;
+
+        // Loaded scripts (GET /api/scripts)
+        this.scripts = [];
 
         // WeeChat configuration values
         this.wconfig = {};
@@ -25,10 +34,10 @@ models.service('models', [
 
         var parseRichText = function (text) {
             if (!text) {
-                return [{ text: text }];
+                return [{ text: text || '', classes: [] }];
             }
 
-            var textElements = weeChat.Protocol.rawText2Rich(text),
+            var textElements = rawText2Rich(text),
                 typeToClassPrefixFg = {
                     option: 'cof-',
                     weechat: 'cwf-',
@@ -65,76 +74,126 @@ models.service('models', [
                     }
                 }
             });
+            if (textElements.length === 0) {
+                return [{ text: '', classes: [] }];
+            }
             return textElements;
         };
         this.parseRichText = parseRichText;
 
+        var plainText = function (richText) {
+            return richText
+                .map(function (part) {
+                    return part.text;
+                })
+                .join('');
+        };
+
         /*
-         * Buffer class
+         * Update a buffer with the properties of a buffer object sent by the
+         * relay (GET /api/buffers, or the body of a buffer_* event).
+         *
+         * @param buffer the Buffer object to update
+         * @param message the buffer object sent by the relay
          */
-        this.Buffer = function (message) {
-            // weechat properties
-            var fullName = parseRichText(message.full_name)[0].text;
-            var shortName = parseRichText(message.short_name)[0].text;
-            var classes = parseRichText(message.short_name)[0].classes;
-            var hidden = message.hidden;
-            // If it's a channel, trim away the prefix (#, &, or +). If that is empty and the buffer
-            // has a short name, use a space (because the prefix will be displayed separately, and we don't want
-            // prefix + fullname, which would happen otherwise). Else, use null so that full_name is used
-            var trimmedName =
+        var updateBuffer = function (buffer, message) {
+            var localVars = message.local_variables || {};
+            var shortNameRich = parseRichText(message.short_name);
+            var shortName = plainText(shortNameRich);
+
+            buffer.fullName = message.name;
+            buffer.shortName = shortName;
+            // Use color from short name
+            buffer.nameClasses = shortNameRich[0].classes;
+            // If it's a channel, trim away the prefix (#, &, or +). If that is
+            // empty and the buffer has a short name, use a space (because the
+            // prefix will be displayed separately, and we don't want prefix +
+            // fullname, which would happen otherwise). Else, use null so that
+            // full_name is used
+            buffer.trimmedName =
                 shortName.replace(/^[#&+]/, '') || (shortName ? ' ' : null);
             // get channel identifier
-            var prefix =
+            buffer.prefix =
                 ['#', '&', '+'].indexOf(shortName.charAt(0)) >= 0
                     ? shortName.charAt(0)
                     : '';
-            var title = parseRichText(message.title);
-            var number = message.number;
-            var pointer = message.pointers[0];
-            var notify = 3; // Default 3 == message
-            var lines = [];
-            var requestedLines = 0;
-            var allLinesFetched = false;
-            var nicklist = {};
-            var history = [];
-            var historyPos = 0;
-            var active = false;
-            var notification = 0;
-            var unread = 0;
-            var lastSeen = -1;
-            // There are two kinds of types: bufferType (free vs formatted) and
-            // the kind of type that distinguishes queries from channels etc
-            var bufferType = message.type;
+            buffer.title = parseRichText(message.title);
+            buffer.rtitle = plainText(buffer.title);
+            buffer.modes = message.modes || '';
+            buffer.number = message.number;
+            buffer.hidden = !!message.hidden;
+            // 0 = formatted (normal); 1 = free
+            buffer.bufferType = message.type === 'free' ? 1 : 0;
+            if (message.notify in NOTIFY_LEVELS) {
+                buffer.notify = NOTIFY_LEVELS[message.notify];
+            }
 
+            buffer.localVariables = localVars;
             // If type is undefined set it as other to avoid later errors
-            var type = message.local_variables.type || 'other';
-            var indent = ['channel', 'private'].indexOf(type) >= 0;
+            buffer.type = localVars.type || 'other';
+            buffer.indent = ['channel', 'private'].indexOf(buffer.type) >= 0;
+            buffer.plugin = localVars.plugin;
+            buffer.server = localVars.server;
+            buffer.pinned = localVars.pinned === 'true';
 
-            var plugin = message.local_variables.plugin;
-            var server = message.local_variables.server;
-
-            var pinned = message.local_variables.pinned === 'true';
-
-            // hide timestamps for certain buffer types
-            var hideBufferLineTimes = type && type === 'relay';
-
-            // Server buffers have this "irc.server.freenode" naming schema, which
-            // messes the sorting up. We need it to be "irc.freenode" instead.
-            var serverSortKey =
-                plugin + '.' + server + (type === 'server' ? '' : '.' + shortName);
+            // Server buffers have this "irc.server.libera" naming schema, which
+            // messes the sorting up. We need it to be "irc.libera" instead.
             // Lowercase it so alt+up/down traverses buffers in the same order
             // angular's sortBy directive puts them in
-            serverSortKey = serverSortKey.toLowerCase();
+            buffer.serverSortKey = (
+                buffer.plugin +
+                '.' +
+                buffer.server +
+                (buffer.type === 'server' ? '' : '.' + shortName)
+            ).toLowerCase();
 
-            // Buffer opened message does not include notify level
-            if (message.notify !== undefined) {
-                notify = message.notify;
-            }
+            // hide timestamps for certain buffer types, or when WeeChat does
+            buffer.hideBufferLineTimes =
+                buffer.type === 'relay' || message.time_displayed === false;
+            buffer.hidePrefix = message.prefix_displayed === false;
+            buffer.dayChange = message.day_change !== false;
+            buffer.hasNicklist = message.nicklist !== false;
 
-            var rtitle = '';
-            for (var i = 0; i < title.length; ++i) {
-                rtitle += title[i].text;
+            buffer.inputPrompt = parseRichText(message.input_prompt);
+            buffer.input = message.input || '';
+            buffer.inputPosition = message.input_position || 0;
+            buffer.inputMultiline = !!message.input_multiline;
+            buffer.keys = message.keys || [];
+            if (message.last_read_line_id !== undefined) {
+                buffer.lastReadLineId = message.last_read_line_id;
             }
+        };
+        this.updateBuffer = updateBuffer;
+
+        /*
+         * Buffer class
+         *
+         * @param message a buffer object sent by the relay
+         */
+        this.Buffer = function (message) {
+            var lines = [];
+            var nicklist = {};
+            // Map of nick group id -> key in nicklist
+            var nickGroups = {};
+            var history = [];
+            var historyPos = 0;
+
+            var buffer = {
+                id: message.id,
+                lines: lines,
+                requestedLines: 0,
+                allLinesFetched: false,
+                active: false,
+                notify: 3, // Default 3 == all
+                notification: 0,
+                unread: 0,
+                lastSeen: -1,
+                lastReadLineId: -1,
+                nicklist: nicklist,
+                nickGroups: nickGroups,
+                history: history,
+            };
+            updateBuffer(buffer, message);
 
             /*
              * Adds a line to this buffer
@@ -142,16 +201,46 @@ models.service('models', [
              * @param line the BufferLine object
              * @return undefined
              */
-            var addLine = function (line) {
+            buffer.addLine = function (line) {
                 lines.push(line);
                 updateNickSpeak(line);
             };
 
             /*
+             * Set a line of a buffer with free content: lines are identified
+             * by their index (y) instead of being appended.
+             */
+            buffer.setFreeLine = function (line) {
+                if (line.y < 0) {
+                    return;
+                }
+                while (lines.length <= line.y) {
+                    lines.push(null);
+                }
+                lines[line.y] = line;
+            };
+
+            /*
+             * Replace an existing line (event buffer_line_data_changed)
+             */
+            buffer.replaceLine = function (line) {
+                if (buffer.bufferType === 1) {
+                    buffer.setFreeLine(line);
+                    return;
+                }
+                for (var i = lines.length - 1; i >= 0; i--) {
+                    if (lines[i] && lines[i].id === line.id) {
+                        lines[i] = line;
+                        return;
+                    }
+                }
+            };
+
+            /*
              * Adds a nick to nicklist
              */
-            var addNick = function (group, nick) {
-                if (nicklistRequested()) {
+            buffer.addNick = function (group, nick) {
+                if (buffer.nicklistRequested() && nicklist[group] !== undefined) {
                     nick.spokeAt = Date.now();
                     nicklist[group].nicks.push(nick);
                 }
@@ -159,12 +248,12 @@ models.service('models', [
             /*
              * Deletes a nick from nicklist
              */
-            var delNick = function (group, nick) {
+            buffer.delNick = function (group, nick) {
                 group = nicklist[group];
                 if (group === undefined) {
                     return;
                 }
-                for (i in group.nicks) {
+                for (var i = 0; i < group.nicks.length; i++) {
                     if (group.nicks[i].name == nick.name) {
                         group.nicks.splice(i, 1);
                         break;
@@ -174,19 +263,19 @@ models.service('models', [
             /*
              * Clear the nicklist
              */
-            var clearNicklist = function () {
-                //only keep the root node
+            buffer.clearNicklist = function () {
                 for (var obj in nicklist) {
-                    if (obj !== 'root') {
-                        delete nicklist[obj];
-                    }
+                    delete nicklist[obj];
+                }
+                for (var id in nickGroups) {
+                    delete nickGroups[id];
                 }
             };
 
             /*
              * Updates a nick in nicklist
              */
-            var updateNick = function (group, nick) {
+            buffer.updateNick = function (group, nick) {
                 group = nicklist[group];
                 if (group === undefined) {
                     // We are getting nicklist events for a buffer where not yet
@@ -194,8 +283,9 @@ models.service('models', [
                     // update. Just ignore the event.
                     return;
                 }
-                for (var i in group.nicks) {
-                    if (group.nicks[i].name === nick.name) {
+                for (var i = 0; i < group.nicks.length; i++) {
+                    if (group.nicks[i].id === nick.id) {
+                        nick.spokeAt = group.nicks[i].spokeAt;
                         group.nicks[i] = nick;
                         break;
                     }
@@ -239,7 +329,7 @@ models.service('models', [
              * called for every tab key press by the user.
              *
              */
-            var getNicklistByTime = function () {
+            buffer.getNicklistByTime = function () {
                 var newlist = [];
                 for (let groupIdx in nicklist) {
                     newlist = newlist.concat(nicklist[groupIdx].nicks);
@@ -250,7 +340,7 @@ models.service('models', [
                 return newlist;
             };
 
-            var addToHistory = function (line) {
+            buffer.addToHistory = function (line) {
                 var result = '';
                 if (historyPos !== history.length) {
                     // Pop cached line from history. Occurs if we submit something from history
@@ -261,7 +351,7 @@ models.service('models', [
                 return result;
             };
 
-            var getHistoryUp = function (currentLine) {
+            buffer.getHistoryUp = function (currentLine) {
                 if (historyPos >= history.length) {
                     // cache current line in history
                     history.push(currentLine);
@@ -277,7 +367,7 @@ models.service('models', [
                 }
             };
 
-            var getHistoryDown = function (currentLine) {
+            buffer.getHistoryDown = function (currentLine) {
                 if (historyPos === history.length) {
                     // stash on history like weechat does
                     if (currentLine !== undefined && currentLine !== '') {
@@ -304,23 +394,23 @@ models.service('models', [
             // Check if the nicklist is empty, i.e., no nicks present
             // This checks for the presence of people, not whether a
             // request for the nicklist has been made
-            var isNicklistEmpty = function () {
+            buffer.isNicklistEmpty = function () {
                 for (var obj in nicklist) {
-                    if (obj !== 'root') {
+                    if (nicklist[obj].nicks.length > 0) {
                         return false;
                     }
                 }
                 return true;
             };
 
-            var nicklistRequested = function () {
+            buffer.nicklistRequested = function () {
                 // If the nicklist has been requested but is empty, it
                 // still has a 'root' property. Check for its existence.
                 return nicklist.hasOwnProperty('root');
             };
 
             // Check whether a particular nick is in the nicklist
-            var queryNicklist = function (nick) {
+            buffer.queryNicklist = function (nick) {
                 for (var groupIdx in nicklist) {
                     var nicks = nicklist[groupIdx].nicks;
                     for (var nickIdx in nicks) {
@@ -333,76 +423,36 @@ models.service('models', [
             };
 
             /* Clear all our buffer lines */
-            var clear = function () {
-                while (lines.length > 0) {
-                    lines.pop();
-                }
-                requestedLines = 0;
+            buffer.clear = function () {
+                lines.length = 0;
+                buffer.requestedLines = 0;
+                buffer.lastSeen = -1;
             };
 
-            return {
-                id: pointer,
-                fullName: fullName,
-                shortName: shortName,
-                hidden: hidden,
-                trimmedName: trimmedName,
-                nameClasses: classes,
-                prefix: prefix,
-                number: number,
-                title: title,
-                rtitle: rtitle,
-                lines: lines,
-                clear: clear,
-                requestedLines: requestedLines,
-                addLine: addLine,
-                lastSeen: lastSeen,
-                unread: unread,
-                notification: notification,
-                notify: notify,
-                nicklist: nicklist,
-                addNick: addNick,
-                delNick: delNick,
-                clearNicklist: clearNicklist,
-                updateNick: updateNick,
-                getNicklistByTime: getNicklistByTime,
-                serverSortKey: serverSortKey,
-                indent: indent,
-                bufferType: bufferType,
-                type: type,
-                plugin: plugin,
-                server: server,
-                history: history,
-                addToHistory: addToHistory,
-                getHistoryUp: getHistoryUp,
-                getHistoryDown: getHistoryDown,
-                isNicklistEmpty: isNicklistEmpty,
-                nicklistRequested: nicklistRequested,
-                hideBufferLineTimes: hideBufferLineTimes,
-                pinned: pinned,
-                queryNicklist: queryNicklist,
-            };
+            return buffer;
         };
 
         /*
          * BufferLine class
+         *
+         * @param message a line object sent by the relay, with an extra
+         *                "buffer" property holding the buffer id
          */
         this.BufferLine = function (message) {
-            var buffer = message.buffer;
-            var date = message.date;
+            var date =
+                message.date instanceof Date ? message.date : new Date(message.date);
             var shortTime = $filter('date')(date, 'HH:mm');
             var formattedTime = $filter('date')(date, $rootScope.angularTimeFormat);
 
             var prefix = parseRichText(message.prefix);
-            var tags_array = message.tags_array;
-            var displayed = message.displayed;
-            var highlight = message.highlight;
+            var tags = message.tags || [];
+            var highlight = !!message.highlight;
             var content = parseRichText(message.message);
 
             // only put invisible angle brackets around nicks in normal messages
             // (for copying/pasting)
             var showHiddenBrackets =
-                tags_array.indexOf('irc_privmsg') >= 0 &&
-                tags_array.indexOf('irc_action') === -1;
+                tags.indexOf('irc_privmsg') >= 0 && tags.indexOf('irc_action') === -1;
 
             if (highlight) {
                 prefix.forEach(function (textEl) {
@@ -410,40 +460,29 @@ models.service('models', [
                 });
             }
 
-            var prefixtext = '';
-            for (var pti = 0; pti < prefix.length; ++pti) {
-                prefixtext += prefix[pti].text;
-            }
-
-            var rtext = '';
-            for (var i = 0; i < content.length; ++i) {
-                rtext += content[i].text;
-            }
-
             return {
+                id: message.id,
+                y: message.y,
                 prefix: prefix,
                 content: content,
                 date: date,
                 shortTime: shortTime,
                 formattedTime: formattedTime,
-                buffer: buffer,
-                tags: tags_array,
+                buffer: message.buffer,
+                tags: tags,
                 highlight: highlight,
-                displayed: displayed,
-                prefixtext: prefixtext,
-                text: rtext,
+                notifyLevel:
+                    message.notify_level === undefined ? 0 : message.notify_level,
+                displayed: message.displayed !== false,
+                prefixtext: plainText(prefix),
+                text: plainText(content),
                 showHiddenBrackets: showHiddenBrackets,
             };
         };
 
-        function nickGetColorClasses(nickMsg, propName) {
+        function nickGetColorClasses(color) {
             var colorClasses = ['cwf-default'];
-            if (
-                propName in nickMsg &&
-                nickMsg[propName] &&
-                nickMsg[propName].length > 0
-            ) {
-                var color = nickMsg[propName];
+            if (color && color.length > 0) {
                 if (color.match(/^weechat/)) {
                     // color option
                     var colorName = color.match(/[a-zA-Z0-9_]+$/)[0];
@@ -476,42 +515,33 @@ models.service('models', [
             return colorClasses;
         }
 
-        function nickGetClasses(nickMsg) {
-            return {
-                name: nickGetColorClasses(nickMsg, 'color'),
-                prefix: nickGetColorClasses(nickMsg, 'prefix_color'),
-            };
-        }
-
         /*
          * Nick class
+         *
+         * @param message a nick object sent by the relay
          */
         this.Nick = function (message) {
-            var prefix = message.prefix;
-            var visible = message.visible;
-            var name = message.name;
-            var colorClasses = nickGetClasses(message);
-
             return {
-                prefix: prefix,
-                visible: visible,
-                name: name,
-                prefixClasses: colorClasses.prefix,
-                nameClasses: colorClasses.name,
+                id: message.id,
+                groupId: message.parent_group_id,
+                prefix: message.prefix,
+                visible: message.visible !== false,
+                name: message.name,
+                prefixClasses: nickGetColorClasses(message.prefix_color_name),
+                nameClasses: nickGetColorClasses(message.color_name),
             };
         };
         /*
          * Nicklist Group class
+         *
+         * @param message a nick group object sent by the relay
          */
         this.NickGroup = function (message) {
-            var name = message.name;
-            var visible = message.visible;
-            var nicks = [];
-
             return {
-                name: name,
-                visible: visible,
-                nicks: nicks,
+                id: message.id,
+                name: message.name,
+                visible: message.visible !== false,
+                nicks: [],
             };
         };
 
@@ -552,18 +582,6 @@ models.service('models', [
          */
         this.getActiveBuffer = function () {
             return activeBuffer;
-        };
-
-        /*
-         * Returns a reference to the currently active buffer that
-         * WeeChat understands without crashing, even if it's invalid
-         *
-         * @return active buffer pointer
-         */
-        this.getActiveBufferReference = function () {
-            // pointers are being validated, they're more reliable than
-            // fullName (e.g. if fullName contains spaces)
-            return '0x' + activeBuffer.id;
         };
 
         /*
@@ -642,6 +660,9 @@ models.service('models', [
         this.reinitialize = function () {
             this.model.buffers = {};
             this.model.servers = {};
+            this.scripts = [];
+            activeBuffer = null;
+            previousBuffer = null;
         };
 
         /*
@@ -696,12 +717,16 @@ models.service('models', [
             if (buffer === undefined) {
                 return;
             }
-            if (buffer.active) {
-                var firstBuffer = Object.keys(this.model.buffers)[0];
-                this.setActiveBuffer(firstBuffer);
-            }
             // Can't use `buffer` here, needs to be deleted from the list
             delete this.model.buffers[bufferId];
+            if (buffer.active) {
+                var firstBuffer = Object.values(this.model.buffers).sort(
+                    sortBy('number'),
+                )[0];
+                if (firstBuffer) {
+                    this.setActiveBuffer(firstBuffer.id);
+                }
+            }
         };
     },
 ]);

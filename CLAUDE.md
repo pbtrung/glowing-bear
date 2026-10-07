@@ -21,7 +21,7 @@ npm test                 # Vitest unit tests (src/**/*.test.{ts,tsx}, jsdom)
 npm run test:relay       # relay "api" compliance tests against a real WeeChat in Docker (see below)
 npm run format           # Prettier (88 columns)
 npm run format:check
-./run_tests.sh           # format check + lint + typecheck + tests + build
+npm run check            # format check + lint + typecheck + tests + build
 ```
 
 Single tests: `npx vitest run src/lib/state` or `npx vitest run -t "name"`.

@@ -60,5 +60,5 @@ npm run lint        # ESLint
 npm run typecheck   # TypeScript
 npm test            # unit tests (Vitest)
 npm run test:relay  # protocol tests against a real WeeChat (needs Docker)
-./run_tests.sh      # format check + lint + typecheck + tests + build
+npm run check       # format check + lint + typecheck + tests + build
 ```

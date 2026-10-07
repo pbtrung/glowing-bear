@@ -8,7 +8,7 @@ description: Commit staged/modified changes with a detailed message and push, no
 
 1. Run `git status` and `git diff` (and `git diff --staged` if anything is already staged) to see all changes.
 2. Lint and test whatever's actually touched, before staging anything (this mirrors
-   `./run_tests.sh`, the full check suite):
+   `npm run check`, the full check suite):
    - Anything formatted by Prettier changed (`*.ts`, `*.tsx`, `*.css`, `*.json`, `*.md`,
      `*.html`...): `npm run format`, then `npm run format:check`.
    - Any `*.ts`/`*.tsx`/`*.mts` changed: `npm run lint`, `npm run typecheck`, then

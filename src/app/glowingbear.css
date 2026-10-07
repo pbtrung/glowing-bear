@@ -999,6 +999,22 @@ span.colourbox {
     min-height: 0;
 }
 
+/* Same height as the top bar */
+.settings-modal .modal-header {
+    flex-shrink: 0;
+    height: var(--gb-topbar-height);
+    padding: 0 0.5rem 0 1rem;
+}
+
+.settings-modal .modal-title {
+    font-size: 1.1rem;
+}
+
+.settings-modal .modal-header .btn-close {
+    margin: 0;
+    padding: 0.6rem;
+}
+
 /* Phones: sections in the ⋮ menu of the header; larger: list on the side */
 .settings-nav {
     display: none;
@@ -1065,7 +1081,8 @@ span.colourbox {
     text-transform: uppercase;
 }
 
-.settings-pane > .settings-heading:first-child {
+.settings-panes > .settings-heading:first-child,
+.settings-panes > .about-header:first-child + .settings-heading {
     margin-top: 0;
 }
 

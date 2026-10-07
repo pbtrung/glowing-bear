@@ -2,7 +2,7 @@
  * Glowing Bear base styles, on top of Bootstrap 5.
  *
  * Mobile first: the base rules are for small screens, the desktop layout is
- * in the "min-width: 968px" media query (the same cutoff as utils.isMobileUi).
+ * in the "min-width: 968px" media query (the same cutoff as isMobileUi in chat.ts).
  *
  * Colors are CSS variables (--gb-*); themes (css/themes/*.css) override them
  * and style the WeeChat color classes (cof-*, cwf-*, cef-*, ...).
@@ -86,23 +86,8 @@ body {
     min-height: 100%;
 }
 
-body.no-overflow {
-    overflow: hidden;
-}
-
-a,
-[ng-click] {
+a {
     cursor: pointer;
-}
-
-/* ng-cloak hides elements until Angular loads, preventing flickering */
-[ng\:cloak],
-[ng-cloak],
-[data-ng-cloak],
-[x-ng-cloak],
-.ng-cloak,
-.x-ng-cloak {
-    display: none !important;
 }
 
 .unselectable {
@@ -122,15 +107,13 @@ a,
 }
 
 /* Form controls and buttons themed from the palette */
-.form-control,
-.form-select {
+.form-control {
     background-color: var(--gb-input-bg);
     border-color: var(--gb-border);
     color: var(--gb-fg);
 }
 
-.form-control:focus,
-.form-select:focus {
+.form-control:focus {
     background-color: var(--gb-input-bg);
     color: var(--gb-fg);
     border-color: var(--gb-accent);
@@ -222,8 +205,7 @@ pre {
     scrollbar-width: thin;
 }
 
-/* Icons (see js/icons.js) */
-gb-icon,
+/* Icons (lucide, see components/Icon.tsx) */
 .gb-icon {
     display: inline-flex;
     align-items: center;
@@ -751,7 +733,6 @@ gb-icon,
     background: var(--gb-backdrop);
 }
 
-.content[sidebar-state='visible'] .panel-backdrop,
 .content[data-sidebar='visible'] .panel-backdrop,
 .content:has(#nicklist) .panel-backdrop {
     display: block;
@@ -1009,12 +990,6 @@ td.message a {
 
 .a-no-d {
     opacity: 1;
-}
-
-.a-reset {
-    font-weight: normal;
-    font-style: normal;
-    text-decoration: none;
 }
 
 div.colourbox,
@@ -1672,7 +1647,6 @@ label.settings-row:hover {
     }
 
     .panel-backdrop,
-    .content[sidebar-state='visible'] .panel-backdrop,
     .content[data-sidebar='visible'] .panel-backdrop,
     .content:has(#nicklist) .panel-backdrop {
         display: none;

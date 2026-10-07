@@ -5,7 +5,7 @@ import {
     toggleNicklistPanel,
     uiStore,
     useActiveBuffer,
-    useChat,
+    useUnreadTotals,
 } from '../chat';
 import { useSettings } from '../settings';
 import { Icon } from './Icon';
@@ -13,16 +13,7 @@ import { RichText } from './RichText';
 
 export function TopBar({ showNicklist }: { showNicklist: boolean }) {
     const buffer = useActiveBuffer();
-    const totals = useChat((s) => {
-        let unread = 0;
-        let notifications = 0;
-        for (const b of Object.values(s.buffers)) {
-            unread += b.unread;
-            notifications += b.notification;
-        }
-        return `${unread}:${notifications}`;
-    });
-    const [unread, notifications] = totals.split(':').map(Number);
+    const { unread, notifications } = useUnreadTotals();
     const host = useSettings((s) => `${s.host}:${s.port}`);
 
     const nameClasses = ['buffer-name'];

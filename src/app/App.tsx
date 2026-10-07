@@ -8,6 +8,7 @@ import {
     useActiveBuffer,
     useChat,
     useUi,
+    useUnreadTotals,
 } from './chat';
 import { updateAppBadge, updateFavicon, updateTitle } from './notifications';
 import { useSettings } from './settings';
@@ -24,25 +25,16 @@ import { TopicDialog } from './components/TopicDialog';
 /** Title, favicon and app badge with the unread counts */
 function useUnreadIndicators(): void {
     const buffer = useActiveBuffer();
-    const counts = useChat((s) => {
-        let unread = 0;
-        let notifications = 0;
-        for (const b of Object.values(s.buffers)) {
-            unread += b.unread;
-            notifications += b.notification;
-        }
-        return `${unread}:${notifications}`;
-    });
+    const { unread, notifications } = useUnreadTotals();
     const connected = useChat(
         (s) => s.status === 'connected' || s.status === 'reconnecting',
     );
     const useFavico = useSettings((s) => s.useFavico);
     useEffect(() => {
-        const [unread, notifications] = counts.split(':').map(Number);
         updateTitle(notifications, connected ? buffer : undefined);
         updateFavicon(connected ? notifications : 0, connected ? unread : 0);
         updateAppBadge(connected ? notifications : 0, connected ? unread : 0);
-    }, [counts, buffer, connected, useFavico]);
+    }, [unread, notifications, buffer, connected, useFavico]);
 }
 
 /** Lines read while the window was hidden are read when it comes back */

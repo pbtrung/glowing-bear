@@ -43,6 +43,18 @@ export function useChatShallow<T>(selector: (state: SessionState) => T): T {
     return useStore(session.store, useShallow(selector));
 }
 
+/** Unread lines and notifications (highlights, private messages) of all buffers */
+export const useUnreadTotals = (): { unread: number; notifications: number } =>
+    useChatShallow((s) => {
+        let unread = 0;
+        let notifications = 0;
+        for (const b of Object.values(s.buffers)) {
+            unread += b.unread;
+            notifications += b.notification;
+        }
+        return { unread, notifications };
+    });
+
 export const useActiveBuffer = (): Buffer | undefined =>
     useChat((s) =>
         s.activeBufferId !== null ? s.buffers[s.activeBufferId] : undefined,

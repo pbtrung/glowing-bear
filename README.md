@@ -45,7 +45,9 @@ nginx, Apache, …).
 
 The host field also accepts `host:port` and `host:port/path` (for relays behind a
 reverse proxy; the default path is `api`). The fields can be prefilled from the URL,
-e.g. `#host=my.domain.com&port=9001&autoconnect=true`.
+e.g. `#host=my.domain.com&port=9001&autoconnect=true` (also `path` and `password`).
+The URL fragment is removed once read, `autoconnect` only applies to that visit, and a
+saved password is forgotten when the URL points to another relay.
 
 To install Glowing Bear as an app, use your browser's "Install" or "Add to Home
 screen" option.

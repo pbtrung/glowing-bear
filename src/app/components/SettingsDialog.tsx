@@ -39,15 +39,15 @@ const FONT_PRESETS = [
 const SHORTCUTS: [ReactNode, string][] = [
     [
         <>
-            <kbd>Alt</kbd> <kbd>0</kbd>–<kbd>9</kbd>
+            <kbd>Alt</kbd> <kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd>
         </>,
-        'Switch to buffer number N',
+        'Switch to the Nth buffer of the list (10th with 0)',
     ],
     [
         <>
             <kbd>Alt</kbd> <kbd>j</kbd> <kbd>NN</kbd>
         </>,
-        'Switch to buffer number NN',
+        'Switch to the buffer with jump key NN (shown after Alt j)',
     ],
     [
         <>
@@ -63,7 +63,7 @@ const SHORTCUTS: [ReactNode, string][] = [
     ],
     [
         <>
-            <kbd>Alt</kbd> <kbd>&lt;</kbd>
+            <kbd>Alt</kbd> <kbd>&lt;</kbd> / <kbd>`</kbd>
         </>,
         'Previously active buffer',
     ],
@@ -91,7 +91,18 @@ const SHORTCUTS: [ReactNode, string][] = [
         </>,
         'Clear all unread counters',
     ],
-    [<kbd>Tab</kbd>, 'Complete nick or command'],
+    [
+        <>
+            <kbd>Tab</kbd> / <kbd>Shift</kbd> <kbd>Tab</kbd>
+        </>,
+        'Complete nick or command (next / previous)',
+    ],
+    [
+        <>
+            <kbd>PgUp</kbd> / <kbd>PgDn</kbd>
+        </>,
+        'Scroll the lines (loads older lines at the top)',
+    ],
     [
         <>
             <kbd>↑</kbd> / <kbd>↓</kbd>
@@ -332,7 +343,8 @@ function Chat() {
                     title="LaTeX math"
                     help={
                         <>
-                            Render math between <code>$$</code> delimiters with KaTeX.
+                            Render math between <code>$$</code>, <code>\[ \]</code> or{' '}
+                            <code>\( \)</code> delimiters with KaTeX.
                         </>
                     }
                 />

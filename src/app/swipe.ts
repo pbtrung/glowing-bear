@@ -7,7 +7,7 @@ import { isMobileUi, session, setUi, uiStore } from './chat';
 
 const MIN_DISTANCE = 60;
 
-export function swipeRight(): void {
+function swipeRight(): void {
     const ui = uiStore.getState();
     if (ui.nicklistOpen) {
         setUi({ nicklistOpen: false });
@@ -17,7 +17,7 @@ export function swipeRight(): void {
     }
 }
 
-export function swipeLeft(): void {
+function swipeLeft(): void {
     const ui = uiStore.getState();
     if (ui.sidebarOpen) {
         setUi({ sidebarOpen: false });

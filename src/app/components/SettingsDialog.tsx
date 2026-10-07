@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
     BellRing,
+    EllipsisVertical,
     Info,
     Keyboard,
     Lock,
@@ -465,10 +466,68 @@ const PANES: Record<Tab, () => ReactNode> = {
     about: About,
 };
 
+/** On phones: the sections in a menu behind a ⋮ button */
+function SectionMenu({ tab, onSelect }: { tab: Tab; onSelect: (tab: Tab) => void }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    // Close when clicking elsewhere
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+        const onPointerDown = (event: PointerEvent) => {
+            if (!ref.current?.contains(event.target as Node)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('pointerdown', onPointerDown);
+        return () => document.removeEventListener('pointerdown', onPointerDown);
+    }, [open]);
+
+    return (
+        <div className="dropdown settings-menu" ref={ref}>
+            <button
+                type="button"
+                className={`btn btn-icon${open ? ' active' : ''}`}
+                aria-label="Settings sections"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                onClick={() => setOpen(!open)}
+            >
+                <Icon icon={EllipsisVertical} />
+            </button>
+            <ul
+                className={`dropdown-menu dropdown-menu-end${open ? ' show' : ''}`}
+                role="menu"
+            >
+                {TABS.filter((t) => !t.desktop).map((t) => (
+                    <li key={t.id} role="none">
+                        <button
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={tab === t.id}
+                            className={`dropdown-item d-flex align-items-center gap-2${tab === t.id ? ' active' : ''}`}
+                            onClick={() => {
+                                onSelect(t.id);
+                                setOpen(false);
+                            }}
+                        >
+                            <Icon icon={t.icon} />
+                            {t.label}
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 export function SettingsDialog() {
     const open = useUi((s) => s.modal === 'settings');
     const [tab, setTab] = useState<Tab>('appearance');
     const Pane = PANES[tab];
+    const current = TABS.find((t) => t.id === tab)!;
     return (
         <Modal
             id="settingsModal"
@@ -483,13 +542,17 @@ export function SettingsDialog() {
                     id="settingsTitle"
                 >
                     <Icon icon={SlidersHorizontal} /> Settings
+                    <span className="settings-current">· {current.label}</span>
                 </h2>
-                <button
-                    type="button"
-                    className="btn-close"
-                    onClick={closeModal}
-                    aria-label="Close"
-                />
+                <div className="d-flex align-items-center gap-1 ms-auto">
+                    <SectionMenu tab={tab} onSelect={setTab} />
+                    <button
+                        type="button"
+                        className="btn-close"
+                        onClick={closeModal}
+                        aria-label="Close"
+                    />
+                </div>
             </div>
             <div className="settings-layout">
                 <nav
@@ -504,13 +567,7 @@ export function SettingsDialog() {
                             role="tab"
                             aria-selected={tab === t.id}
                             className={`settings-nav-item${tab === t.id ? ' active' : ''}${t.desktop ? ' desktop' : ''}`}
-                            onClick={(e) => {
-                                setTab(t.id);
-                                e.currentTarget.scrollIntoView({
-                                    block: 'nearest',
-                                    inline: 'nearest',
-                                });
-                            }}
+                            onClick={() => setTab(t.id)}
                         >
                             <Icon icon={t.icon} />
                             <span>{t.label}</span>

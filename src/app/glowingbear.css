@@ -999,14 +999,31 @@ span.colourbox {
     min-height: 0;
 }
 
+/* Phones: sections in the ⋮ menu of the header; larger: list on the side */
 .settings-nav {
-    display: flex;
+    display: none;
     gap: 0.25rem;
     flex-shrink: 0;
-    padding: 0.5rem 0.75rem;
-    overflow-x: auto;
-    border-bottom: 1px solid var(--gb-border);
-    scrollbar-width: none;
+}
+
+.settings-current {
+    color: var(--gb-muted);
+    font-weight: normal;
+}
+
+.settings-menu .dropdown-menu {
+    --bs-dropdown-bg: var(--gb-chrome-bg);
+    --bs-dropdown-border-color: var(--gb-border);
+    --bs-dropdown-link-color: var(--gb-fg);
+    --bs-dropdown-link-hover-bg: var(--gb-hover-bg);
+    --bs-dropdown-link-hover-color: var(--gb-fg);
+    --bs-dropdown-link-active-bg: var(--gb-active-bg);
+    --bs-dropdown-link-active-color: var(--gb-active-fg);
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 0.25rem;
+    box-shadow: var(--gb-shadow);
 }
 
 .settings-nav-item {
@@ -1295,12 +1312,16 @@ label.settings-row:hover {
     }
 
     .settings-nav {
+        display: flex;
         flex-direction: column;
         width: 12rem;
         padding: 0.75rem;
-        overflow-x: visible;
-        border-bottom: 0;
         border-right: 1px solid var(--gb-border);
+    }
+
+    .settings-menu,
+    .settings-current {
+        display: none;
     }
 
     .settings-panes {

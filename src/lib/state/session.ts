@@ -55,6 +55,9 @@ export function escapeInsert(text: string): string {
         .replace(/ +$/, (spaces) => '\\x20'.repeat(spaces.length));
 }
 
+/** Lines loaded when a buffer is shown */
+const LINES_WANTED = 100;
+
 /** Time to wait for a buffer we asked to open (ms) */
 const OUTGOING_QUERY_TIMEOUT = 60000;
 
@@ -131,6 +134,9 @@ export class Session {
     private hotlistTimer: ReturnType<typeof setInterval> | undefined;
     private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     private history = new Map<number, { lines: string[]; pos: number }>();
+    /** Buffers whose lines / nicklist are being fetched */
+    private fetching = new Set<number>();
+    private loadingNicklist = new Set<number>();
     private readonly options: SessionOptions;
 
     constructor(options: SessionOptions) {
@@ -242,7 +248,6 @@ export class Session {
         api: RelayApi,
         current: () => void,
     ): Promise<void> {
-        const previous = activeBuffer(this.state)?.fullName;
         // Alone first: older relays may not answer the batch
         const version = await api.version();
         current();
@@ -273,6 +278,8 @@ export class Session {
         );
         current();
 
+        // The buffer shown (the user may switch while reconnecting)
+        const previous = activeBuffer(this.state)?.fullName;
         const loaded: ChatState = {
             ...initialState,
             status: 'connected',
@@ -317,7 +324,8 @@ export class Session {
         this.set({ latency: null });
         this.client = null;
         this.api = null;
-        if (byClient || this.state.status === 'disconnected') {
+        // Closed by us, or during the first connection (connect() reports it)
+        if (byClient || this.state.status === 'connecting') {
             this.set({ status: 'disconnected' });
             return;
         }
@@ -358,7 +366,16 @@ export class Session {
             }
             const next = delay * 1.5;
             if (next >= (this.options.reconnectMaxDelay ?? 600000)) {
-                this.set({ status: 'disconnected' });
+                this.set({
+                    status: 'disconnected',
+                    error:
+                        e instanceof ConnectError
+                            ? e
+                            : new ConnectError(
+                                  'network',
+                                  'Reconnecting failed: ' + String(e),
+                              ),
+                });
             } else {
                 this.scheduleReconnect(next);
             }
@@ -435,7 +452,7 @@ export class Session {
      *
      * @param linesWanted number of lines to load if none are loaded yet
      */
-    activate(bufferId: number, linesWanted = 100): void {
+    activate(bufferId: number, linesWanted = LINES_WANTED): void {
         const before = this.state.buffers[bufferId];
         if (!before) {
             return;
@@ -475,16 +492,16 @@ export class Session {
      */
     async fetchLines(bufferId: number, count?: number, unreadHint = 0): Promise<void> {
         const buffer = this.state.buffers[bufferId];
-        if (!this.api || !buffer) {
+        if (!this.api || !buffer || this.fetching.has(bufferId)) {
             return;
         }
+        this.fetching.add(bufferId);
         // Free buffers (e.g. /fset) are fetched whole: their lines are a screen
         const wanted = buffer.free
             ? Infinity
             : Math.max(
                   count ?? 0,
-                  buffer.linesFetched ? buffer.requestedLines * 2 : 0,
-                  1,
+                  buffer.linesFetched ? buffer.requestedLines * 2 : LINES_WANTED,
               );
         this.update((s) => setLoadingLines(s, bufferId, true));
         try {
@@ -497,19 +514,23 @@ export class Session {
         } catch {
             // connection lost (the reconnection reloads them), or buffer closed
         } finally {
+            this.fetching.delete(bufferId);
             this.update((s) => setLoadingLines(s, bufferId, false));
         }
     }
 
     async loadNicklist(bufferId: number): Promise<void> {
-        if (!this.api) {
+        if (!this.api || this.loadingNicklist.has(bufferId)) {
             return;
         }
+        this.loadingNicklist.add(bufferId);
         try {
             const root = await this.api.nicks(bufferId, 'weechat');
             this.update((s) => applyNicklist(s, bufferId, root));
         } catch {
             // connection lost (the reconnection reloads it), or buffer closed
+        } finally {
+            this.loadingNicklist.delete(bufferId);
         }
     }
 
@@ -561,7 +582,19 @@ export class Session {
         this.addToHistory(bufferId, text);
         const opened = openedBufferName(text);
         if (opened) {
-            this.expectBuffer(opened);
+            // Already open (no event will come): switch to it now
+            const origin = this.state.buffers[bufferId];
+            const existing = Object.values(this.state.buffers).find(
+                (b) =>
+                    b.shortName.toLowerCase() === opened.toLowerCase() &&
+                    b.plugin === origin?.plugin &&
+                    b.server === origin?.server,
+            );
+            if (existing) {
+                this.activate(existing.id);
+            } else {
+                this.expectBuffer(opened);
+            }
         }
         // A buffer accepting multi-line input gets the text whole
         const multiline = this.state.buffers[bufferId]?.inputMultiline === true;

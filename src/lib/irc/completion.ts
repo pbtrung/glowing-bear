@@ -88,7 +88,8 @@ export function completeNick(
         iterCandidate: null,
     };
 
-    const escapedSuffix = suffix.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+    // (outside a character class, "-" must not be escaped with the u flag)
+    const escapedSuffix = suffix.replace(/[[\]/{}()*+?.\\^$|]/g, '\\$&');
 
     // iterating nicks at the beginning?
     let m = beforeCaret.match(regex('^(' + NICK + ')' + escapedSuffix + ' ?$'));

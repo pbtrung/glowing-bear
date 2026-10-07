@@ -168,6 +168,22 @@ describe('connection', () => {
         expect(session.state.buffers).toEqual({});
     });
 
+    it('reports a connection lost during the first connection, without reconnecting', async () => {
+        vi.useFakeTimers();
+        const session = newSession({ reconnectDelay: 10 });
+        const connecting = session.connect(OPTIONS).catch((e) => e);
+        await vi.advanceTimersByTimeAsync(0);
+        const ws = FakeWebSocket.last;
+        ws.open();
+        await vi.advanceTimersByTimeAsync(0);
+        ws.refuse(1006);
+        expect(await connecting).toBeInstanceOf(Error);
+        expect(session.state.status).toBe('disconnected');
+        const count = FakeWebSocket.instances.length;
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(FakeWebSocket.instances).toHaveLength(count);
+    });
+
     it('refuses relay API versions older than 0.6.0, without retrying', async () => {
         const { session, ws } = await connected({ reconnectDelay: 1 });
         ws.refuse(1006);
@@ -358,6 +374,29 @@ describe('buffers', () => {
         expect(session.state.outgoingQueries).toEqual([
             { name: 'bob', expires: expect.any(Number) },
         ]);
+    });
+
+    it('switches to a query or channel already open', async () => {
+        const { session, ws } = await connected();
+        session.activate(1);
+        const sending = session.send(2, '/query #WEECHAT');
+        expect(session.state.activeBufferId).toBe(2);
+        expect(session.state.outgoingQueries).toEqual([]);
+        await flush();
+        ws.reply(204);
+        await sending;
+    });
+
+    it('fetches the usual number of lines when none were fetched', async () => {
+        const { session, ws } = await connected();
+        void session.fetchLines(2);
+        expect(ws.sent.map((r) => r.request)).toContain(
+            'GET /api/buffers/2/lines?lines=-100&colors=weechat',
+        );
+        // Not twice at once
+        const count = ws.sent.length;
+        void session.fetchLines(2);
+        expect(ws.sent).toHaveLength(count);
     });
 
     it('sends each line of a text, skipping empty ones', async () => {

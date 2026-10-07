@@ -83,6 +83,11 @@ describe('nick completion', () => {
         ).toBeNull();
     });
 
+    it('accepts any nick completer', () => {
+        expect(completeNick('al', 2, null, nicks, '-').text).toBe('alice- ');
+        expect(completeNick('al', 2, null, nicks, '.*').text).toBe('alice.* ');
+    });
+
     it('does nothing without a match', () => {
         expect(completeNick('zz', 2, null, nicks)).toEqual({
             text: 'zz',

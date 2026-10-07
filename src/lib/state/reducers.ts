@@ -243,8 +243,11 @@ function addNewLine(
 
     const active = draft.activeBufferId === buffer.id;
     if (!active) {
-        // (the lines of the active buffer are kept while it's read)
         trimLines(buffer);
+    } else if (buffer.lines.length > 4 * MAX_LINES) {
+        // The lines of the active buffer are kept while it's read, up to a
+        // point (e.g. a busy buffer shown all night)
+        trimLines(buffer, 2 * MAX_LINES);
     }
     if (active) {
         effects.push({ type: 'activeBufferLine', bufferId: buffer.id });
@@ -325,19 +328,21 @@ export function applyLines(
         // event, and must not replace the local one)
         const noMarker =
             buffer.lastReadKey === null || buffer.lastReadKey === READ_MARKER_TOP;
-        if (noMarker && buffer.lastReadLineId >= 0) {
-            const key = 'l' + buffer.lastReadLineId;
-            const first = buffer.lines.find((l) => !l.isDateChange);
-            if (buffer.lines.some((l) => l.key === key)) {
-                buffer.lastReadKey = key;
-            } else if (first && first.id > buffer.lastReadLineId) {
-                // read before the lines loaded (line ids grow with time)
-                buffer.lastReadKey = READ_MARKER_TOP;
-            }
+        if (noMarker && buffer.lastReadLineId >= 0 && buffer.lines.length > 0) {
+            // The last line loaded up to WeeChat's one (which may be filtered,
+            // e.g. a join hidden by the smart filter); line ids grow with time
+            const read = buffer.lines.findLast(
+                (l) => !l.isDateChange && l.id <= buffer.lastReadLineId,
+            );
+            buffer.lastReadKey = read ? read.key : READ_MARKER_TOP;
         } else if (noMarker && unreadHint > 0) {
             buffer.lastReadKey = guessLastRead(buffer.lines, unreadHint);
         }
         buffer.linesFetched = true;
+        if (draft.activeBufferId !== bufferId) {
+            // fetched for a buffer left meanwhile
+            trimLines(buffer);
+        }
         // Show a date change before today's first message
         const last = buffer.lines[buffer.lines.length - 1];
         if (last && startOfDay(last.date) !== startOfDay(new Date())) {
@@ -546,7 +551,7 @@ function checkOutgoingQuery(
 }
 
 /** The body of the event is the buffer: update its properties */
-const bufferChanged: EventHandler = (draft, event) => {
+const bufferChanged: EventHandler = (draft, event, _ctx, effects) => {
     const buffer = eventBuffer(draft, event);
     if (buffer && event.body) {
         const wasFree = buffer.free;
@@ -555,6 +560,10 @@ const bufferChanged: EventHandler = (draft, event) => {
             // Lines are addressed differently (y instead of id): reload them
             resetLines(buffer);
             buffer.allLinesFetched = false;
+            if (draft.activeBufferId === buffer.id) {
+                // (activating the buffer shown fetches its lines)
+                effects.push({ type: 'activate', bufferId: buffer.id });
+            }
         }
     }
 };

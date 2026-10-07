@@ -31,14 +31,23 @@ export function buildShortcodes(data: Record<string, string | string[]>): Shortc
 }
 
 let shortcodes: Shortcodes | null = null;
-let loading: Promise<Shortcodes> | null = null;
+let loading: Promise<Shortcodes | null> | null = null;
 
 /** Load the shortcodes (once); null until they are loaded */
 export function loadShortcodes(): Shortcodes | null {
-    loading ??= import('emojibase-data/en/shortcodes/github.json').then((m) => {
-        shortcodes = buildShortcodes(m.default as Record<string, string | string[]>);
-        return shortcodes;
-    });
+    loading ??= import('emojibase-data/en/shortcodes/github.json').then(
+        (m) => {
+            shortcodes = buildShortcodes(
+                m.default as Record<string, string | string[]>,
+            );
+            return shortcodes;
+        },
+        () => {
+            // e.g. offline, or a new version deployed: try again next time
+            loading = null;
+            return null;
+        },
+    );
     return shortcodes;
 }
 

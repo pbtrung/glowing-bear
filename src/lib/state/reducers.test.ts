@@ -227,6 +227,41 @@ describe('lines', () => {
         expect(applyLines(setup(), 2, lines, 100, 2).buffers[2].lastReadKey).toBe('l1');
     });
 
+    it('places the read marker when WeeChat one is on a filtered line', () => {
+        let state = applyBuffers(setup(), [
+            apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat', {
+                last_read_line_id: 2,
+            }),
+        ]);
+        state = applyLines(
+            state,
+            2,
+            [
+                apiLine(1, 'a'),
+                apiLine(2, 'join', { displayed: false }),
+                apiLine(3, 'b'),
+            ],
+            100,
+        );
+        expect(state.buffers[2].lastReadKey).toBe('l1');
+    });
+
+    it('reloads the lines of the buffer shown when its type changes', () => {
+        let state = setActiveBuffer(
+            applyLines(setup(), 2, [apiLine(1, 'one')], 100),
+            2,
+        );
+        const r = send(
+            state,
+            'buffer_type_changed',
+            2,
+            apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat', { type: 'free' }),
+        );
+        expect(r.effects).toEqual([{ type: 'activate', bufferId: 2 }]);
+        state = r.state;
+        expect(state.buffers[2].linesFetched).toBe(false);
+    });
+
     it('keeps the local read marker over WeeChat one', () => {
         let state = applyLines(setup(), 2, [apiLine(1, 'a'), apiLine(2, 'b')], 100);
         state = setActiveBuffer(setActiveBuffer(state, 2), 1);
@@ -825,6 +860,22 @@ describe('lines kept', () => {
         expect(lines.at(-1)?.id).toBe(5000);
         // The read marker is on the last line
         expect(state.buffers[2].lastReadKey).toBe('l5000');
+    });
+
+    it('trims the buffer shown when it gets very long', () => {
+        let state = setActiveBuffer(setup(), 2);
+        state = applyLines(state, 2, many(1, 4 * MAX_LINES), 4 * MAX_LINES);
+        state = send(state, 'buffer_line_added', 2, apiLine(9000, 'one more')).state;
+        const lines = state.buffers[2].lines.filter((l) => !l.isDateChange);
+        expect(lines).toHaveLength(2 * MAX_LINES);
+        expect(lines.at(-1)?.id).toBe(9000);
+    });
+
+    it('trims lines fetched for a buffer left meanwhile', () => {
+        const state = applyLines(setup(), 2, many(1, 3 * MAX_LINES), 4 * MAX_LINES);
+        expect(state.buffers[2].lines.filter((l) => !l.isDateChange)).toHaveLength(
+            MAX_LINES,
+        );
     });
 
     it('moves the read marker to the top when its line is dropped', () => {

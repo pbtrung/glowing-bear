@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Glowing Bear is a browser-based frontend for the WeeChat IRC client. It speaks the WeeChat relay **`api` protocol** (JSON over HTTP + WebSocket) directly — there is **no backend service**. All code is client-side JavaScript (AngularJS 1.x). The user's browser connects straight to their WeeChat instance.
+Glowing Bear is a browser-based frontend for the WeeChat IRC client. It speaks the WeeChat relay **`api` protocol** (JSON over HTTP + WebSocket) directly — there is **no backend service**. The UI is AngularJS 1.x (`src/js/`, being replaced by React + Vite + TypeScript); the protocol and state core is TypeScript in `src/lib/`. The user's browser connects straight to their WeeChat instance.
 
 Requires WeeChat ≥ 4.1 with an `api` relay (`/relay add api <port>`). The binary `weechat` relay protocol is no longer supported. Protocol spec: https://weechat.org/files/doc/weechat/stable/weechat_relay_api.en.html
 
@@ -14,19 +14,36 @@ Requires WeeChat ≥ 4.1 with an `api` relay (`/relay add api <port>`). The bina
 npm install              # install deps (runs automatically before `start`)
 npm start                # webpack dev server on http://localhost:8000 with live reload
 npm run build            # production build into build/
-npm run lint             # jshint over src/js/*.js and test/unit/*.js
-npm test                 # karma + jasmine unit tests (single run; uses webpack preprocessor)
+npm run lint             # jshint (src/js, test/unit) + eslint (TypeScript)
+npm run typecheck        # tsc (TypeScript 6, target ES2025)
+npm test                 # vitest (src/**/*.test.ts) + karma/jasmine (AngularJS, test/unit)
+npm run test:relay       # relay "api" compliance tests against a real WeeChat in Docker (see below)
 npm run protractor       # legacy e2e tests — REQUIRES Glowing Bear on :8000 AND a WeeChat relay
 npm run format           # prettier --write . (88 columns; *.html is excluded)
 npm run format:check     # prettier --check .
-./run_tests.sh           # full check suite: format check + lint + unit tests
+./run_tests.sh           # full check suite: format check + lint + typecheck + unit tests
 ```
 
-Single-test runs: there is no built-in filter flag; edit `test/unit/main.test.js` to import only the spec you want, or use Jasmine's `fdescribe` / `fit` to focus.
+Single-test runs: `npx vitest run src/lib/state` (or `-t "name"`) for Vitest; for Karma edit `test/unit/main.test.js` or use Jasmine's `fdescribe` / `fit`.
+
+`npm run test:relay` (`vitest.relay.config.mts`, `test/relay/`) starts `weechat/weechat:latest-alpine` in Docker with a plain `api` relay and the fixtures script `test/relay/fixtures/gbtest.py`, then tests authentication (every hash algorithm, errors, TOTP), every resource and every event against it. `WEECHAT_KEEP=1` keeps the container for debugging; `WEECHAT_RELAY=host:port WEECHAT_PASSWORD=...` uses an existing relay. Things learned from it: `POST /api/input` answers before the command runs (tests use a barrier), `buffer_moved` is sent for every renumbered buffer, `/quit` is blocked by `relay.network.commands`, and Node's fetch keep-alive breaks the next WebSocket upgrade (tests send `Connection: close`).
 
 The Karma config (`test/karma.conf.js`) auto-switches to `ChromeHeadlessNoSandbox` under `TRAVIS=1`. For headless local runs without a display, set that env var or add a custom launcher.
 
 ## Architecture
+
+### TypeScript core (`src/lib/`, framework-agnostic, tested with Vitest)
+
+- **`relay/types.ts`** — types of every object of the `api` protocol.
+- **`relay/auth.ts`** — credentials (`plain:` / `hash:<algo>:<timestamp>:…`, PBKDF2 salted with the timestamp), WebSocket sub-protocol auth, URLs, auth error messages.
+- **`relay/client.ts`** — `RelayClient`: handshake, authenticated WebSocket, `request(method, path, body)` matched by `request_id`, events, ping keepalive, `abort()`; a refused WebSocket is explained with `GET /api/version` over HTTP (`ConnectError.kind`).
+- **`relay/api.ts`** — `RelayApi`: one typed method per resource (version, buffers, lines, nicks, hotlist, scripts, options, input, completion, ping, sync).
+- **`relay/colors.ts`** — WeeChat color codes → `RichText` parts with the theme CSS classes.
+- **`state/model.ts`**, **`state/reducers.ts`** — buffers/lines/nicks and pure (immer) reducers for responses and every event; side effects are returned as `Effect`s.
+- **`state/session.ts`** — `Session`: zustand store, connect/initial sync/reconnect/upgrade handling, user actions, input history.
+- **`time-format.ts`** (strftime → text parts), **`irc/completion.ts`** (nick completion).
+
+### AngularJS app (`src/js/`, to be replaced)
 
 Entry point is `src/main.js`, which imports every AngularJS module under `src/js/`. Webpack bundles everything; `src/index.html` is the shell that Angular boots into. There is **no router-driven view layout** — the whole UI lives in `src/index.html` with the input bar directive template in `src/directives/input.html`.
 

@@ -12,9 +12,12 @@ description: Commit staged/modified changes with a detailed message and push, no
    - Any `*.js`, `*.css`, `*.json`, or `*.md` changed: `npm run format` (Prettier,
      88 columns; `*.html` templates are deliberately excluded), then
      `npm run format:check`.
-   - Any `src/**/*.js`, `src/**/*.html`, `src/css/**`, or `test/unit/**` changed:
-     `npm run lint` (jshint over `src/js/*.js` and `test/unit/*.js`), then
-     `env TRAVIS=1 npm test` (karma + jasmine, single run; `TRAVIS=1` forces
+   - Any `*.ts`/`*.tsx`/`*.mts` changed: `npm run typecheck`.
+   - Any `src/lib/relay/**` or `src/lib/state/**` changed and Docker is available:
+     `npm run test:relay` (protocol compliance against a real WeeChat).
+   - Any `src/**/*.js`, `src/**/*.ts*`, `src/**/*.html`, `src/css/**`, `test/**` changed:
+     `npm run lint` (jshint + ESLint), then
+     `env TRAVIS=1 npm test` (vitest, then karma + jasmine, single run; `TRAVIS=1` forces
      `ChromeHeadlessNoSandbox` so it doesn't try to open a real Chrome window; set
      `CHROME_BIN=/usr/bin/chromium` if Karma can't find Chrome).
    - Any `webpack.config.js`, `package.json`, or `.babelrc` changed: also run

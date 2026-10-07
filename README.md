@@ -53,8 +53,10 @@ screen" option.
 ## Development
 
 ```bash
-npm run format   # Prettier
-npm run lint     # jshint
-npm test         # Karma + Jasmine unit tests
-./run_tests.sh   # format check + lint + unit tests
+npm run format      # Prettier
+npm run lint        # jshint + ESLint
+npm run typecheck   # TypeScript
+npm test            # Vitest + Karma unit tests
+npm run test:relay  # protocol tests against a real WeeChat (needs Docker)
+./run_tests.sh      # format check + lint + typecheck + unit tests
 ```

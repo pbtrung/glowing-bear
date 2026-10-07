@@ -134,8 +134,6 @@ weechat.controller('WeechatCtrl', [
             enableQuickKeys: true,
             customCSS: '',
             currentlyViewedBuffers: {},
-            iToken: '',
-            iAlb: '',
         });
         $scope.settings = settings;
 

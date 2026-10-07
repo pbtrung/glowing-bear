@@ -50,7 +50,6 @@ The codebase splits cleanly into protocol vs. UI:
 
 - **`src/js/glowingbear.js`** (~1000 lines) — the main `WeechatCtrl` controller. Handles settings defaults, theme switching, mobile swipe state, the buffer list, notifications wiring, focus/scroll. Imports `connectionFactory` from `connection.js` and registers it as the `connection` service.
 - **`src/js/inputbar.js`** (~800 lines) — chat input directive with readline-style keybindings, history, tab completion (delegates to `irc-utils.js` for nick completion).
-- **`src/js/imgur*.js`** — Imgur upload integration (drag-and-drop in `imgur-drop-directive.js`).
 - **`src/js/filters.js`** — Angular filters used in templates (highlighting, IRC color → HTML, etc.).
 - **`src/js/notifications.js`** — desktop notifications, sound, favicon badge (`favico.js`).
 - **`src/js/settings.js`** + **`src/js/localstorage.js`** — settings with localStorage persistence. Every setting must be declared in `settings.setDefaults({...})` in `glowingbear.js` or it won't persist.

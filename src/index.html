@@ -27,9 +27,6 @@
   <body ng-controller="WeechatCtrl" ng-keydown="handleKeyPress($event)" ng-keyup="handleKeyRelease($event)" ng-keypress="handleKeyPress($event)" ng-class="{'no-overflow': connected}" ng-init="init()">
     <audio id="audioNotificationInitializer"><source src="data:audio/mp3;base64,/+MYxAAJs2H8AABLSZv4Af/5yAsCIElB/v/+Y///U+QiEaSchGO+IMQjZCgOLw4KVoIEkf/r69Kbfc7/WbLRPsyvp7/p/p///+MYxBQK+1oUAACNMUWSyLcrqpERhDqKCBWcgbTmuIq8ISkQSv+yf/tbZf9krRTptRUv/XT////66NJQFZTpOd3KUEtM+a+l/+MYxCMKM2YcAACNMB+Jqe+HLv+75fSreYSWGtqHJghl6y///89fcz/p8qIRKeFWYKEGo5mLFmCGBjV0FEJn/9f85V87iy98/+MYxDULA1YYAABHLbI52f2/4v////n7U/swVr0SzhrRIueMLLog0qIKcOwu/5v/lLR/r9DPN/R+vmf//////V8tAxlMY1sy/+MYxEQKM2IYAABHLZjRjUlgUSUAhTUBFHVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxFYJ22oAAACHMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"></audio>
 
-    <div class="alert alert-danger upload-error d-flex align-items-center gap-2" role="alert" ng-show="uploadError" ng-cloak>
-      <gb-icon name="circle-alert"></gb-icon><span><strong>Upload error:</strong> Image upload failed.</span>
-    </div>
 
     <!-- Login page -->
     <main ng-hide="connected" class="login container">
@@ -266,7 +263,7 @@ chown -R <strong>username</strong>:<strong>username</strong> ~<strong>username</
         </ul>
       </aside>
 
-      <main id="bufferlines" class="favorite-font" ng-swipe-right="swipeRight()" ng-swipe-left="swipeLeft()" ng-swipe-disable-mouse ng-class="{'withnicklist': showNicklist, 'hideTime': activeBuffer().hideBufferLineTimes, 'hidePrefix': activeBuffer().hidePrefix, 'freeBuffer': activeBuffer().bufferType === 1}" when-scrolled="infiniteScroll()" imgur-drop>
+      <main id="bufferlines" class="favorite-font" ng-swipe-right="swipeRight()" ng-swipe-left="swipeLeft()" ng-swipe-disable-mouse ng-class="{'withnicklist': showNicklist, 'hideTime': activeBuffer().hideBufferLineTimes, 'hidePrefix': activeBuffer().hidePrefix, 'freeBuffer': activeBuffer().bufferType === 1}" when-scrolled="infiniteScroll()">
         <table>
           <tbody>
             <tr class="bufferline fetch-more">
@@ -396,19 +393,6 @@ chown -R <strong>username</strong>:<strong>username</strong> ~<strong>username</
               </div>
             </section>
 
-            <section class="settings-section">
-              <h3 class="h6 d-flex align-items-center gap-2"><gb-icon name="upload"></gb-icon> Image upload (Imgur) <a target="_blank" rel="noopener" href="https://github.com/glowing-bear/glowing-bear/wiki/Getting-an-imgur-token-&-album-hash" title="Getting an Imgur token" class="link-secondary"><gb-icon name="info"></gb-icon></a></h3>
-              <div class="row g-2">
-                <div class="col-12 col-sm-7">
-                  <label class="form-label" for="iToken">Access token</label>
-                  <input type="text" id="iToken" class="form-control" ng-model="settings.iToken" placeholder="Access token" autocapitalize="off" spellcheck="false">
-                </div>
-                <div class="col-12 col-sm-5">
-                  <label class="form-label" for="iAlb">Album hash</label>
-                  <input type="text" id="iAlb" class="form-control" ng-model="settings.iAlb" placeholder="Album hash" autocapitalize="off" spellcheck="false">
-                </div>
-              </div>
-            </section>
 
             <section class="settings-section mb-0">
               <h3 class="h6 d-flex align-items-center gap-2"><gb-icon name="server"></gb-icon> About</h3>

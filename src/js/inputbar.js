@@ -16,9 +16,7 @@ weechat.directive('inputBar', function () {
             '$scope',
             '$element',
             '$log',
-            '$compile',
             'connection',
-            'imgur',
             'models',
             'IrcUtils',
             'settings',
@@ -28,9 +26,7 @@ weechat.directive('inputBar', function () {
                 $scope,
                 $element, //XXX do we need this? don't seem to be using it
                 $log,
-                $compile,
                 connection, //XXX we should eliminate this dependency and use signals instead
-                imgur,
                 models,
                 IrcUtils,
                 settings,
@@ -269,78 +265,6 @@ weechat.directive('inputBar', function () {
                         // Input hasn't changed so we should already have our completion list
                         cycleCompletionList(direction);
                     }
-                };
-
-                $rootScope.insertAtCaret = function (toInsert) {
-                    // caret position in the input bar
-                    var inputNode = $scope.getInputNode(),
-                        caretPos = inputNode.selectionStart;
-
-                    var prefix = $scope.command.substring(0, caretPos),
-                        suffix = $scope.command.substring(
-                            caretPos,
-                            $scope.command.length,
-                        );
-                    // Add spaces if missing
-                    if (prefix.length > 0 && prefix[prefix.length - 1] !== ' ') {
-                        prefix += ' ';
-                    }
-                    if (suffix.length > 0 && suffix[0] !== ' ') {
-                        suffix = ' '.concat(suffix);
-                    }
-                    $scope.command = prefix + toInsert + suffix;
-
-                    setTimeout(function () {
-                        inputNode.focus();
-                        var pos = $scope.command.length - suffix.length;
-                        inputNode.setSelectionRange(pos, pos);
-                        // force refresh?
-                        $scope.$apply();
-                    }, 0);
-                };
-
-                $scope.uploadImage = function ($event, files) {
-                    // Send image url after upload
-                    var sendImageUrl = function (imageUrl, deleteHash) {
-                        // Put link in input box
-                        if (imageUrl !== undefined && imageUrl !== '') {
-                            $rootScope.insertAtCaret(String(imageUrl));
-                        }
-                    };
-
-                    if (typeof files !== 'undefined' && files.length > 0) {
-                        // Loop through files
-                        for (var i = 0; i < files.length; i++) {
-                            // Process image
-                            imgur.process(files[i], sendImageUrl);
-                        }
-                    }
-                };
-
-                var deleteCallback = function (deleteHash) {
-                    // Image got sucessfully deleted.
-                    // Show toast with delete link
-                    var toastDeleted = $compile(
-                        '<div class="gb-toast gb-toast-short">Successfully deleted.</div>',
-                    )($scope)[0];
-                    document.body.appendChild(toastDeleted);
-                    setTimeout(function () {
-                        document.body.removeChild(toastDeleted);
-                    }, 5000);
-
-                    // Try to remove the toast with the deletion link (it stays 15s
-                    // instead of the 5 of the deletion notification, so it could
-                    // come back beneath it, which would be confusing)
-                    var pasteToast = document.querySelector(
-                        "[data-imgur-deletehash='" + deleteHash + "']",
-                    );
-                    if (!!pasteToast) {
-                        document.body.removeChild(pasteToast);
-                    }
-                };
-
-                $scope.imgurDelete = function (deleteHash) {
-                    imgur.deleteImage(deleteHash, deleteCallback);
                 };
 
                 // Send the message to the websocket
@@ -949,55 +873,6 @@ weechat.directive('inputBar', function () {
                         $scope.getInputNode().focus();
                     }, 0);
 
-                    return true;
-                };
-
-                $scope.inputPasted = function (e) {
-                    if (
-                        e.clipboardData &&
-                        e.clipboardData.files &&
-                        e.clipboardData.files.length
-                    ) {
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        var sendImageUrl = function (imageUrl, deleteHash) {
-                            if (imageUrl !== undefined && imageUrl !== '') {
-                                $rootScope.insertAtCaret(String(imageUrl));
-                            }
-
-                            // The hash is compiled into a template: only accept
-                            // the alphanumeric hashes Imgur uses
-                            if (!/^[A-Za-z0-9]+$/.test(deleteHash || '')) {
-                                return;
-                            }
-
-                            // Show toast with delete link
-                            var toastImgur = $compile(
-                                '<div class="gb-toast gb-toast-long" data-imgur-deletehash=\'' +
-                                    deleteHash +
-                                    '\'>Image uploaded to Imgur. <a id="deleteImgur" ng-click="imgurDelete(\'' +
-                                    deleteHash +
-                                    '\')" href="">Delete?</a></div>',
-                            )($scope)[0];
-                            document.body.appendChild(toastImgur);
-                            setTimeout(function () {
-                                document.body.removeChild(toastImgur);
-                            }, 15000);
-
-                            // Log the delete hash to the console in case the toast was missed.
-                            console.log(
-                                "An image was uploaded to imgur, delete it with $scope.imgurDelete('" +
-                                    deleteHash +
-                                    "')",
-                            );
-                        };
-
-                        for (var i = 0; i < e.clipboardData.files.length; i++) {
-                            imgur.process(e.clipboardData.files[i], sendImageUrl);
-                        }
-                        return false;
-                    }
                     return true;
                 };
             },

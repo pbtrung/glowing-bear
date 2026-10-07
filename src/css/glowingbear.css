@@ -901,34 +901,6 @@ div.colourbox {
     color: var(--gb-accent);
 }
 
-.imgur-upload {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    opacity: 0;
-    cursor: pointer;
-}
-
-#imgur-upload-progress {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    width: 100%;
-}
-
-.imgur-progress-bar {
-    width: 0%;
-    height: 4px;
-    margin-top: 1px;
-    border-radius: 2px;
-    background: var(--gb-accent);
-}
-
-.imgur-drop-hover {
-    outline: 2px dashed var(--gb-accent);
-    outline-offset: -4px;
-}
-
 /*
  * Modals (shown/hidden through data-state, see showModal/closeModal)
  */
@@ -1000,8 +972,7 @@ div.colourbox {
 /*
  * Notices
  */
-.status-banner,
-.upload-error {
+.status-banner {
     position: fixed;
     top: calc(env(safe-area-inset-top) + var(--gb-topbar-height) + 0.5rem);
     left: 50%;
@@ -1040,12 +1011,6 @@ div.colourbox {
     animation:
         gb-fadein 0.3s,
         gb-fadeout 0.5s 4.5s forwards;
-}
-
-.gb-toast-long {
-    animation:
-        gb-fadein 0.3s,
-        gb-fadeout 0.5s 14.5s forwards;
 }
 
 @keyframes gb-fadein {

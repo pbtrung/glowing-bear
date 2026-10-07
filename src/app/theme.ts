@@ -80,6 +80,36 @@ export const THEMES: Theme[] = [
         light: true,
         preview: ['#fdf6e3', '#eee8d5', '#657b83', '#268bd2'],
     },
+    {
+        id: 'dracula',
+        label: 'Dracula',
+        light: false,
+        preview: ['#282a36', '#21222c', '#f8f8f2', '#bd93f9'],
+    },
+    {
+        id: 'catppuccin-latte',
+        label: 'Catppuccin Latte',
+        light: true,
+        preview: ['#eff1f5', '#e6e9ef', '#4c4f69', '#8839ef'],
+    },
+    {
+        id: 'catppuccin-frappe',
+        label: 'Catppuccin Frappé',
+        light: false,
+        preview: ['#303446', '#292c3c', '#c6d0f5', '#ca9ee6'],
+    },
+    {
+        id: 'catppuccin-macchiato',
+        label: 'Catppuccin Macchiato',
+        light: false,
+        preview: ['#24273a', '#1e2030', '#cad3f5', '#c6a0f6'],
+    },
+    {
+        id: 'catppuccin-mocha',
+        label: 'Catppuccin Mocha',
+        light: false,
+        preview: ['#1e1e2e', '#181825', '#cdd6f4', '#cba6f7'],
+    },
 ];
 
 function applyTheme(themeId: string): void {

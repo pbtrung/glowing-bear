@@ -1,0 +1,31 @@
+/* Glowing Bear theme: Catppuccin Frappé (https://catppuccin.com) */
+@import 'base16-default.css';
+
+:root {
+    --base00: #303446;
+    --base01: #292c3c;
+    --base02: #414559;
+    --base03: #51576d;
+    --base04: #626880;
+    --base05: #c6d0f5;
+    --base06: #f2d5cf;
+    --base07: #babbf1;
+    --base08: #e78284;
+    --base09: #ef9f76;
+    --base0A: #e5c890;
+    --base0B: #a6d189;
+    --base0C: #81c8be;
+    --base0D: #8caaee;
+    --base0E: #ca9ee6;
+    --base0F: #eebebe;
+    --gb-muted: #a5adce;
+    --gb-chrome-bg: #292c3c;
+    --gb-input-bg: #232634;
+    --gb-accent: #ca9ee6;
+    --gb-accent-fg: #303446;
+    --gb-link: #85c1dc;
+    --gb-active-bg: #414559;
+    --gb-active-fg: #c6d0f5;
+    --gb-repeated-time: #51576d;
+    --gb-readmarker: #e78284;
+}

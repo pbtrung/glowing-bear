@@ -7,6 +7,8 @@ import './glowingbear.css';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initConnection } from './connect';
+// Drafts and the input shared with WeeChat
+import './input';
 import { initKeyboard } from './keyboard';
 import { initAppearance } from './theme';
 

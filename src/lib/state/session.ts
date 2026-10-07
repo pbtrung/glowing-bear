@@ -39,6 +39,22 @@ export const WEECHAT_OPTIONS: Record<string, string> = {
     'weechat.completion.nick_add_space': 'on',
 };
 
+/**
+ * Text for "/input insert", which reads escapes like /print: backslashes and
+ * control characters are escaped, and the spaces around the text (WeeChat
+ * strips the arguments of commands).
+ */
+export function escapeInsert(text: string): string {
+    const escaped = text
+        .replace(/\\/g, '\\\\')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+    return escaped
+        .replace(/^ +/, (spaces) => '\\x20'.repeat(spaces.length))
+        .replace(/ +$/, (spaces) => '\\x20'.repeat(spaces.length));
+}
+
 /** Time to wait for a buffer we asked to open (ms) */
 const OUTGOING_QUERY_TIMEOUT = 60000;
 
@@ -574,11 +590,11 @@ export class Session {
         if (!client || !api) {
             return;
         }
-        // "/input insert" reads escapes like /print
-        const escaped = text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n');
         const requests = client.batch(() => [
             api.input('/input delete_input', bufferId),
-            ...(text ? [api.input('/input insert ' + escaped, bufferId)] : []),
+            ...(text
+                ? [api.input('/input insert ' + escapeInsert(text), bufferId)]
+                : []),
         ]);
         for (const request of requests) {
             request.catch(() => undefined);

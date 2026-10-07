@@ -36,6 +36,41 @@ const NAMED: Record<string, string> = {
     ',': 'comma',
 };
 
+/** Keys of a US layout, without and with shift, by KeyboardEvent.code */
+const US_KEYS: Record<string, string> = {
+    Minus: '-_',
+    Equal: '=+',
+    BracketLeft: '[{',
+    BracketRight: ']}',
+    Backslash: '\\|',
+    Semicolon: ';:',
+    Quote: '\'"',
+    Backquote: '`~',
+    Comma: ',<',
+    Period: '.>',
+    Slash: '/?',
+    Digit1: '1!',
+    Digit2: '2@',
+    Digit3: '3#',
+    Digit4: '4$',
+    Digit5: '5%',
+    Digit6: '6^',
+    Digit7: '7&',
+    Digit8: '8*',
+    Digit9: '9(',
+    Digit0: '0)',
+};
+
+/** Character of a key on a US layout, null if unknown */
+function usKey(code: string, shift: boolean): string | null {
+    const letter = /^Key([A-Z])$/.exec(code)?.[1];
+    if (letter) {
+        return shift ? letter : letter.toLowerCase();
+    }
+    const chars = US_KEYS[code];
+    return chars ? chars[shift ? 1 : 0] : null;
+}
+
 const combo = (modifiers: Iterable<string>, key: string): Combo =>
     [...new Set(modifiers)].sort().join('+') + '|' + key;
 
@@ -60,15 +95,17 @@ export function comboOf(event: KeyInput): Combo | null {
             modifiers.push('shift');
         }
     } else if ([...event.key].length === 1) {
-        // A character (shift is in the character itself); with Option, macOS
-        // gives another character: take the letter of the key
+        // A character (shift is in the character itself). With Option, macOS
+        // gives another character (Option+N: "˜"), and so do non-Latin layouts
+        // with Ctrl (Ctrl+L: "д"): take the key of a US layout
         key = event.key;
-        const letter = /^Key([A-Z])$/.exec(event.code ?? '')?.[1];
-        if (event.altKey && letter && !/^[a-z]$/i.test(key)) {
-            key = event.shiftKey ? letter : letter.toLowerCase();
-        } else if (event.ctrlKey && /^[A-Z]$/.test(key) && !event.shiftKey) {
+        if ((event.altKey || event.ctrlKey) && !/^[\x21-\x7e]$/.test(key)) {
+            key = usKey(event.code ?? '', event.shiftKey) ?? key;
+        }
+        if (event.ctrlKey && /^[A-Z]$/.test(key) && !event.shiftKey) {
             key = key.toLowerCase();
         }
+        key = NAMED[key] ?? key;
     } else {
         return null;
     }
@@ -77,7 +114,8 @@ export function comboOf(event: KeyInput): Combo | null {
 
 /** Keys of a WeeChat key name ("meta-f,meta-a" has two) */
 export function parseKeyName(name: string): Combo[] {
-    return name.split(',').map((part) => {
+    // (a comma at the end is the key: "meta-,", else it separates keys)
+    return name.split(/,(?=.)/).map((part) => {
         const modifiers: string[] = [];
         let rest = part;
         for (let m = /^(meta|ctrl|shift)-(.+)$/.exec(rest); m;) {
@@ -85,7 +123,9 @@ export function parseKeyName(name: string): Combo[] {
             rest = m[2];
             m = /^(meta|ctrl|shift)-(.+)$/.exec(rest);
         }
-        return combo(modifiers, rest === 'comma' ? 'comma' : rest);
+        // ctrl-@ is how terminals see Ctrl+Space
+        const key = rest === '@' && modifiers.includes('ctrl') ? 'space' : rest;
+        return combo(modifiers, NAMED[key] ?? key);
     });
 }
 

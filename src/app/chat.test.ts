@@ -3,6 +3,7 @@ import { applyBuffers, initialState } from '../lib/state/reducers';
 import type { ApiBuffer } from '../lib/relay/types';
 import type { Buffer } from '../lib/state/model';
 import { activityOrder, listBuffers, session, setUi, uiStore } from './chat';
+import './input';
 
 const apiBuffer = (
     id: number,

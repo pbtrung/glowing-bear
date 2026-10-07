@@ -6,7 +6,12 @@ import {
     nextSocket,
 } from '../relay/fake-websocket.test-helper';
 import { apiBuffer, apiLine } from './fixtures.test-helper';
-import { openedBufferName, Session, type SessionOptions } from './session';
+import {
+    escapeInsert,
+    openedBufferName,
+    Session,
+    type SessionOptions,
+} from './session';
 
 const OPTIONS = {
     host: 'localhost',
@@ -427,6 +432,12 @@ describe('multi-line input', () => {
 });
 
 describe('WeeChat input', () => {
+    it('escapes the text for /input insert', () => {
+        expect(escapeInsert('a\\b\nc\td')).toBe('a\\\\b\\nc\\td');
+        expect(escapeInsert('  x y  ')).toBe('\\x20\\x20x y\\x20\\x20');
+        expect(escapeInsert('\\x41')).toBe('\\\\x41');
+    });
+
     it('sets the input of a buffer in one frame, with escapes', async () => {
         const { session, ws } = await connected();
         const frames = ws.frames.length;

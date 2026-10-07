@@ -32,7 +32,9 @@ const FSET = [
 
 describe('WeeChat keys', () => {
     it('reads key names', () => {
-        expect(parseKeyName('meta--')).toEqual(parseKeyName('meta--'));
+        expect(parseKeyName('meta--')).toEqual(['meta|-']);
+        expect(parseKeyName('meta-,')).toEqual(parseKeyName('meta-comma'));
+        expect(parseKeyName('ctrl-@')).toEqual(['ctrl|space']);
         expect(parseKeyName('meta-f,meta-a')).toHaveLength(2);
         expect(parseKeyName('ctrl-meta-x')).toEqual(parseKeyName('meta-ctrl-x'));
     });
@@ -62,6 +64,17 @@ describe('WeeChat keys', () => {
         );
         expect(command(key('\u00a0', { altKey: true, code: 'Space' }))).toBe(
             '/fset -toggle',
+        );
+        // macOS Option with punctuation, Ctrl on a Russian layout
+        expect(command(key('–', { altKey: true, code: 'Minus' }))).toBe(
+            '/fset -add -1',
+        );
+        expect(command(key('≤', { altKey: true, code: 'Comma' }))).toBe('/fset -mark');
+        expect(command(key('±', { altKey: true, shiftKey: true, code: 'Equal' }))).toBe(
+            '/fset -add 1',
+        );
+        expect(command(key('д', { ctrlKey: true, code: 'KeyL' }))).toBe(
+            '/fset -refresh',
         );
         expect(command(key('x'))).toBe('none');
         expect(command(key('l', { metaKey: true }))).toBe('none');

@@ -889,7 +889,7 @@ describe('session', () => {
         try {
             await c.api.sync({ sync: true, input: true });
             c.mark();
-            const text = 'one \\ two\nthree';
+            const text = '  one \\ two\tx\nthree  ';
             session.setRemoteInput(gbtest().id, text);
             await c.waitEvent(
                 'input_text_changed',

@@ -383,9 +383,14 @@ gb-icon,
     width: 1.6rem;
 }
 
+/* Same metrics as the buffer list badges, which center the digits in Inter */
 #topbar .brand .badge {
-    font-size: 0.65rem;
+    min-width: 1.375rem;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7rem;
     font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
 }
 
 #topbar .title {

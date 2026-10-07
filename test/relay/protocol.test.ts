@@ -36,11 +36,11 @@ const BUFFER_KEYS = [
     'local_variables',
     'keys',
 ];
+// (and date_printed before WeeChat 5.0)
 const LINE_KEYS = [
     'id',
     'y',
     'date',
-    'date_printed',
     'displayed',
     'highlight',
     'notify_level',
@@ -131,6 +131,73 @@ describe('authentication', () => {
         );
         expect(response.status).toBe(401);
         expect(await response.json()).toEqual({ error: 'Invalid timestamp' });
+    });
+
+    /** Status and error of GET /api/version with these credentials */
+    async function authResponse(credentials?: string) {
+        const { base64 } = await import('../../src/lib/relay/auth');
+        const options = relayOptions();
+        const response = await fetch(
+            `http://${options.host}:${options.port}/api/version`,
+            {
+                headers: {
+                    Connection: 'close',
+                    ...(credentials !== undefined
+                        ? { Authorization: 'Basic ' + base64(credentials) }
+                        : {}),
+                },
+            },
+        );
+        return { status: response.status, body: await response.json() };
+    }
+
+    it('reports a missing password', async () => {
+        expect(await authResponse()).toEqual({
+            status: 401,
+            body: { error: 'Missing password' },
+        });
+    });
+
+    it('reports a hash algorithm that is not allowed', async () => {
+        const { buildCredentials } = await import('../../src/lib/relay/auth');
+        await admin.weechat('/set relay.network.password_hash_algo "sha256"');
+        try {
+            const creds = await buildCredentials(relayOptions().password, 'sha512', 0);
+            expect(await authResponse(creds)).toEqual({
+                status: 401,
+                body: { error: 'Invalid hash algorithm (not found or not supported)' },
+            });
+        } finally {
+            await admin.weechat('/unset relay.network.password_hash_algo');
+        }
+    });
+
+    it('reports a wrong number of PBKDF2 iterations', async () => {
+        const { buildCredentials } = await import('../../src/lib/relay/auth');
+        const { password_hash_iterations } = await RelayClient.handshake({
+            http: `http://${relayOptions().host}:${relayOptions().port}/api`,
+            ws: '',
+        });
+        const creds = await buildCredentials(
+            relayOptions().password,
+            'pbkdf2+sha256',
+            password_hash_iterations + 1,
+        );
+        expect(await authResponse(creds)).toEqual({
+            status: 401,
+            body: { error: 'Invalid number of iterations' },
+        });
+    });
+
+    it('uses the number of iterations set in WeeChat', async () => {
+        await admin.weechat('/set relay.network.password_hash_iterations 1000');
+        try {
+            const c = await connect();
+            expect((await c.api.version()).weechat_version).toMatch(/^\d+\.\d+/);
+            c.client.close();
+        } finally {
+            await admin.weechat('/unset relay.network.password_hash_iterations');
+        }
     });
 
     it('refuses TOTP, which browsers cannot send on a WebSocket', async () => {
@@ -232,6 +299,39 @@ describe('resources', () => {
         const [last] = await admin.api.lines(gbtest.id, -1, 'strip');
         const line = await admin.api.line(gbtest.id, last.id, 'strip');
         expect(line).toEqual(last);
+        const error = await admin.api.line(gbtest.id, last.id + 1000).catch((e) => e);
+        expect(error).toBeInstanceOf(RequestError);
+        expect(error.response.code).toBe(404);
+    });
+
+    it('GET lines and nicks of a buffer by name', async () => {
+        const byName = await admin.api.lines('python.gbtest', -1, 'strip');
+        const byId = await admin.api.lines(gbtest.id, -1, 'strip');
+        expect(byName).toEqual(byId);
+        expect((await admin.api.nicks('python.gbtest')).name).toBe('root');
+    });
+
+    it('GET lines of a free buffer, by y', async () => {
+        await admin.weechat('/buffer add -free gbfree');
+        try {
+            for (const y of [0, 1, 2]) {
+                await admin.weechat(`/print -buffer core.gbfree -y ${y} row ${y}`);
+            }
+            const buffer = await admin.api.buffer('core.gbfree', {
+                lines_free: 2,
+                colors: 'strip',
+            });
+            expect(buffer.type).toBe('free');
+            expect(buffer.lines?.map((l) => [l.y, l.message])).toEqual([
+                [0, 'row 0'],
+                [1, 'row 1'],
+            ]);
+            // Without "lines": all of them
+            const all = await admin.api.lines('core.gbfree', undefined, 'strip');
+            expect(all.map((l) => l.y)).toEqual([0, 1, 2]);
+        } finally {
+            await admin.weechat('/buffer close core.gbfree');
+        }
     });
 
     it('returns colors as WeeChat codes, ANSI or stripped', async () => {
@@ -411,7 +511,11 @@ describe('events', () => {
         );
         expect(event.body_type).toBe('line');
         const line = event.body as ApiLine;
-        expect(Object.keys(line).sort()).toEqual([...LINE_KEYS].sort());
+        expect(
+            Object.keys(line)
+                .filter((k) => k !== 'date_printed')
+                .sort(),
+        ).toEqual([...LINE_KEYS].sort());
         expect(line.message).toContain('hello');
     });
 
@@ -537,6 +641,23 @@ describe('events', () => {
         );
         expect((event.body as ApiBuffer).input_position).toBe(0);
         await c.weechat('/input delete_line', bufferId);
+    });
+
+    it('sends no input events with input: false (as the session syncs)', async () => {
+        const quiet = await connect();
+        try {
+            await quiet.api.sync({ sync: true, nicks: true, input: false });
+            quiet.mark();
+            await c.weechat('/input insert quiet text', bufferId);
+            await c.weechat('/print -buffer core.weechat after the input', bufferId);
+            await quiet.waitEvent('buffer_line_added');
+            const names = quiet.events.map((e) => e.event_name);
+            expect(names).not.toContain('input_text_changed');
+            expect(names).not.toContain('input_text_cursor_moved');
+        } finally {
+            await c.weechat('/input delete_line', bufferId);
+            quiet.client.close();
+        }
     });
 
     it('buffer_cleared', async () => {
@@ -753,6 +874,26 @@ describe('session', () => {
             Object.values(session.state.buffers).map((b) => [b.id, b.number]),
         );
         expect(actual).toEqual(expected);
+    });
+
+    it('clears the hotlist of the buffer it shows in WeeChat', async () => {
+        await session.input('/gbtest say alice for the hotlist');
+        const c = await connect();
+        try {
+            await until(async () =>
+                (await c.api.hotlist()).some((h) => h.buffer_id === gbtest().id),
+            );
+            session.clearHotlist(gbtest().id);
+            await until(
+                async () =>
+                    !(await c.api.hotlist()).some((h) => h.buffer_id === gbtest().id),
+            );
+            // The read marker of WeeChat moved to its last line
+            const [last] = await c.api.lines(gbtest().id, -1);
+            expect((await c.api.buffer(gbtest().id)).last_read_line_id).toBe(last.id);
+        } finally {
+            c.client.close();
+        }
     });
 
     it('completes commands with WeeChat', async () => {

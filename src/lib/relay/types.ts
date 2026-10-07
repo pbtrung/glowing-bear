@@ -36,7 +36,8 @@ export interface ApiLine {
     y: number;
     /** ISO 8601 date (UTC) */
     date: string;
-    date_printed: string;
+    /** Removed in WeeChat 5.0 */
+    date_printed?: string;
     displayed: boolean;
     highlight: boolean;
     /** -1: none, 0: low, 1: message, 2: private, 3: highlight */

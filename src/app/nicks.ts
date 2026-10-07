@@ -23,6 +23,9 @@ export function groupTitle(name: string): string {
     return MODE_TITLES[bare] ?? bare;
 }
 
+/** Order of nicks (one collator: localeCompare with options creates one per call) */
+const byName = new Intl.Collator(undefined, { sensitivity: 'base' });
+
 export interface NickSection {
     id: number;
     title: string;
@@ -47,7 +50,12 @@ export function nickSections(buffer: Buffer, filter = ''): NickSection[] {
         if (!nick.visible || (needle && !nick.name.toLowerCase().includes(needle))) {
             continue;
         }
-        byGroup.set(nick.groupId, [...(byGroup.get(nick.groupId) ?? []), nick]);
+        const list = byGroup.get(nick.groupId);
+        if (list) {
+            list.push(nick);
+        } else {
+            byGroup.set(nick.groupId, [nick]);
+        }
     }
     const groups = Object.values(buffer.nickGroups);
     const isRoot = (id: number) =>
@@ -57,9 +65,7 @@ export function nickSections(buffer: Buffer, filter = ''): NickSection[] {
             .filter((g) => g.parentId === parentId && !isRoot(g.id))
             .sort((a, b) => a.name.localeCompare(b.name));
     const sortNicks = (nicks: Nick[]) =>
-        nicks.sort((a, b) =>
-            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
-        );
+        nicks.sort((a, b) => byName.compare(a.name, b.name));
 
     const sections: NickSection[] = [];
     const visit = (parentId: number, depth: number, seen: Set<number>) => {

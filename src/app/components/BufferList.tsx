@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react';
+import { memo, type KeyboardEvent } from 'react';
 import {
     ChevronDown,
     Merge,
@@ -49,7 +49,9 @@ function onSearchKey(
                 break;
             }
             event.preventDefault();
-            setUi({ searchIndex: Math.min(count - 1, ui.searchIndex + 1) });
+            setUi({
+                searchIndex: Math.max(0, Math.min(count - 1, ui.searchIndex + 1)),
+            });
             break;
         case 'ArrowDown':
             event.preventDefault();
@@ -81,7 +83,27 @@ function BufferIcon({ buffer }: { buffer: Buffer }) {
     return <span className="buffer-icon">{icon && <Icon icon={icon} />}</span>;
 }
 
-function BufferRow({
+type RowProps = { item: ListedBuffer; active: boolean; highlighted: boolean };
+
+/** A row changes with its buffer (buffers not changed keep their object) */
+function sameRow(a: RowProps, b: RowProps): boolean {
+    const x = a.item;
+    const y = b.item;
+    return (
+        a.active === b.active &&
+        a.highlighted === b.highlighted &&
+        x.buffer === y.buffer &&
+        x.quickKey === y.quickKey &&
+        x.jumpKey === y.jumpKey &&
+        x.group === y.group &&
+        x.collapsed === y.collapsed &&
+        x.hiddenUnread === y.hiddenUnread &&
+        x.hiddenNotification === y.hiddenNotification &&
+        x.mergedWith.join() === y.mergedWith.join()
+    );
+}
+
+const BufferRow = memo(function BufferRow({
     item,
     active,
     highlighted,
@@ -151,7 +173,7 @@ function BufferRow({
             )}
         </li>
     );
-}
+}, sameRow);
 
 export function BufferList() {
     const buffers = useChat((s) => s.buffers);

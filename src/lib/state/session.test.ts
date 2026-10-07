@@ -9,6 +9,7 @@ import { apiBuffer, apiLine } from './fixtures.test-helper';
 import {
     escapeInsert,
     openedBufferName,
+    SendError,
     Session,
     type SessionOptions,
 } from './session';
@@ -374,6 +375,18 @@ describe('buffers', () => {
         expect(session.state.outgoingQueries).toEqual([
             { name: 'bob', expires: expect.any(Number) },
         ]);
+    });
+
+    it('reports the lines not sent when sending fails', async () => {
+        const { session, ws } = await connected();
+        const sending = session.send(2, 'one\ntwo\nthree').catch((e) => e);
+        await flush();
+        ws.reply(204);
+        await flush();
+        ws.reply(400, { error: 'nope' });
+        const error = await sending;
+        expect(error).toBeInstanceOf(SendError);
+        expect(error.unsent).toBe('two\nthree');
     });
 
     it('switches to a query or channel already open', async () => {

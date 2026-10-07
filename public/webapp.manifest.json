@@ -1,4 +1,5 @@
 {
+  "id": "./",
   "lang": "en-US",
   "name": "Glowing Bear",
   "short_name": "Glowing Bear",
@@ -23,11 +24,17 @@
       "src": "assets/img/glowing_bear_512x512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "assets/img/glowing_bear_maskable_512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "scope": "./",
   "start_url": "./",
   "display": "standalone",
-  "theme_color": "#181818",
-  "background_color": "#333"
+  "theme_color": "#232323",
+  "background_color": "#181818"
 }

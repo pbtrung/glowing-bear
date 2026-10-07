@@ -23,7 +23,8 @@ export function TopicDialog() {
                     aria-label="Close"
                 />
             </div>
-            {buffer && (
+            {/* (not rendered closed: it would follow every line of the buffer) */}
+            {open && buffer && (
                 <div className="modal-body">
                     <p className="topic mb-2">
                         {buffer.titleText ? (

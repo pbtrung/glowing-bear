@@ -89,6 +89,17 @@ export function openedBufferName(text: string): string | undefined {
     return words[i]?.split(',')[0] || undefined;
 }
 
+/** Sending failed: the lines not sent (from the one that failed) */
+export class SendError extends Error {
+    readonly unsent: string;
+
+    constructor(message: string, unsent: string) {
+        super(message);
+        this.name = 'SendError';
+        this.unsent = unsent;
+    }
+}
+
 /** A connection attempt replaced by a newer one, or by a disconnect */
 class Cancelled extends Error {
     constructor() {
@@ -599,14 +610,18 @@ export class Session {
         // A buffer accepting multi-line input gets the text whole
         const multiline = this.state.buffers[bufferId]?.inputMultiline === true;
         const lines = multiline && !text.startsWith('/') ? [text] : text.split(/\r?\n/);
-        for (const line of lines) {
+        for (const [i, line] of lines.entries()) {
             if (line === '') {
                 continue;
             }
             if ((line === '/quit' || line.startsWith('/quit ')) && !confirmQuit()) {
                 continue;
             }
-            await this.input(line, bufferId);
+            try {
+                await this.input(line, bufferId);
+            } catch (e) {
+                throw new SendError(String(e), lines.slice(i).join('\n'));
+            }
         }
         if (this.options.hotlistSync()) {
             this.clearHotlist(bufferId);

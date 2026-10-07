@@ -75,7 +75,7 @@ function Banners() {
                     </span>
                     <button
                         type="button"
-                        className="btn btn-sm btn-outline-dark"
+                        className="btn btn-sm btn-on-alert"
                         onClick={() => void session.reconnect()}
                     >
                         Reconnect now
@@ -95,6 +95,7 @@ function Banners() {
 function Chat() {
     const buffer = useActiveBuffer();
     const sidebarOpen = useUi((s) => s.sidebarOpen);
+    const modalOpen = useUi((s) => s.modal !== null);
     const nicklistOpen = useUi((s) => s.nicklistOpen);
     const nonicklist = useSettings((s) => s.nonicklist);
     const alwaysnicklist = useSettings((s) => s.alwaysnicklist);
@@ -120,6 +121,8 @@ function Chat() {
             className="content"
             id="content"
             data-sidebar={sidebarOpen ? 'visible' : 'hidden'}
+            // (behind a dialog)
+            inert={modalOpen}
         >
             <TopBar showNicklist={showNicklist} />
             <BufferList />
@@ -127,7 +130,7 @@ function Chat() {
                 className="panel-backdrop"
                 onClick={() => setUi({ sidebarOpen: false, nicklistOpen: false })}
             />
-            {showNicklist && buffer && <NickList buffer={buffer} />}
+            {showNicklist && buffer && <NickList key={buffer.id} buffer={buffer} />}
             <ErrorBoundary what="This buffer" resetKey={buffer?.id}>
                 <BufferLines />
             </ErrorBoundary>

@@ -315,14 +315,6 @@ pre {
     transform: none;
 }
 
-.shortcut-list {
-    padding-left: 1.1rem;
-}
-
-.shortcut-list li {
-    margin-bottom: 0.3rem;
-}
-
 /*
  * Main layout
  */
@@ -400,6 +392,7 @@ pre {
 }
 
 #topbar .buffer-away {
+    flex-shrink: 0;
     align-self: center;
     background: var(--gb-hover-bg);
     color: var(--gb-muted);
@@ -420,6 +413,18 @@ pre {
 .local-variables dd {
     margin: 0;
     overflow-wrap: anywhere;
+}
+
+/* Readable on any alert color (the reconnection banner) */
+.btn-on-alert {
+    color: inherit;
+    border-color: currentColor;
+}
+
+.btn-on-alert:hover,
+.btn-on-alert:focus-visible {
+    color: inherit;
+    background: color-mix(in srgb, currentColor 15%, transparent);
 }
 
 #topbar .latency {
@@ -456,8 +461,9 @@ pre {
     color: var(--gb-fg);
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-shrink: 0;
-    max-width: 100%;
+    /* a long name shrinks first, the modes and badges stay whole */
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 #topbar .buffer-modes {
@@ -924,6 +930,8 @@ pre {
     grid-area: lines;
     min-height: 0;
     overflow-y: auto;
+    /* the scroll position is managed (BufferLines.tsx) */
+    overflow-anchor: none;
     overscroll-behavior: contain;
     padding: 0.5rem 0.75rem 0.25rem;
     -webkit-overflow-scrolling: touch;
@@ -1192,6 +1200,10 @@ span.colourbox {
 .gb-modal[data-state='visible'] {
     visibility: visible;
     opacity: 1;
+    /* Visible at once, so that the dialog can take the focus when it opens */
+    transition:
+        opacity 0.15s ease-in-out,
+        visibility 0s;
 }
 
 .gb-modal .backdrop {

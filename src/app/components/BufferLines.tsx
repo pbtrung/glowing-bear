@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { History, LoaderCircle } from 'lucide-react';
 import { READ_MARKER_TOP, type Buffer, type Line } from '../../lib/state/model';
 import {
@@ -67,6 +67,7 @@ const LineRow = memo(function LineRow({
                 </span>
             </td>
             <td className="prefix">
+                {/* repeated-prefix: no style, a hook for custom CSS */}
                 <span className={repeatedPrefix ? 'repeated-prefix' : undefined}>
                     <a onClick={mention} title={line.host ?? undefined}>
                         {line.isMessage && <span className="hidden-bracket">&lt;</span>}
@@ -90,6 +91,7 @@ const LineRow = memo(function LineRow({
 function showToast(text: string): void {
     const toast = document.createElement('div');
     toast.className = 'gb-toast gb-toast-short';
+    toast.setAttribute('role', 'status');
     toast.textContent = text;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 5000);
@@ -111,9 +113,13 @@ function Lines({ buffer }: { buffer: Buffer }) {
     );
     const math = useSettings((s) => s.enableMathjax);
     const hideSmartFiltered = useSettings((s) => s.hideSmartFiltered);
-    const lines = hideSmartFiltered
-        ? buffer.lines.filter((l) => !l.smartFiltered)
-        : buffer.lines;
+    const lines = useMemo(
+        () =>
+            hideSmartFiltered
+                ? buffer.lines.filter((l) => !l.smartFiltered)
+                : buffer.lines,
+        [buffer.lines, hideSmartFiltered],
+    );
     // The read marker goes after the last line shown before it
     let marker = buffer.lastReadKey;
     if (hideSmartFiltered && marker !== null && marker !== READ_MARKER_TOP) {
@@ -157,6 +163,10 @@ export function BufferLines() {
     const ref = useRef<HTMLElement>(null);
     const atBottom = useRef(true);
     const scrollState = useRef({ bufferId: -1, firstKey: '', height: 0 });
+    /** Scroll to the read marker once the lines being fetched arrive */
+    const markerPending = useRef(false);
+    /** The last scroll was ours, not the user's (it loads no older lines) */
+    const ownScroll = useRef(false);
     const swipe = useSwipe();
 
     const scrollToBottom = useCallback(() => {
@@ -174,14 +184,29 @@ export function BufferLines() {
         }
         const state = scrollState.current;
         const firstKey = buffer.lines[0]?.key ?? '';
-        if (state.bufferId !== buffer.id) {
-            // Switched buffer: show the read marker, else the bottom
+        const showMarker = () => {
             const marker = el.querySelector<HTMLElement>('.readmarker');
             if (marker) {
-                el.scrollTop = Math.max(0, marker.offsetTop - el.clientHeight / 3);
+                // (offsetTop would be from its table)
+                const top =
+                    marker.getBoundingClientRect().top -
+                    el.getBoundingClientRect().top +
+                    el.scrollTop;
+                ownScroll.current = true;
+                el.scrollTop = Math.max(0, top - el.clientHeight / 3);
             } else {
                 el.scrollTop = el.scrollHeight;
             }
+        };
+        const fetched = buffer.linesFetched && !buffer.loadingLines;
+        if (state.bufferId !== buffer.id) {
+            // Switched buffer: show the read marker, else the bottom (again
+            // when the lines are fetched: the marker is placed then)
+            markerPending.current = !fetched;
+            showMarker();
+        } else if (markerPending.current && fetched) {
+            markerPending.current = false;
+            showMarker();
         } else if (firstKey !== state.firstKey && !atBottom.current) {
             // Older lines loaded above: stay on the same lines
             el.scrollTop += el.scrollHeight - state.height;
@@ -224,7 +249,9 @@ export function BufferLines() {
         }
         atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
         scrollState.current.height = el.scrollHeight;
-        if (el.scrollTop < 50) {
+        if (ownScroll.current) {
+            ownScroll.current = false;
+        } else if (el.scrollTop < 50) {
             fetchMore();
         }
     };

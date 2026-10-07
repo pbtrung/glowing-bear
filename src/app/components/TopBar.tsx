@@ -68,10 +68,8 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                             </span>
                         )}
                         <span className="buffer-title desktop">
-                            <RichText
-                                parts={buffer.title}
-                                links={buffer.free ? 'scheme' : true}
-                            />
+                            {/* no links in a button (the topic dialog has them) */}
+                            <RichText parts={buffer.title} links={false} />
                         </span>
                     </>
                 )}
@@ -79,18 +77,17 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
 
             <div className="actions">
                 {(unread > 0 || notifications > 0) && (
-                    <div
-                        className="totals"
-                        aria-label={`${unread} unread, ${notifications} highlights`}
-                    >
+                    <div className="totals">
                         {unread > 0 && (
                             <span className="badge rounded-pill text-bg-secondary">
                                 {unread}
+                                <span className="visually-hidden"> unread</span>
                             </span>
                         )}
                         {notifications > 0 && (
                             <span className="badge rounded-pill text-bg-danger">
                                 {notifications}
+                                <span className="visually-hidden"> highlights</span>
                             </span>
                         )}
                     </div>

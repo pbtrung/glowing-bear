@@ -3,6 +3,7 @@ import { AtSign, SendHorizontal } from 'lucide-react';
 import { emojifyWord, loadShortcodes } from '../../lib/emoji';
 import { completeNick } from '../../lib/irc/completion';
 import type { Buffer } from '../../lib/state/model';
+import { SendError } from '../../lib/state/session';
 import { session, setUi, uiStore, useUi } from '../chat';
 import { flushInput } from '../input';
 import { handleBufferKey } from '../bufferkeys';
@@ -43,6 +44,9 @@ function emojifyInput(
     });
     return changed ? { text: segments.join(''), caret } : null;
 }
+
+/** Key of a completion: the input in a buffer */
+const completionKey = (input: string, bufferId: number) => `${bufferId}\n${input}`;
 
 /** Command completion state, cycling through WeeChat's list */
 interface CommandCompletion {
@@ -92,7 +96,12 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                         'connecting with Glowing Bear until you restart WeeChat on the command line!',
                 ),
             )
-            .catch(() => undefined);
+            .catch((e: unknown) => {
+                // Not sent (e.g. connection lost): give back what wasn't sent
+                if (uiStore.getState().input === '') {
+                    setInput(e instanceof SendError ? e.unsent : text);
+                }
+            });
         ref.current?.focus();
     };
 
@@ -139,7 +148,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
             completion.list.length;
         completion.baseWord = word + suffix;
         completion.position = caret;
-        completion.key = next + buffer.id;
+        completion.key = completionKey(next, buffer.id);
         if (completion.list.length === 1) {
             commandCompletion.current = null;
         }
@@ -151,7 +160,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
      */
     const doCompleteWeeChat = (direction: 1 | -1) => {
         const el = ref.current!;
-        const key = input + buffer.id;
+        const key = completionKey(input, buffer.id);
         if (commandCompletion.current?.key === key) {
             cycleCommand(direction);
             return;
@@ -169,7 +178,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                 // The input changed while waiting
                 if (
                     request !== commandRequest.current ||
-                    uiStore.getState().input + buffer.id !== key
+                    completionKey(uiStore.getState().input, buffer.id) !== key
                 ) {
                     return;
                 }
@@ -330,7 +339,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                         setUi({ sidebarOpen: false });
                         loadShortcodes();
                     }}
-                    autoComplete="on"
+                    autoComplete="off"
                     autoCapitalize="sentences"
                     enterKeyHint="send"
                     aria-label="Message"

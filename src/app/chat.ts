@@ -243,10 +243,12 @@ export function listBuffers(
     // Merged buffers share their number
     const sameNumber = new Map<number, Buffer[]>();
     for (const buffer of all) {
-        sameNumber.set(buffer.number, [
-            ...(sameNumber.get(buffer.number) ?? []),
-            buffer,
-        ]);
+        const list = sameNumber.get(buffer.number);
+        if (list) {
+            list.push(buffer);
+        } else {
+            sameNumber.set(buffer.number, [buffer]);
+        }
     }
 
     return visible.map((buffer) => {

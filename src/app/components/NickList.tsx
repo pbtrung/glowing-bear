@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import type { Buffer } from '../../lib/state/model';
 import { session } from '../chat';
 import { nickSections, showGroupTitles } from '../nicks';
@@ -9,10 +9,19 @@ import { SearchBox } from './SearchBox';
 export function NickList({ buffer }: { buffer: Buffer }) {
     const swipe = useSwipe();
     const [filter, setFilter] = useState('');
-    const visible = Object.values(buffer.nicks).filter((n) => n.visible);
+    // Computed again when the nicklist changes, not for each line added
+    const { nicks, nickGroups, nicklistDisplayGroups } = buffer;
+    const { visible, titled, sections } = useMemo(() => {
+        const nicklist = { ...buffer, nicks, nickGroups, nicklistDisplayGroups };
+        const visible = Object.values(nicks).filter((n) => n.visible);
+        return {
+            visible,
+            titled: showGroupTitles(nicklist, visible),
+            sections: nickSections(nicklist, filter),
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- only the nicklist matters
+    }, [nicks, nickGroups, nicklistDisplayGroups, filter]);
     const total = visible.length;
-    const sections = nickSections(buffer, filter);
-    const titled = showGroupTitles(buffer, visible);
 
     return (
         <aside id="nicklist" aria-label="Nicklist" {...swipe}>

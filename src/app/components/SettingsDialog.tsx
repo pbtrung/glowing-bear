@@ -167,13 +167,39 @@ function Appearance() {
     return (
         <>
             <h3 className="settings-heading">Theme</h3>
-            <div className="theme-grid" role="radiogroup" aria-label="Theme">
+            <div
+                className="theme-grid"
+                role="radiogroup"
+                aria-label="Theme"
+                onKeyDown={(event) => {
+                    // Arrows choose the previous / next theme
+                    const step = {
+                        ArrowRight: 1,
+                        ArrowDown: 1,
+                        ArrowLeft: -1,
+                        ArrowUp: -1,
+                    }[event.key];
+                    if (step === undefined) {
+                        return;
+                    }
+                    event.preventDefault();
+                    const at = Math.max(
+                        0,
+                        THEMES.findIndex((t) => t.id === theme),
+                    );
+                    const next = THEMES[(at + step + THEMES.length) % THEMES.length];
+                    updateSettings({ theme: next.id });
+                    document.getElementById(`theme-${next.id}`)?.focus();
+                }}
+            >
                 {THEMES.map((t) => (
                     <button
                         key={t.id}
+                        id={`theme-${t.id}`}
                         type="button"
                         role="radio"
                         aria-checked={theme === t.id}
+                        tabIndex={theme === t.id ? 0 : -1}
                         className={`theme-card${theme === t.id ? ' active' : ''}`}
                         title={t.label}
                         onClick={() => updateSettings({ theme: t.id })}
@@ -542,8 +568,30 @@ function SectionMenu({ tab, onSelect }: { tab: Tab; onSelect: (tab: Tab) => void
         return () => document.removeEventListener('pointerdown', onPointerDown);
     }, [open]);
 
+    // Escape closes the menu (not the dialog); arrows move between items
+    const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (!open) {
+            return;
+        }
+        const items = [
+            ...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ??
+                []),
+        ];
+        const at = items.indexOf(document.activeElement as HTMLElement);
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen(false);
+            ref.current?.querySelector<HTMLElement>('button')?.focus();
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            items[(at + step + items.length) % items.length]?.focus();
+        }
+    };
+
     return (
-        <div className="dropdown settings-menu" ref={ref}>
+        <div className="dropdown settings-menu" ref={ref} onKeyDown={onKeyDown}>
             <button
                 type="button"
                 className={`btn btn-icon${open ? ' active' : ''}`}

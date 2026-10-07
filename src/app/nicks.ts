@@ -60,6 +60,25 @@ export function nickSections(buffer: Buffer, filter = ''): NickSection[] {
         }));
 }
 
+/**
+ * Whether the nicklist shows group titles: with several groups, when the
+ * buffer displays its groups (nicklist_display_groups) or they are IRC mode
+ * groups ("000|o"...), which IRC buffers don't display but are worth naming.
+ */
+export function showGroupTitles(buffer: Buffer, visible: Nick[]): boolean {
+    const groups = new Set(visible.map((n) => n.groupId));
+    if (groups.size < 2) {
+        return false;
+    }
+    return (
+        buffer.nicklistDisplayGroups ||
+        [...groups].every((id) => {
+            const name = buffer.nickGroups[id]?.name ?? '';
+            return id === 0 || name === 'root' || /^\d+\|/.test(name);
+        })
+    );
+}
+
 /** A stable hue (0-359) for a name, to color its avatar */
 export function nameHue(name: string): number {
     let hash = 0;

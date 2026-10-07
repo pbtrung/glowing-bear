@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { applyBuffers, applyNicklist, initialState } from '../lib/state/reducers';
 import { parseRichText, plainText } from '../lib/relay/colors';
 import type { ApiBuffer, ApiNick, ApiNickGroup } from '../lib/relay/types';
-import { groupTitle, initial, nameHue, nickSections, promptNick } from './nicks';
+import {
+    groupTitle,
+    initial,
+    nameHue,
+    nickSections,
+    promptNick,
+    showGroupTitles,
+} from './nicks';
 
 const nick = (id: number, groupId: number, name: string, visible = true): ApiNick => ({
     id,
@@ -68,6 +75,30 @@ describe('nicklist display', () => {
             ['Users', ['alice', 'Bob', 'zoe']],
             ['Users', ['rootnick']],
         ]);
+    });
+
+    it('titles IRC mode groups, and the groups of buffers displaying them', () => {
+        const irc = buffer();
+        const visible = Object.values(irc.nicks).filter((n) => n.visible);
+        expect(showGroupTitles(irc, visible)).toBe(true);
+        const other = {
+            ...irc,
+            nickGroups: {
+                ...irc.nickGroups,
+                10: { ...irc.nickGroups[10], name: 'friends' },
+            },
+        };
+        expect(showGroupTitles(other, visible)).toBe(false);
+        expect(
+            showGroupTitles({ ...other, nicklistDisplayGroups: true }, visible),
+        ).toBe(true);
+        // Not with one group
+        expect(
+            showGroupTitles(
+                { ...other, nicklistDisplayGroups: true },
+                visible.filter((n) => n.groupId === 10),
+            ),
+        ).toBe(false);
     });
 
     it('filters nicks', () => {

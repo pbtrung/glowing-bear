@@ -112,7 +112,8 @@ export const THEMES: Theme[] = [
     },
 ];
 
-function applyTheme(themeId: string): void {
+/** Resolves when the stylesheet of the theme is loaded (or failed) */
+function applyTheme(themeId: string): Promise<void> {
     const theme = THEMES.find((t) => t.id === themeId) ?? THEMES[0];
     let link = document.getElementById('themeCSS') as HTMLLinkElement | null;
     const href = `css/themes/${theme.id}.css`;
@@ -122,7 +123,13 @@ function applyTheme(themeId: string): void {
         link.rel = 'stylesheet';
         document.head.appendChild(link);
     }
+    let loaded = Promise.resolve();
     if (link.getAttribute('href') !== href) {
+        const element = link;
+        loaded = new Promise((resolve) => {
+            element.addEventListener('load', () => resolve(), { once: true });
+            element.addEventListener('error', () => resolve(), { once: true });
+        });
         link.onload = () => {
             // Tint the browser UI (e.g. the mobile status bar) like the top bar
             const color = getComputedStyle(document.documentElement)
@@ -138,6 +145,7 @@ function applyTheme(themeId: string): void {
         'data-bs-theme',
         theme.light ? 'light' : 'dark',
     );
+    return loaded;
 }
 
 function applyCustomCss(css: string): void {
@@ -172,8 +180,16 @@ function apply(settings: Settings, previous?: Settings): void {
     }
 }
 
-/** Apply the appearance settings now and whenever they change */
-export function initAppearance(): void {
-    apply(settingsStore.getState());
+/**
+ * Apply the appearance settings now and whenever they change. Resolves when
+ * the theme is loaded (at most after `timeout` ms), to render without a flash
+ * of the default colors.
+ */
+export function initAppearance(timeout = 1500): Promise<void> {
+    const settings = settingsStore.getState();
+    applyCustomCss(settings.customCSS);
+    applyFont(settings.fontfamily, settings.fontsize);
+    const theme = applyTheme(settings.theme);
     settingsStore.subscribe((settings, previous) => apply(settings, previous));
+    return Promise.race([theme, new Promise<void>((r) => setTimeout(r, timeout))]);
 }

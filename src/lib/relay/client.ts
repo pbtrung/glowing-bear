@@ -96,6 +96,8 @@ export interface RelayClientOptions {
     pageProtocol?: string;
     /** Requests not answered after this (ms) are rejected (0: never) */
     requestTimeout?: number;
+    /** Called with the round-trip time of each ping (ms) */
+    onLatency?: (latency: number) => void;
 }
 
 interface Pending {
@@ -432,15 +434,24 @@ export class RelayClient {
                 waiting = false;
                 clearTimeout(this.pingDeadline);
             };
-            this.request('POST', '/api/ping', { data: String(Date.now()) }).then(
-                answered,
-                (e: unknown) => {
-                    if (e instanceof RequestError) {
-                        answered();
-                    }
-                },
-            );
+            this.ping().then(answered, (e: unknown) => {
+                if (e instanceof RequestError) {
+                    answered();
+                }
+            });
         }, interval);
+    }
+
+    /**
+     * Ping WeeChat: resolves with the round-trip time in ms (also reported to
+     * onLatency).
+     */
+    async ping(): Promise<number> {
+        const start = performance.now();
+        await this.request('POST', '/api/ping', { data: String(Date.now()) });
+        const latency = Math.round(performance.now() - start);
+        this.options.onLatency?.(latency);
+        return latency;
     }
 
     private stopPing(): void {

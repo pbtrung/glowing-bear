@@ -24,6 +24,21 @@
             href="assets/img/glowing_bear_128x128.png"
         />
         <link rel="icon" type="image/png" href="assets/img/favicon.png" />
+        <script>
+            // Fetch the theme stylesheet right away (theme.ts applies it)
+            try {
+                const theme = JSON.parse(localStorage.getItem('theme') || '"dark"');
+                if (/^[\w-]+$/.test(theme)) {
+                    const link = document.createElement('link');
+                    link.rel = 'preload';
+                    link.as = 'style';
+                    link.href = 'css/themes/' + theme + '.css';
+                    document.head.appendChild(link);
+                }
+            } catch {
+                // no storage
+            }
+        </script>
     </head>
     <body>
         <noscript

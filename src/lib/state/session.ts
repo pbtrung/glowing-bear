@@ -78,6 +78,8 @@ class Cancelled extends Error {
 }
 
 export interface SessionState extends ChatState {
+    /** Round-trip time of the last ping (ms), null if unknown */
+    latency: number | null;
     /** Error of the last connection attempt */
     error: ConnectError | null;
 }
@@ -120,6 +122,7 @@ export class Session {
         this.store = createStore<SessionState>(() => ({
             ...initialState,
             error: null,
+            latency: null,
         }));
     }
 
@@ -189,6 +192,11 @@ export class Session {
                 }
             },
             pingInterval: this.options.pingInterval,
+            onLatency: (latency) => {
+                if (this.client === client) {
+                    this.set({ latency });
+                }
+            },
         });
         try {
             await client.connect(options);
@@ -259,6 +267,9 @@ export class Session {
             error: null,
         });
 
+        // The latency, then every keepalive ping updates it
+        client.ping().catch(() => undefined);
+
         // Scripts are not needed right away
         api.scripts().then(
             (scripts) => this.set({ scripts }),
@@ -286,6 +297,7 @@ export class Session {
 
     private onClose(byClient: boolean): void {
         clearInterval(this.hotlistTimer);
+        this.set({ latency: null });
         this.client = null;
         this.api = null;
         if (byClient || this.state.status === 'disconnected') {
@@ -341,7 +353,7 @@ export class Session {
         this.attempt++;
         clearTimeout(this.reconnectTimer);
         clearInterval(this.hotlistTimer);
-        this.set({ status: 'disconnected' });
+        this.set({ status: 'disconnected', latency: null });
         const client = this.client;
         this.client = null;
         this.api = null;
@@ -534,7 +546,10 @@ export class Session {
         if (opened) {
             this.expectBuffer(opened);
         }
-        for (const line of text.split(/\r?\n/)) {
+        // A buffer accepting multi-line input gets the text whole
+        const multiline = this.state.buffers[bufferId]?.inputMultiline === true;
+        const lines = multiline && !text.startsWith('/') ? [text] : text.split(/\r?\n/);
+        for (const line of lines) {
             if (line === '') {
                 continue;
             }

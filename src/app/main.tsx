@@ -5,17 +5,21 @@ import '@fontsource-variable/inter/wght.css';
 // After Bootstrap, before the theme (added by initAppearance)
 import './glowingbear.css';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { initConnection } from './connect';
 import { initKeyboard } from './keyboard';
 import { initAppearance } from './theme';
 
-initAppearance();
 initKeyboard();
-
-createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-        <App />
-    </StrictMode>,
-);
-
 initConnection();
+
+// Render once the theme is loaded (no flash of the default colors)
+void initAppearance().then(() =>
+    createRoot(document.getElementById('root')!).render(
+        <StrictMode>
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>
+        </StrictMode>,
+    ),
+);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyBuffers, initialState } from '../lib/state/reducers';
 import type { ApiBuffer } from '../lib/relay/types';
-import { listBuffers } from './chat';
+import { listBuffers, session, setUi, uiStore } from './chat';
 
 const apiBuffer = (
     id: number,
@@ -201,5 +201,37 @@ describe('buffer list', () => {
             { ...ui, jumpMode: true, jumpDigit: 0 },
         );
         expect(jump.map((l) => l.jumpKey).sort()).toEqual([1, 2, 3, 4, 5]);
+    });
+});
+
+describe('input drafts', () => {
+    it('keeps the text typed in each buffer', () => {
+        const state = applyBuffers(initialState, [
+            apiBuffer(1, 1, 'core.weechat', 'other'),
+            apiBuffer(2, 2, 'irc.libera.#a', 'channel'),
+        ]);
+        session.store.setState({ ...state, activeBufferId: 1 });
+        setUi({ input: 'draft of 1' });
+        session.store.setState({ activeBufferId: 2 });
+        expect(uiStore.getState().input).toBe('');
+        setUi({ input: 'draft of 2' });
+        session.store.setState({ activeBufferId: 1 });
+        expect(uiStore.getState().input).toBe('draft of 1');
+        // Reconnecting goes through no buffer
+        session.store.setState({ activeBufferId: null });
+        session.store.setState({ activeBufferId: 2 });
+        expect(uiStore.getState().input).toBe('draft of 2');
+        // Drafts of closed buffers are dropped at the next switch
+        setUi({ input: '' });
+        session.store.setState({ activeBufferId: 1 });
+        setUi({ input: 'draft of 1' });
+        session.store.setState({ activeBufferId: 2 });
+        session.store.setState({
+            buffers: { 2: state.buffers[2] },
+            activeBufferId: null,
+        });
+        // (same id again only to check that the draft is gone)
+        session.store.setState({ buffers: state.buffers, activeBufferId: 1 });
+        expect(uiStore.getState().input).toBe('');
     });
 });

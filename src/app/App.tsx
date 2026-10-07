@@ -14,6 +14,7 @@ import {
 import { updateAppBadge, updateFavicon, updateTitle } from './notifications';
 import { useSettings } from './settings';
 import { BufferLines } from './components/BufferLines';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { BufferList } from './components/BufferList';
 import { Icon } from './components/Icon';
 import { InputBar } from './components/InputBar';
@@ -127,7 +128,9 @@ function Chat() {
                 onClick={() => setUi({ sidebarOpen: false, nicklistOpen: false })}
             />
             {showNicklist && buffer && <NickList buffer={buffer} />}
-            <BufferLines />
+            <ErrorBoundary what="This buffer" resetKey={buffer?.id}>
+                <BufferLines />
+            </ErrorBoundary>
             <footer className="footer">{buffer && <InputBar buffer={buffer} />}</footer>
         </div>
     );

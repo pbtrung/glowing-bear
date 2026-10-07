@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Buffer } from '../../lib/state/model';
 import { session } from '../chat';
-import { nickSections } from '../nicks';
+import { nickSections, showGroupTitles } from '../nicks';
 import { useSwipe } from '../swipe';
 import { Avatar } from './Avatar';
 import { SearchBox } from './SearchBox';
@@ -12,8 +12,7 @@ export function NickList({ buffer }: { buffer: Buffer }) {
     const visible = Object.values(buffer.nicks).filter((n) => n.visible);
     const total = visible.length;
     const sections = nickSections(buffer, filter);
-    // Titles only help with several groups
-    const titled = new Set(visible.map((n) => n.groupId)).size > 1;
+    const titled = showGroupTitles(buffer, visible);
 
     return (
         <aside id="nicklist" aria-label="Nicklist" {...swipe}>

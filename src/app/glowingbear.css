@@ -383,6 +383,17 @@ pre {
     font-variant-numeric: tabular-nums;
 }
 
+#topbar .latency {
+    font-size: 0.75rem;
+    color: var(--gb-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+#topbar .latency.slow {
+    color: var(--bs-warning-text-emphasis);
+}
+
 #topbar .title {
     display: flex;
     align-items: baseline;
@@ -852,6 +863,19 @@ pre {
 /*
  * Buffer lines
  */
+/* A part of the page that failed to render (components/ErrorBoundary.tsx) */
+.error-boundary {
+    grid-area: lines;
+    align-self: start;
+    display: flex;
+    gap: 0.75rem;
+    margin: 1rem;
+}
+
+.error-boundary-message {
+    overflow-wrap: anywhere;
+}
+
 #bufferlines {
     grid-area: lines;
     min-height: 0;

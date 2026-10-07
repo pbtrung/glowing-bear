@@ -77,6 +77,10 @@ export interface Buffer {
     hasNicklist: boolean;
     /** Nicks are compared with their case (e.g. for completion) */
     nicklistCaseSensitive: boolean;
+    /** The nicklist shows its groups (else only their order matters) */
+    nicklistDisplayGroups: boolean;
+    /** Input with several lines is sent whole (else line by line) */
+    inputMultiline: boolean;
     inputPrompt: RichText[];
     input: string;
     inputPosition: number;
@@ -144,6 +148,8 @@ export function bufferProperties(api: ApiBuffer): Partial<Buffer> {
         hideTime: type === 'relay' || api.time_displayed === false,
         hasNicklist: api.nicklist !== false,
         nicklistCaseSensitive: api.nicklist_case_sensitive === true,
+        nicklistDisplayGroups: api.nicklist_display_groups === true,
+        inputMultiline: api.input_multiline === true,
         inputPrompt: parseRichText(api.input_prompt),
         input: api.input ?? '',
         inputPosition: api.input_position ?? 0,

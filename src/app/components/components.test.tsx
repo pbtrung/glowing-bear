@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/react';
+import { ErrorBoundary } from './ErrorBoundary';
 import { Modal } from './Modal';
 import { SearchBox } from './SearchBox';
 
@@ -74,5 +75,34 @@ describe('Modal', () => {
         expect(document.activeElement).toBe(getByText('first'));
         fireEvent.keyDown(getByText('first'), { key: 'Tab', shiftKey: true });
         expect(document.activeElement).toBe(getByText('last'));
+    });
+});
+
+describe('ErrorBoundary', () => {
+    function Broken({ fail }: { fail: boolean }) {
+        if (fail) {
+            throw new Error('bad line');
+        }
+        return <p>fine</p>;
+    }
+
+    it('shows the error, retries, and resets with its key', () => {
+        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const { getByRole, getByText, rerender } = render(
+            <ErrorBoundary what="This buffer" resetKey={1}>
+                <Broken fail />
+            </ErrorBoundary>,
+        );
+        expect(getByRole('alert').textContent).toContain(
+            'This buffer could not be displayed.',
+        );
+        expect(getByRole('alert').textContent).toContain('bad line');
+        // Another buffer
+        rerender(
+            <ErrorBoundary what="This buffer" resetKey={2}>
+                <Broken fail={false} />
+            </ErrorBoundary>,
+        );
+        expect(getByText('fine')).toBeTruthy();
     });
 });

@@ -180,6 +180,41 @@ function setFreeLine(buffer: Draft<Buffer>, line: Line): void {
     }
 }
 
+/** Lines kept in buffers not shown (older ones are fetched again if needed) */
+export const MAX_LINES = 500;
+
+/** Keep the last `max` lines of a buffer (memory of long sessions) */
+function trimLines(buffer: Draft<Buffer>, max = MAX_LINES): void {
+    if (buffer.free) {
+        return;
+    }
+    let count = buffer.lines.filter((l) => !l.isDateChange).length;
+    if (count <= max) {
+        return;
+    }
+    let start = 0;
+    for (; count > max; start++) {
+        if (!buffer.lines[start].isDateChange) {
+            count--;
+        }
+    }
+    // No date change at the top
+    while (buffer.lines[start]?.isDateChange) {
+        start++;
+    }
+    buffer.lines.splice(0, start);
+    buffer.requestedLines = max;
+    buffer.allLinesFetched = false;
+    if (
+        buffer.lastReadKey !== null &&
+        buffer.lastReadKey !== READ_MARKER_TOP &&
+        !buffer.lines.some((l) => l.key === buffer.lastReadKey)
+    ) {
+        // read before the lines kept
+        buffer.lastReadKey = READ_MARKER_TOP;
+    }
+}
+
 /**
  * Add a line pushed by WeeChat (buffer_line_added).
  */
@@ -204,6 +239,10 @@ function addNewLine(
     updateNickSpeak(buffer, line, Date.now());
 
     const active = draft.activeBufferId === buffer.id;
+    if (!active) {
+        // (the lines of the active buffer are kept while it's read)
+        trimLines(buffer);
+    }
     if (active) {
         effects.push({ type: 'activeBufferLine', bufferId: buffer.id });
     }
@@ -415,6 +454,7 @@ export function setActiveBuffer(state: ChatState, bufferId: number): ChatState {
             const last = previous.lines.findLast((l) => !l.isDateChange);
             previous.lastReadKey = last ? last.key : null;
             draft.previousBufferId = previous.id;
+            trimLines(previous);
         }
         clearCounts(draft.buffers[bufferId]);
         draft.activeBufferId = bufferId;

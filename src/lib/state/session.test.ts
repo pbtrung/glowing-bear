@@ -384,6 +384,48 @@ describe('lines', () => {
     });
 });
 
+describe('latency', () => {
+    it('is measured when connected, and forgotten when disconnected', async () => {
+        const { session, ws } = await connected();
+        expect(session.state.latency).toBeNull();
+        ws.replyTo('POST /api/ping', 200, { data: 'x' }, 'ping');
+        await flush();
+        expect(session.state.latency).toEqual(expect.any(Number));
+        session.disconnect();
+        expect(session.state.latency).toBeNull();
+    });
+});
+
+describe('multi-line input', () => {
+    it('sends the text whole to buffers accepting it', async () => {
+        const { session, ws } = await connected();
+        ws.receive({
+            code: 0,
+            message: 'OK',
+            event_name: 'buffer_opened',
+            buffer_id: 7,
+            body_type: 'buffer',
+            body: apiBuffer(7, 3, 'matrix.room', 'room', { input_multiline: true }),
+        });
+        const count = ws.sent.length;
+        const sending = session.send(7, 'line one\nline two');
+        await flush();
+        ws.reply(204);
+        await sending;
+        expect(
+            ws.sent.slice(count).map((r) => (r.body as { command: string }).command),
+        ).toEqual(['line one\nline two']);
+        // Commands are still sent line by line
+        const commands = session.send(7, '/print a\n/print b');
+        await flush();
+        ws.reply(204);
+        await flush();
+        ws.reply(204);
+        await commands;
+        expect(ws.sent.length).toBe(count + 3);
+    });
+});
+
 describe('commands opening a buffer', () => {
     it('finds the name of the buffer', () => {
         expect(openedBufferName('/join #a')).toBe('#a');

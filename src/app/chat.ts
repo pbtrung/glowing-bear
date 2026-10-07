@@ -97,7 +97,7 @@ export interface UiState {
     jumpMode: boolean;
     /** First digit typed in jump mode */
     jumpDigit: number | null;
-    /** Text of the input bar */
+    /** Text of the input bar (of the buffer shown; the others keep drafts) */
     input: string;
 }
 
@@ -112,6 +112,36 @@ export const uiStore = createStore<UiState>(() => ({
     jumpDigit: null,
     input: '',
 }));
+
+/** Text typed in the input bar of the buffers not shown, by buffer id */
+const drafts = new Map<number, string>();
+
+// Each buffer keeps its draft: switching buffers saves the text of the input
+// bar and restores the one of the new buffer
+session.store.subscribe((state, previous) => {
+    if (state.activeBufferId === previous.activeBufferId) {
+        return;
+    }
+    const text = uiStore.getState().input;
+    const left = previous.activeBufferId;
+    if (left !== null && state.buffers[left]) {
+        if (text) {
+            drafts.set(left, text);
+        } else {
+            drafts.delete(left);
+        }
+    }
+    for (const id of drafts.keys()) {
+        if (!state.buffers[id]) {
+            // closed
+            drafts.delete(id);
+        }
+    }
+    if (state.activeBufferId !== null) {
+        setUi({ input: drafts.get(state.activeBufferId) ?? '' });
+        drafts.delete(state.activeBufferId);
+    }
+});
 
 export function useUi<T>(selector: (state: UiState) => T): T {
     return useStore(uiStore, selector);

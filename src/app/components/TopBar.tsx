@@ -5,15 +5,20 @@ import {
     toggleNicklistPanel,
     uiStore,
     useActiveBuffer,
+    useChat,
     useUnreadTotals,
 } from '../chat';
 import { useSettings } from '../settings';
 import { Icon } from './Icon';
 import { RichText } from './RichText';
 
+/** Latency shown as slow (ms) */
+const SLOW_LATENCY = 1000;
+
 export function TopBar({ showNicklist }: { showNicklist: boolean }) {
     const buffer = useActiveBuffer();
     const { unread, notifications } = useUnreadTotals();
+    const latency = useChat((s) => s.latency);
     const host = useSettings((s) => `${s.host}:${s.port}`);
 
     const nameClasses = ['buffer-name'];
@@ -92,6 +97,14 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                     >
                         <Icon icon={Users} />
                     </button>
+                )}
+                {latency !== null && (
+                    <span
+                        className={`latency desktop${latency >= SLOW_LATENCY ? ' slow' : ''}`}
+                        title={`Latency to WeeChat (${host})`}
+                    >
+                        {latency} ms
+                    </span>
                 )}
                 <button
                     type="button"

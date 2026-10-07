@@ -7,6 +7,7 @@ import {
     applyLines,
     applyNicklist,
     HANDLED_EVENTS,
+    MAX_LINES,
     initialState,
     markAllRead,
     setActiveBuffer,
@@ -789,5 +790,52 @@ describe('nick colors', () => {
             'coa-chat_nick_self',
         ]);
         expect(nickColorClasses(undefined)).toEqual(['cwf-default']);
+    });
+});
+
+describe('lines kept', () => {
+    const many = (from: number, count: number) =>
+        Array.from({ length: count }, (_, i) =>
+            apiLine(from + i, 'line ' + (from + i)),
+        );
+
+    it('keeps the last lines of the buffers not shown', () => {
+        let state = applyLines(setup(), 2, many(1, MAX_LINES), MAX_LINES);
+        expect(state.buffers[2].allLinesFetched).toBe(false);
+        state = applyLines(state, 2, many(1, MAX_LINES - 1), MAX_LINES);
+        expect(state.buffers[2].allLinesFetched).toBe(true);
+        for (const id of [MAX_LINES, MAX_LINES + 1, MAX_LINES + 2]) {
+            state = send(state, 'buffer_line_added', 2, apiLine(id, 'new')).state;
+        }
+        const lines = state.buffers[2].lines.filter((l) => !l.isDateChange);
+        expect(lines).toHaveLength(MAX_LINES);
+        expect(lines[0].id).toBe(3);
+        expect(state.buffers[2].allLinesFetched).toBe(false);
+        expect(state.buffers[2].requestedLines).toBe(MAX_LINES);
+    });
+
+    it('keeps the lines of the buffer shown until it is left', () => {
+        let state = setActiveBuffer(setup(), 2);
+        state = applyLines(state, 2, many(1, 3 * MAX_LINES), 4 * MAX_LINES);
+        state = send(state, 'buffer_line_added', 2, apiLine(5000, 'new')).state;
+        expect(state.buffers[2].lines.length).toBeGreaterThan(3 * MAX_LINES);
+        state = setActiveBuffer(state, 1);
+        const lines = state.buffers[2].lines.filter((l) => !l.isDateChange);
+        expect(lines).toHaveLength(MAX_LINES);
+        expect(lines.at(-1)?.id).toBe(5000);
+        // The read marker is on the last line
+        expect(state.buffers[2].lastReadKey).toBe('l5000');
+    });
+
+    it('moves the read marker to the top when its line is dropped', () => {
+        let state = applyLines(setup(), 3, many(1, MAX_LINES), 2 * MAX_LINES);
+        state = setActiveBuffer(setActiveBuffer(state, 3), 1);
+        expect(state.buffers[3].lastReadKey).toBe('l' + MAX_LINES);
+        state = send(state, 'buffer_line_added', 3, apiLine(5000, 'new')).state;
+        expect(state.buffers[3].lastReadKey).toBe('l' + MAX_LINES);
+        for (let id = 5001; id < 5000 + MAX_LINES + 1; id++) {
+            state = send(state, 'buffer_line_added', 3, apiLine(id, 'new')).state;
+        }
+        expect(state.buffers[3].lastReadKey).toBe(READ_MARKER_TOP);
     });
 });

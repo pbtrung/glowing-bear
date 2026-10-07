@@ -1,9 +1,14 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-const SERVICE_WORKER = 'src/sw/serviceworker.ts';
+/** A path in the project */
+const path = (relative: string) => fileURLToPath(new URL(relative, import.meta.url));
+
+/** The service worker, from the root (src/) */
+const SERVICE_WORKER = 'sw/serviceworker.ts';
 
 /**
  * The service worker is built to serviceworker.js at the root (it controls
@@ -31,6 +36,9 @@ const { version } = JSON.parse(
 );
 
 export default defineConfig({
+    // The app (index.html) is in src/, the static files in public/
+    root: path('./src'),
+    publicDir: path('./public'),
     // Relative URLs: Glowing Bear can be served from any path
     base: './',
     plugins: [react(), serviceWorker()],
@@ -41,10 +49,14 @@ export default defineConfig({
         port: 8000,
     },
     build: {
-        outDir: 'build',
+        outDir: path('./build'),
+        emptyOutDir: true,
         sourcemap: true,
         rollupOptions: {
-            input: { main: 'index.html', serviceworker: SERVICE_WORKER },
+            input: {
+                main: path('./src/index.html'),
+                serviceworker: path('./src/' + SERVICE_WORKER),
+            },
             output: {
                 entryFileNames: (chunk) =>
                     chunk.name === 'serviceworker'
@@ -55,6 +67,7 @@ export default defineConfig({
     },
     test: {
         environment: 'jsdom',
-        include: ['src/**/*.test.{ts,tsx}'],
+        // (relative to the root, src/)
+        include: ['**/*.test.{ts,tsx}'],
     },
 });

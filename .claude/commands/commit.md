@@ -15,7 +15,7 @@ description: Commit staged/modified changes with a detailed message and push, no
      `npm test` (Vitest).
    - Any `src/lib/relay/**` or `src/lib/state/**` changed and Docker is available:
      `npm run test:relay` (protocol compliance against a real WeeChat).
-   - Any `src/app/**`, `public/**`, `index.html`, `vite.config.mts` or `package.json`
+   - Any `src/app/**`, `public/**`, `src/index.html`, `vite.config.mts` or `package.json`
      changed: also `npm run build`.
    - Only `.claude/**` changed: no checks needed.
    - If any check reports an error, fix it and re-run before continuing.

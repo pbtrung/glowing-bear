@@ -30,7 +30,7 @@ Single tests: `npx vitest run src/lib/state` or `npx vitest run -t "name"`.
 
 ## Architecture
 
-`index.html` loads `src/app/main.tsx`. Static files (images, sounds, theme stylesheets, manifests, service worker) are in `public/` and served as-is; `vite.config.mts` uses `base: './'` so the app works from any path.
+`src/index.html` loads `src/app/main.tsx`; `src/` is Vite's root. Static files (images, sounds, theme stylesheets, manifests) are in `public/` and served as-is; `vite.config.mts` uses `base: './'` so the app works from any path.
 
 ### TypeScript core (`src/lib/`, framework-agnostic)
 

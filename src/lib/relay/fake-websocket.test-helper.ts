@@ -13,7 +13,10 @@ export class FakeWebSocket {
     readonly url: string;
     readonly protocols: string[];
     readyState = FakeWebSocket.CONNECTING;
+    /** Requests sent (those of a batch one by one) */
     sent: Record<string, unknown>[] = [];
+    /** Frames sent */
+    frames: unknown[] = [];
     onopen: (() => void) | null = null;
     onclose: ((event: { code: number; reason: string }) => void) | null = null;
     onmessage: ((event: { data: string }) => void) | null = null;
@@ -29,7 +32,10 @@ export class FakeWebSocket {
     }
 
     send(data: string): void {
-        this.sent.push(JSON.parse(data));
+        const frame = JSON.parse(data) as
+            Record<string, unknown> | Record<string, unknown>[];
+        this.frames.push(frame);
+        this.sent.push(...(Array.isArray(frame) ? frame : [frame]));
     }
 
     close(): void {
@@ -59,8 +65,32 @@ export class FakeWebSocket {
 
     /** Answer the last request sent */
     reply(code: number, body: unknown = null, bodyType: string | null = null): void {
-        const request = this.sent[this.sent.length - 1];
-        this.receive({
+        this.receive(
+            this.response(this.sent[this.sent.length - 1], code, body, bodyType),
+        );
+    }
+
+    /** Answer the first request sent matching "METHOD /path" (prefix) */
+    replyTo(
+        request: string,
+        code: number,
+        body: unknown = null,
+        bodyType: string | null = null,
+    ): void {
+        const sent = this.sent.find((r) => String(r.request).startsWith(request));
+        if (!sent) {
+            throw new Error('No request ' + request);
+        }
+        this.receive(this.response(sent, code, body, bodyType));
+    }
+
+    response(
+        request: Record<string, unknown>,
+        code: number,
+        body: unknown = null,
+        bodyType: string | null = null,
+    ): Record<string, unknown> {
+        return {
             code,
             message: code === 200 ? 'OK' : code === 204 ? 'No Content' : 'Error',
             request: request.request,
@@ -68,7 +98,7 @@ export class FakeWebSocket {
             request_id: request.request_id,
             body_type: bodyType,
             body,
-        });
+        };
     }
 }
 

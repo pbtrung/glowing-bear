@@ -32,6 +32,13 @@ export const WEECHAT_OPTIONS: Record<string, string> = {
 /** Commands opening a buffer: switch to it once WeeChat opened it */
 const OPEN_COMMANDS = ['/query', '/join', '/j', '/q'];
 
+/** A connection attempt replaced by a newer one, or by a disconnect */
+class Cancelled extends Error {
+    constructor() {
+        super('Connection attempt cancelled');
+    }
+}
+
 export interface SessionState extends ChatState {
     /** Error of the last connection attempt */
     error: ConnectError | null;
@@ -65,6 +72,8 @@ export class Session {
     private client: RelayClient | null = null;
     private api: RelayApi | null = null;
     private connectOptions: ConnectOptions | null = null;
+    /** Number of the last connection attempt (see open()) */
+    private attempt = 0;
     private hotlistTimer: ReturnType<typeof setInterval> | undefined;
     private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     private history = new Map<number, { lines: string[]; pos: number }>();
@@ -106,6 +115,9 @@ export class Session {
         try {
             await this.open(options);
         } catch (e) {
+            if (e instanceof Cancelled) {
+                return;
+            }
             this.set({
                 status: 'disconnected',
                 error:
@@ -117,9 +129,23 @@ export class Session {
         }
     }
 
+    /**
+     * Open a connection and load everything. A newer attempt (or a disconnect)
+     * cancels it: it then closes its connection and rejects with Cancelled.
+     */
     private async open(options: ConnectOptions): Promise<void> {
+        const attempt = ++this.attempt;
+        const current = () => {
+            if (attempt !== this.attempt) {
+                throw new Cancelled();
+            }
+        };
         const client = new RelayClient({
-            onEvent: (event) => this.onEvent(event),
+            onEvent: (event) => {
+                if (this.client === client) {
+                    this.onEvent(event);
+                }
+            },
             onClose: (info) => {
                 if (this.client === client) {
                     this.onClose(info.byClient);
@@ -127,49 +153,67 @@ export class Session {
             },
             pingInterval: this.options.pingInterval,
         });
-        await client.connect(options);
-        this.client = client;
-        this.api = new RelayApi(client);
-        await this.initialSync();
+        try {
+            await client.connect(options);
+            current();
+            this.client = client;
+            this.api = new RelayApi(client);
+            await this.initialSync(client, this.api, current);
+        } catch (e) {
+            if (this.client === client) {
+                this.client = null;
+                this.api = null;
+            }
+            client.close();
+            throw attempt === this.attempt ? e : new Cancelled();
+        }
     }
 
     /**
-     * Load everything and enable the synchronization. Requests are processed
-     * in order by WeeChat, so no event is missed between the buffer list and
-     * the sync.
+     * Load everything and enable the synchronization. The requests are sent
+     * in one frame so that no event is missed between the buffer list and the
+     * sync.
+     *
+     * @param current throws if the connection attempt was cancelled
      */
-    private async initialSync(): Promise<void> {
-        const api = this.api!;
+    private async initialSync(
+        client: RelayClient,
+        api: RelayApi,
+        current: () => void,
+    ): Promise<void> {
         const previous =
             this.state.activeBufferId !== null
                 ? this.state.buffers[this.state.activeBufferId]?.fullName
                 : undefined;
-        this.set({
-            ...initialState,
-            status: this.state.status,
-            error: null,
-            options: { ...WEECHAT_OPTIONS },
-        });
+        const [version, buffers, hotlist] = await Promise.all(
+            client.batch(
+                () =>
+                    [
+                        api.version(),
+                        api.buffers({ colors: 'weechat' }),
+                        api.hotlist(),
+                        api.sync({
+                            sync: true,
+                            nicks: true,
+                            input: false,
+                            colors: 'weechat',
+                        }),
+                    ] as const,
+            ),
+        );
+        current();
+
         this.history.clear();
-
-        const version = api.version();
-        const buffers = api.buffers({ colors: 'weechat' });
-        const hotlist = api.hotlist();
-        const sync = api.sync({
-            sync: true,
-            nicks: true,
-            input: false,
-            colors: 'weechat',
+        const loaded: ChatState = {
+            ...initialState,
+            status: 'connected',
+            options: { ...WEECHAT_OPTIONS },
+            version,
+        };
+        this.set({
+            ...applyHotlist(applyBuffers(loaded, buffers), hotlist),
+            error: null,
         });
-
-        this.set({ version: await version });
-        const buffersResult = await buffers;
-        this.update((s) => applyBuffers(s, buffersResult));
-        const hotlistResult = await hotlist;
-        this.update((s) => applyHotlist(s, hotlistResult));
-        await sync;
-
-        this.set({ status: 'connected', upgrading: false });
 
         // Options and scripts are not needed right away
         for (const name of Object.keys(WEECHAT_OPTIONS)) {
@@ -206,7 +250,7 @@ export class Session {
         clearInterval(this.hotlistTimer);
         if (this.options.hotlistSync()) {
             this.hotlistTimer = setInterval(
-                () => this.refreshHotlist(),
+                () => void this.refreshHotlist(),
                 this.options.hotlistInterval ?? 60000,
             );
         }
@@ -227,19 +271,29 @@ export class Session {
 
     private scheduleReconnect(delay: number): void {
         clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = setTimeout(() => this.reconnect(delay), delay);
+        this.reconnectTimer = setTimeout(() => void this.reconnect(delay), delay);
     }
 
-    /** Try to reconnect now (also when the user asks for it) */
+    /**
+     * Try to reconnect now (also when the user asks for it): an attempt in
+     * progress is replaced by this one.
+     */
     async reconnect(delay = this.options.reconnectDelay ?? 3000): Promise<void> {
-        if (!this.connectOptions || this.state.status === 'connected') {
+        if (
+            !this.connectOptions ||
+            this.state.status === 'connected' ||
+            this.state.status === 'connecting'
+        ) {
             return;
         }
         clearTimeout(this.reconnectTimer);
         this.set({ status: 'reconnecting' });
         try {
             await this.open(this.connectOptions);
-        } catch {
+        } catch (e) {
+            if (e instanceof Cancelled) {
+                return;
+            }
             const next = delay * 1.5;
             if (next >= (this.options.reconnectMaxDelay ?? 600000)) {
                 this.set({ status: 'disconnected' });
@@ -249,8 +303,9 @@ export class Session {
         }
     }
 
-    /** Disconnect (no reconnection) */
+    /** Disconnect (no reconnection); cancels a connection in progress */
     disconnect(): void {
+        this.attempt++;
         clearTimeout(this.reconnectTimer);
         clearInterval(this.hotlistTimer);
         this.set({ status: 'disconnected' });
@@ -301,13 +356,6 @@ export class Session {
                 // Frames received after the upgrade can't be decompressed with
                 // this WebSocket: reconnect, which reloads everything
                 this.client?.abort('upgrade');
-                break;
-            case 'resync':
-                if (this.api) {
-                    void this.initialSync();
-                }
-                break;
-            case 'nicklist':
                 break;
         }
     }
@@ -367,6 +415,8 @@ export class Session {
         try {
             const lines = await this.api.lines(bufferId, -wanted, 'weechat');
             this.update((s) => applyLines(s, bufferId, lines, wanted, unreadHint));
+        } catch {
+            // connection lost (the reconnection reloads them), or buffer closed
         } finally {
             this.set({ loadingLines: false });
         }
@@ -376,8 +426,12 @@ export class Session {
         if (!this.api) {
             return;
         }
-        const root = await this.api.nicks(bufferId, 'weechat');
-        this.update((s) => applyNicklist(s, bufferId, root));
+        try {
+            const root = await this.api.nicks(bufferId, 'weechat');
+            this.update((s) => applyNicklist(s, bufferId, root));
+        } catch {
+            // connection lost (the reconnection reloads it), or buffer closed
+        }
     }
 
     /** Clear the unread counters of a buffer, locally */
@@ -504,11 +558,12 @@ export class Session {
     /** Previous line of the history (the current one is kept for coming back) */
     historyUp(bufferId: number, current: string): string {
         const history = this.historyOf(bufferId);
-        if (history.pos >= history.lines.length) {
-            history.lines.push(current);
-        }
-        if (history.pos <= 0 || history.pos >= history.lines.length) {
+        if (history.pos <= 0) {
             return current;
+        }
+        if (history.pos >= history.lines.length) {
+            // stash the line being typed, popped when coming back down
+            history.lines.push(current);
         }
         history.pos--;
         return history.lines[history.pos];

@@ -100,6 +100,8 @@ export class RelayClient {
     private ws: WebSocket | null = null;
     private pending = new Map<string, Pending>();
     private nextId = 0;
+    /** Requests collected by batch(), sent together */
+    private batched: Record<string, unknown>[] | null = null;
     private pingTimer: ReturnType<typeof setInterval> | undefined;
     private pingDeadline: ReturnType<typeof setTimeout> | undefined;
     private closing = false;
@@ -245,7 +247,16 @@ export class RelayClient {
             return;
         }
         for (const message of Array.isArray(messages) ? messages : [messages]) {
-            this.dispatch(message as ApiResponse | ApiEvent);
+            if (typeof message !== 'object' || message === null) {
+                continue;
+            }
+            try {
+                this.dispatch(message as ApiResponse | ApiEvent);
+            } catch (e) {
+                // An event handler failing must not drop the next messages
+                // (and leave their requests pending forever)
+                console.error('Error handling a relay message', e);
+            }
         }
     }
 
@@ -259,6 +270,9 @@ export class RelayClient {
             ? this.pending.get(response.request_id)
             : undefined;
         if (!pending || !response.request_id) {
+            if (response.code >= 400) {
+                console.warn('Unexpected relay error', response);
+            }
             return;
         }
         this.pending.delete(response.request_id);
@@ -298,8 +312,35 @@ export class RelayClient {
                 resolve: resolve as (response: ApiResponse) => void,
                 reject,
             });
-            ws.send(JSON.stringify(request));
+            if (this.batched !== null) {
+                this.batched.push(request);
+            } else {
+                ws.send(JSON.stringify(request));
+            }
         });
+    }
+
+    /**
+     * Send the requests made by fn in a single frame (a JSON array): WeeChat
+     * processes them together, so no event can happen in between (e.g. between
+     * the buffer list and the start of the synchronization).
+     */
+    batch<T>(fn: () => T): T {
+        if (this.batched !== null) {
+            return fn();
+        }
+        this.batched = [];
+        try {
+            return fn();
+        } finally {
+            const requests = this.batched;
+            this.batched = null;
+            if (requests.length > 0 && this.ws?.readyState === WebSocket.OPEN) {
+                this.ws.send(
+                    JSON.stringify(requests.length === 1 ? requests[0] : requests),
+                );
+            }
+        }
     }
 
     /** Close the connection */
@@ -335,15 +376,29 @@ export class RelayClient {
         if (interval <= 0) {
             return;
         }
+        let waiting = false;
         this.pingTimer = setInterval(() => {
-            clearTimeout(this.pingDeadline);
+            if (waiting) {
+                // the deadline of the previous ping runs
+                return;
+            }
+            waiting = true;
             this.pingDeadline = setTimeout(
                 () => this.abort('ping timeout'),
                 this.options.pingTimeout ?? 15000,
             );
+            // Any answer, even an error, shows the connection is alive
+            const answered = () => {
+                waiting = false;
+                clearTimeout(this.pingDeadline);
+            };
             this.request('POST', '/api/ping', { data: String(Date.now()) }).then(
-                () => clearTimeout(this.pingDeadline),
-                () => undefined,
+                answered,
+                (e: unknown) => {
+                    if (e instanceof RequestError) {
+                        answered();
+                    }
+                },
             );
         }, interval);
     }

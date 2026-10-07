@@ -68,11 +68,7 @@ export type Effect =
     /** Switch to a buffer (one we opened with /query or /join) */
     | { type: 'activate'; bufferId: number }
     /** WeeChat is upgrading: the connection must be reopened */
-    | { type: 'upgrade' }
-    /** WeeChat finished upgrading: data must be reloaded */
-    | { type: 'resync' }
-    /** The nicklist of a buffer changed */
-    | { type: 'nicklist'; bufferId: number };
+    | { type: 'upgrade' };
 
 export interface Result {
     state: ChatState;
@@ -520,27 +516,25 @@ const lineDataChanged: EventHandler = (draft, event) => {
     }
 };
 
-const nickGroupAdded: EventHandler = (draft, event, _ctx, effects) => {
+const nickGroupAdded: EventHandler = (draft, event) => {
     const buffer = eventBuffer(draft, event);
     if (!buffer?.nicklistLoaded || !event.body) {
         return;
     }
     const group = createNickGroup(event.body as ApiNickGroup);
     buffer.nickGroups[group.id] = group;
-    effects.push({ type: 'nicklist', bufferId: buffer.id });
 };
 
-const nickGroupChanged: EventHandler = (draft, event, _ctx, effects) => {
+const nickGroupChanged: EventHandler = (draft, event) => {
     const buffer = eventBuffer(draft, event);
     const api = event.body as ApiNickGroup | null;
     if (!buffer?.nicklistLoaded || !api || !buffer.nickGroups[api.id]) {
         return;
     }
     buffer.nickGroups[api.id] = createNickGroup(api);
-    effects.push({ type: 'nicklist', bufferId: buffer.id });
 };
 
-const nickGroupRemoving: EventHandler = (draft, event, _ctx, effects) => {
+const nickGroupRemoving: EventHandler = (draft, event) => {
     const buffer = eventBuffer(draft, event);
     const api = event.body as ApiNickGroup | null;
     if (!buffer?.nicklistLoaded || !api) {
@@ -566,10 +560,9 @@ const nickGroupRemoving: EventHandler = (draft, event, _ctx, effects) => {
             delete buffer.nicks[nick.id];
         }
     }
-    effects.push({ type: 'nicklist', bufferId: buffer.id });
 };
 
-const nickAdded: EventHandler = (draft, event, _ctx, effects) => {
+const nickAdded: EventHandler = (draft, event) => {
     const buffer = eventBuffer(draft, event);
     if (!buffer?.nicklistLoaded || !event.body) {
         return;
@@ -577,10 +570,9 @@ const nickAdded: EventHandler = (draft, event, _ctx, effects) => {
     const nick = createNick(event.body as ApiNick);
     nick.spokeAt = Date.now();
     buffer.nicks[nick.id] = nick;
-    effects.push({ type: 'nicklist', bufferId: buffer.id });
 };
 
-const nickChanged: EventHandler = (draft, event, _ctx, effects) => {
+const nickChanged: EventHandler = (draft, event) => {
     const buffer = eventBuffer(draft, event);
     if (!buffer?.nicklistLoaded || !event.body) {
         return;
@@ -588,16 +580,14 @@ const nickChanged: EventHandler = (draft, event, _ctx, effects) => {
     const nick = createNick(event.body as ApiNick);
     nick.spokeAt = buffer.nicks[nick.id]?.spokeAt ?? 0;
     buffer.nicks[nick.id] = nick;
-    effects.push({ type: 'nicklist', bufferId: buffer.id });
 };
 
-const nickRemoving: EventHandler = (draft, event, _ctx, effects) => {
+const nickRemoving: EventHandler = (draft, event) => {
     const buffer = eventBuffer(draft, event);
     if (!buffer?.nicklistLoaded || !event.body) {
         return;
     }
     delete buffer.nicks[(event.body as ApiNick).id];
-    effects.push({ type: 'nicklist', bufferId: buffer.id });
 };
 
 const EVENT_HANDLERS: Record<string, EventHandler> = {
@@ -637,9 +627,10 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
         draft.upgrading = true;
         effects.push({ type: 'upgrade' });
     },
-    upgrade_ended: (draft, _event, _ctx, effects) => {
+    // Not received in practice: the upgrade event drops the connection, and
+    // the reconnection reloads everything
+    upgrade_ended: (draft) => {
         draft.upgrading = false;
-        effects.push({ type: 'resync' });
     },
     quit: (draft) => {
         draft.quitting = true;

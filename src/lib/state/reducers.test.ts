@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type {
-    ApiBuffer,
-    ApiEvent,
-    ApiLine,
-    ApiNick,
-    ApiNickGroup,
-} from '../relay/types';
+import type { ApiBuffer, ApiEvent, ApiNickGroup } from '../relay/types';
 import {
     applyBuffers,
     applyEvent,
@@ -18,65 +12,7 @@ import {
     setActiveBuffer,
     type ChatState,
 } from './reducers';
-
-const apiBuffer = (
-    id: number,
-    number: number,
-    name: string,
-    shortName: string,
-    extra: Partial<ApiBuffer> = {},
-): ApiBuffer => ({
-    id,
-    name,
-    short_name: shortName,
-    number,
-    type: 'formatted',
-    hidden: false,
-    title: 'Title of ' + name,
-    modes: '',
-    input_prompt: '',
-    input: '',
-    input_position: 0,
-    input_multiline: false,
-    nicklist: true,
-    nicklist_case_sensitive: false,
-    nicklist_display_groups: false,
-    time_displayed: true,
-    local_variables: { plugin: 'irc', type: 'channel', server: 'libera' },
-    keys: [],
-    last_read_line_id: -1,
-    ...extra,
-});
-
-const apiLine = (
-    id: number,
-    message: string,
-    extra: Partial<ApiLine> = {},
-): ApiLine => ({
-    id,
-    y: -1,
-    date: '2024-01-07T08:54:00.179483Z',
-    date_printed: '2024-01-07T08:54:00.179483Z',
-    displayed: true,
-    highlight: false,
-    notify_level: 1,
-    prefix: 'alice',
-    message,
-    tags: ['irc_privmsg', 'nick_alice', 'log1'],
-    ...extra,
-});
-
-const apiNick = (id: number, groupId: number, name: string): ApiNick => ({
-    id,
-    parent_group_id: groupId,
-    prefix: '@',
-    prefix_color_name: 'lightgreen',
-    prefix_color: '',
-    name,
-    color_name: 'bar_fg',
-    color: '',
-    visible: true,
-});
+import { apiBuffer, apiLine, apiNick } from './fixtures.test-helper';
 
 const root: ApiNickGroup = {
     id: 0,
@@ -679,7 +615,7 @@ describe('events', () => {
         expect(r.effects).toEqual([{ type: 'upgrade' }]);
         r = send(r.state, 'upgrade_ended', -1);
         expect(r.state.upgrading).toBe(false);
-        expect(r.effects).toEqual([{ type: 'resync' }]);
+        expect(r.effects).toEqual([]);
         expect(send(setup(), 'quit', -1).state.quitting).toBe(true);
         const state = setup();
         expect(send(state, 'day_changed', -1).state).toBe(state);

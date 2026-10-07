@@ -232,6 +232,53 @@ describe('requests', () => {
         ]);
     });
 
+    it('sends batched requests in one frame', async () => {
+        const { client, ws } = await connected();
+        const api = new RelayApi(client);
+        const [version, hotlist] = client.batch(() => [api.version(), api.hotlist()]);
+        expect(ws.frames).toHaveLength(1);
+        expect(ws.frames[0]).toEqual([
+            { request: 'GET /api/version', request_id: expect.any(String) },
+            { request: 'GET /api/hotlist', request_id: expect.any(String) },
+        ]);
+        // WeeChat answers with an array too
+        ws.receive([
+            ws.response(ws.sent[0], 200, { weechat_version: '4.4.0' }),
+            ws.response(ws.sent[1], 200, []),
+        ]);
+        expect(await version).toEqual({ weechat_version: '4.4.0' });
+        expect(await hotlist).toEqual([]);
+        // A single request is sent as an object
+        void client.batch(() => api.hotlist());
+        expect(ws.frames[1]).toMatchObject({ request: 'GET /api/hotlist' });
+    });
+
+    it('keeps handling the messages of a frame when an event handler throws', async () => {
+        const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const { client, ws } = await connected({
+            onEvent: () => {
+                throw new Error('bug');
+            },
+        });
+        const pending = client.request('GET', '/api/hotlist');
+        ws.receive([
+            { code: 0, message: 'OK', event_name: 'quit', buffer_id: -1 },
+            null,
+            42,
+            ws.response(ws.sent[0], 200, []),
+        ]);
+        expect((await pending).body).toEqual([]);
+        expect(errors).toHaveBeenCalledOnce();
+    });
+
+    it('ignores responses to unknown requests', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const { ws } = await connected();
+        ws.receive({ code: 200, message: 'OK', request_id: 'nope', body: null });
+        ws.receive({ code: 400, message: 'Bad Request', request_id: null, body: null });
+        expect(warn).toHaveBeenCalledOnce();
+    });
+
     it('pings and drops the connection if WeeChat does not answer', async () => {
         vi.useFakeTimers();
         const closes: CloseInfo[] = [];
@@ -257,6 +304,35 @@ describe('requests', () => {
         expect(closes).toEqual([]);
 
         await vi.advanceTimersByTimeAsync(400 + 500);
+        expect(closes).toEqual([
+            { code: 4000, reason: 'ping timeout', byClient: false },
+        ]);
+    });
+
+    it('waits for the answer of a ping before the next one', async () => {
+        vi.useFakeTimers();
+        const closes: CloseInfo[] = [];
+        const client = new RelayClient({
+            // a timeout longer than the interval
+            pingInterval: 1000,
+            pingTimeout: 2500,
+            pageProtocol: 'http:',
+            onClose: (i) => closes.push(i),
+        });
+        const connecting = client.connect(OPTIONS);
+        await vi.advanceTimersByTimeAsync(0);
+        const ws = FakeWebSocket.last;
+        ws.open();
+        await connecting;
+
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(ws.sent).toHaveLength(1);
+        // an error answer shows the connection is alive
+        ws.reply(400, { error: 'x' });
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(closes).toEqual([]);
+        expect(ws.sent).toHaveLength(2);
+        await vi.advanceTimersByTimeAsync(2500);
         expect(closes).toEqual([
             { code: 4000, reason: 'ping timeout', byClient: false },
         ]);

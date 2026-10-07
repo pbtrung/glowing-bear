@@ -334,13 +334,27 @@ describe('resources', () => {
         expect(error.response.code).toBe(404);
     });
 
-    it('answers batched requests in order', async () => {
+    it('answers pipelined requests', async () => {
         const [version, ping] = await Promise.all([
             admin.client.request('GET', '/api/version'),
-            admin.client.request('POST', '/api/ping', { data: 'batch' }),
+            admin.client.request('POST', '/api/ping', { data: 'pipelined' }),
         ]);
         expect(version.body_type).toBe('version');
+        expect(ping.body).toEqual({ data: 'pipelined' });
+    });
+
+    it('answers batched requests (a JSON array in one frame)', async () => {
+        const [version, ping, error] = await Promise.all(
+            admin.client.batch(() => [
+                admin.client.request('GET', '/api/version'),
+                admin.client.request('POST', '/api/ping', { data: 'batch' }),
+                admin.client.request('GET', '/api/nothing').catch((e) => e),
+            ]),
+        );
+        expect(version.body_type).toBe('version');
         expect(ping.body).toEqual({ data: 'batch' });
+        expect(error).toBeInstanceOf(RequestError);
+        expect(error.response.code).toBe(404);
     });
 });
 

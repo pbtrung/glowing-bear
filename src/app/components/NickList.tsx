@@ -35,59 +35,63 @@ export function NickList({ buffer }: { buffer: Buffer }) {
                     />
                 </div>
             </div>
-            {sections.map((section) => (
-                <section key={section.id} className="nick-section">
-                    {titled && (
-                        <h3 className="nick-section-title">
-                            {section.title}
-                            <span className="nick-section-count">
-                                {section.nicks.length}
-                            </span>
-                        </h3>
-                    )}
-                    <ul className="list-unstyled">
-                        {section.nicks.map((nick) => (
-                            <li key={nick.id}>
-                                <a
-                                    href="#"
-                                    title={`Open a query with ${nick.name}`}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        session.openQuery(buffer.id, nick.name);
-                                    }}
-                                >
-                                    <span
-                                        className="nick-avatar avatar"
-                                        style={
-                                            {
-                                                '--avatar-hue': nameHue(nick.name),
-                                            } as CSSProperties
-                                        }
-                                        aria-hidden="true"
+            <div className="nicklist-body">
+                {sections.map((section) => (
+                    <section key={section.id} className="nick-section">
+                        {titled && (
+                            <h3 className="nick-section-title">
+                                {section.title}
+                                <span className="nick-section-count">
+                                    {section.nicks.length}
+                                </span>
+                            </h3>
+                        )}
+                        <ul className="list-unstyled">
+                            {section.nicks.map((nick) => (
+                                <li key={nick.id}>
+                                    <a
+                                        href="#"
+                                        title={`Open a query with ${nick.name}`}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            session.openQuery(buffer.id, nick.name);
+                                        }}
                                     >
-                                        {initial(nick.name)}
-                                    </span>
-                                    <span className="nick-name">
-                                        {nick.prefix.trim() && (
-                                            <span
-                                                className={`nick-prefix ${nick.prefixClasses.join(' ')}`}
-                                            >
-                                                {nick.prefix}
-                                            </span>
-                                        )}
-                                        <span className={nick.nameClasses.join(' ')}>
-                                            {nick.name}
+                                        <span
+                                            className="nick-avatar avatar"
+                                            style={
+                                                {
+                                                    '--avatar-hue': nameHue(nick.name),
+                                                } as CSSProperties
+                                            }
+                                            aria-hidden="true"
+                                        >
+                                            {initial(nick.name)}
                                         </span>
-                                    </span>
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            ))}
-            {sections.length === 0 && (
-                <p className="nick-empty">No user matches the filter.</p>
-            )}
+                                        <span className="nick-name">
+                                            {nick.prefix.trim() && (
+                                                <span
+                                                    className={`nick-prefix ${nick.prefixClasses.join(' ')}`}
+                                                >
+                                                    {nick.prefix}
+                                                </span>
+                                            )}
+                                            <span
+                                                className={nick.nameClasses.join(' ')}
+                                            >
+                                                {nick.name}
+                                            </span>
+                                        </span>
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                ))}
+                {sections.length === 0 && (
+                    <p className="nick-empty">No user matches the filter.</p>
+                )}
+            </div>
         </aside>
     );
 }

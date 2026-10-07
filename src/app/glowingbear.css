@@ -758,8 +758,8 @@ gb-icon,
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-right: env(safe-area-inset-right);
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
     background: var(--gb-chrome-bg);
     color: var(--gb-chrome-fg);
     border-left: 1px solid var(--gb-border);
@@ -775,12 +775,17 @@ gb-icon,
 }
 
 /* The header is the filter, like the search of the buffer list */
+/* Only the nicks scroll: a scrollbar must not narrow the header */
 .nicklist-header {
-    position: sticky;
-    top: 0;
-    z-index: 1;
+    flex: none;
     padding: 0.625rem;
-    background: var(--gb-chrome-bg);
+}
+
+.nicklist-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .nicklist-header .search-box {
@@ -1660,6 +1665,7 @@ label.settings-row:hover {
         grid-area: nick;
         z-index: auto;
         width: var(--gb-nicklist-width);
+        min-height: 0;
         padding: 0;
         box-shadow: none;
         animation: none;

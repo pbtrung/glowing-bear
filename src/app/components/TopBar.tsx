@@ -92,6 +92,14 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                         )}
                     </div>
                 )}
+                {latency !== null && (
+                    <span
+                        className={`latency desktop${latency >= SLOW_LATENCY ? ' slow' : ''}`}
+                        title={`Latency to WeeChat (${host})`}
+                    >
+                        {latency} ms
+                    </span>
+                )}
                 {buffer?.hasNicklist && (
                     <button
                         type="button"
@@ -102,14 +110,6 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                     >
                         <Icon icon={Users} />
                     </button>
-                )}
-                {latency !== null && (
-                    <span
-                        className={`latency desktop${latency >= SLOW_LATENCY ? ' slow' : ''}`}
-                        title={`Latency to WeeChat (${host})`}
-                    >
-                        {latency} ms
-                    </span>
                 )}
                 <button
                     type="button"

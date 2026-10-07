@@ -461,8 +461,9 @@ pre {
     color: var(--gb-fg);
     overflow: hidden;
     text-overflow: ellipsis;
-    /* a long name shrinks first, the modes and badges stay whole */
-    flex-shrink: 1;
+    /* whole unless it can't fit by itself (the topic gives way first), the
+       modes and badges stay whole */
+    flex: 0 1 auto;
     min-width: 0;
 }
 
@@ -477,6 +478,8 @@ pre {
     color: var(--gb-muted);
     overflow: hidden;
     text-overflow: ellipsis;
+    /* only the space left by the name: shortened first */
+    flex: 1 1 0;
     min-width: 0;
 }
 

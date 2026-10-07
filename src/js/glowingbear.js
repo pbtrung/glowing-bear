@@ -571,6 +571,17 @@ weechat.controller('WeechatCtrl', [
             // Load new theme
             utils.inject_css('css/themes/' + theme + '.css', 'themeCSS');
 
+            // Tint the browser UI (e.g. the mobile status bar) like the top bar
+            document.getElementById('themeCSS').onload = function () {
+                var color = getComputedStyle(document.documentElement)
+                    .getPropertyValue('--gb-chrome-bg')
+                    .trim();
+                var meta = document.querySelector('meta[name="theme-color"]');
+                if (meta && color) {
+                    meta.setAttribute('content', color);
+                }
+            };
+
             // Bootstrap color mode matching the theme
             var mode = LIGHT_THEMES.indexOf(theme) >= 0 ? 'light' : 'dark';
             document.documentElement.setAttribute('data-bs-theme', mode);

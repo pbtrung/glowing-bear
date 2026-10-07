@@ -528,6 +528,12 @@ gb-icon {
     font-weight: 600;
 }
 
+/* Buffer names without a color of their own follow the row's color */
+.buffer.active .buffername.cwf-default,
+.buffer.highlight .buffername.cwf-default {
+    color: inherit;
+}
+
 /* Search result selected with the keyboard */
 .buffer.highlight a {
     background: var(--gb-accent);
@@ -776,8 +782,8 @@ td.message a {
     font-size: 0.9em;
 }
 
-/* Highlighted nick in the prefix */
-.highlight {
+/* Highlighted nick in the prefix (beats the theme's nick colors) */
+#bufferlines .highlight {
     color: var(--gb-highlight-fg);
     font-weight: 700;
 }
@@ -1085,6 +1091,12 @@ div.colourbox {
     #bufferlines td.message {
         display: inline;
         padding: 0;
+    }
+
+    /* A fainter color for repeated times looks irregular in this layout */
+    .repeated-time .cof-chat_time,
+    .repeated-time .cof-chat_time_delimiters {
+        color: var(--gb-muted);
     }
 
     #bufferlines tr.readmarker td {

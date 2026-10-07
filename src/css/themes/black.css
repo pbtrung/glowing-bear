@@ -1,31 +1,11 @@
+/* Glowing Bear theme: black (dark theme on a pure black background) */
 @import 'dark.css';
 
-body,
-.modal-content {
-    background-color: #000;
-}
-
-#topbar,
-#sidebar,
-.panel,
-.dropdown-menu,
-#topbar .actions {
-    background: #080808;
-}
-
-.nav-pills li:nth-child(2n) {
-    background: #000;
-}
-
-.form-control option,
-input.form-control,
-select.form-control {
-    color: #ccc;
-    background: #080808;
-}
-
-.close,
-.close:hover,
-.close:focus {
-    color: #ddd;
+:root {
+    --gb-bg: #000000;
+    --gb-chrome-bg: #080808;
+    --gb-input-bg: #0e0e0e;
+    --gb-border: #1e1e1e;
+    --gb-line-hover: #0d0d0d;
+    --gb-repeated-time: #2a2a2a;
 }

@@ -1,3 +1,11 @@
+/*
+ * Glowing Bear theme: base16 (default palette, also used by the other base16 themes)
+ *
+ * The first part sets the palette used by glowingbear.css (--gb-* variables);
+ * the second part maps WeeChat colors (options cof-/cob-/coa-, basic colors
+ * cwf-/cwb-, extended colors cef-/ceb-) to CSS colors.
+ */
+
 :root {
     --base00: #181818; /* Default Background */
     --base01: #282828; /* Lighter Background (Used for status bars) */
@@ -17,464 +25,37 @@
     --base0F: #a16946; /* "Brown": Deprecated, Opening/Closing Embedded Language Tags e.g. <?php ?> */
 }
 
-body {
-    background-color: var(--base00);
-    color: var(--base05);
+:root {
+    --gb-bg: var(--base00);
+    --gb-fg: var(--base05);
+    --gb-muted: var(--base04);
+    --gb-chrome-bg: var(--base01);
+    --gb-chrome-fg: var(--base05);
+    --gb-border: var(--base02);
+    --gb-hover-bg: color-mix(in srgb, var(--base05) 8%, transparent);
+    --gb-active-bg: var(--base02);
+    --gb-active-fg: var(--base06);
+    --gb-accent: var(--base0D);
+    --gb-accent-fg: var(--base00);
+    --gb-input-bg: var(--base00);
+    --gb-line-hover: color-mix(in srgb, var(--base05) 4%, transparent);
+    --gb-line-highlight: color-mix(in srgb, var(--base0A) 10%, transparent);
+    --gb-highlight-fg: var(--base0A);
+    --gb-readmarker: var(--base08);
+    --gb-repeated-time: var(--base02);
+    --gb-code-bg: var(--base02);
+    --gb-code-fg: var(--base06);
+    --gb-link: var(--base0D);
+    --gb-scrollbar: var(--base03);
+    --gb-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.35);
+    --gb-backdrop: color-mix(in srgb, var(--base00) 60%, transparent);
 }
+
 tr.bufferline {
     line-height: 1.4;
 }
 
-a:link {
-    color: var(--base0D);
-}
-
-a:visited {
-    color: var(--base0E);
-}
-
-#topbar .actions > a:visited {
-    color: var(--base0D);
-}
-
-a:hover,
-a:active,
-a:focus,
-#nicklist a:hover,
-#nicklist a:active,
-#nicklist a:focus {
-    color: var(--base0D);
-}
-
-a:hover,
-a:active,
-a:focus,
-#nicklist a:hover,
-#nicklist a:active,
-#nicklist a:focus {
-    background-color: var(--base03);
-    text-decoration: underline;
-}
-
-a:visited:hover,
-a:visited:active,
-a:visited:focus {
-    color: var(--base0E);
-}
-
-#topbar a:hover,
-#topbar a:active,
-#topbar .actions > a:hover > i,
-#topbar .actions > a:active > i {
-    background-color: var(--base01);
-}
-
-.form-control {
-    color: var(--base05);
-    box-shadow:
-        0px 1px 0px rgba(255, 255, 255, 0.1),
-        0px 1px 7px 0px rgba(0, 0, 0, 0.2) inset;
-    background: var(--base01);
-    border: 0px none;
-}
-
-.form-control[disabled] {
-    background: var(--base03);
-}
-
-.form-control:focus {
-    color: var(--base06);
-    box-shadow:
-        0px 1px 0px rgba(255, 255, 255, 0.1),
-        0px 1px 7px 0px rgba(0, 0, 0, 0.2) inset;
-    background: var(--base02);
-}
-
-.form-control option {
-    color: var(--base05);
-    background: var(--base01);
-}
-
-html {
-    background-color: inherit;
-}
-
-/* fix for mobile firefox which ignores :hover */
-.nav-pills > li > a:hover,
-.nav-pills > li > a:active,
-.nav-pills > li > a:focus,
-.nav-pills > li.highlight > a:hover,
-.nav-pills > li.highlight > a:active,
-.nav-pills > li.highlight > a:focus,
-.nav-pills > li.active > a:hover,
-.nav-pills > li.active > a:active,
-.nav-pills > li.active > a:focus,
-.nav-pills > li.notification > a:hover,
-.nav-pills > li.notification > a:active,
-.nav-pills > li.notification > a:focus {
-    background-color: var(--base03);
-}
-
-.nav-pills > li > a:hover,
-.nav-pills > li > a:hover span,
-.nav-pills > li > a:active,
-.nav-pills > li > a:active span,
-.nav-pills > li > a:focus,
-.nav-pills > li > a:focus span,
-.nav-pills > li.active > a:hover,
-.nav-pills > li.active > a:hover span,
-.nav-pills > li.active > a:active,
-.nav-pills > li.active > a:active span,
-.nav-pills > li.active > a:focus,
-.nav-pills > li.active > a:focus span {
-    color: var(--base06);
-}
-
-.nav-pills > li > a:hover span,
-.nav-pills > li > a:active span,
-.nav-pills > li > a:focus span,
-.nav-pills > li.active > a:hover span,
-.nav-pills > li.active > a:active span,
-.nav-pills > li.active > a:focus span {
-    background-color: transparent;
-}
-
-.nav-pills > li.buffer.channel a span:last-of-type:before {
-    color: var(--base04);
-}
-
-.nav-pills > li.buffer.channel.highlight a:hover span:last-of-type:before,
-.nav-pills > li.buffer.channel.highlight a:active span:last-of-type:before,
-.nav-pills > li.buffer.channel.highlight a:focus span:last-of-type:before,
-.nav-pills > li.buffer.channel.active a:hover span:last-of-type:before,
-.nav-pills > li.buffer.channel.active a:active span:last-of-type:before,
-.nav-pills > li.buffer.channel.active a:focus span:last-of-type:before,
-.nav-pills > li.buffer.channel.unread a span:last-of-type:before,
-.nav-pills > li.buffer.channel.unread a:hover span:last-of-type:before,
-.nav-pills > li.buffer.channel.unread a:active span:last-of-type:before,
-.nav-pills > li.buffer.channel.unread a:focus span:last-of-type:before,
-.nav-pills > li.buffer.channel.notification a:hover span:last-of-type:before,
-.nav-pills > li.buffer.channel.notification a:active span:last-of-type:before,
-.nav-pills > li.buffer.channel.notification a:focus span:last-of-type:before {
-    color: var(--base05);
-}
-
-.nav-pills > li.buffer.channel.highlight a span:last-of-type:before,
-.nav-pills > li.buffer.channel.active a span:last-of-type:before,
-.nav-pills > li.buffer.channel.notification a span:last-of-type:before {
-    color: var(--base02);
-}
-
-.nav-pills > li.active > a,
-.nav-pills > li.highlight > a,
-.nav-pills > li.unread > a,
-.nav-pills > li.notification > a {
-    font-weight: bold;
-}
-
-.nav-pills > li.active > a {
-    background-color: var(--base0E);
-    color: var(--base01);
-}
-
-.nav-pills > li.highlight > a {
-    background-color: var(--base0A);
-    color: var(--base01);
-}
-
-.nav-pills > li.highlight > a > span {
-    background-color: transparent;
-    color: var(--base01);
-}
-
-.nav-pills > li.unread > a {
-    color: var(--base06);
-}
-
-.nav-pills > li.notification > a {
-    background-color: var(--base0B);
-    color: var(--base00);
-}
-
-.nav-pills > li.highlight > a:hover,
-.nav-pills > li.highlight > a:hover span,
-.nav-pills > li.highlight > a:active,
-.nav-pills > li.highlight > a:active span,
-.nav-pills > li.highlight > a:focus,
-.nav-pills > li.highlight > a:focus span,
-.nav-pills > li.unread > a:hover,
-.nav-pills > li.unread > a:hover span,
-.nav-pills > li.unread > a:active,
-.nav-pills > li.unread > a:active span,
-.nav-pills > li.unread > a:focus,
-.nav-pills > li.unread > a:focus span,
-.nav-pills > li.notification > a:hover,
-.nav-pills > li.notification > a:hover span,
-.nav-pills > li.notification > a:active,
-.nav-pills > li.notification > a:active span,
-.nav-pills > li.notification > a:focus,
-.nav-pills > li.notification > a:focus span {
-    color: var(--base07);
-}
-
-.nav-pills > li.highlight > a:hover span,
-.nav-pills > li.highlight > a:active span,
-.nav-pills > li.highlight > a:focus span,
-.nav-pills > li.unread > a:hover span,
-.nav-pills > li.unread > a:active span,
-.nav-pills > li.unread > a:focus span,
-.nav-pills > li.notification > a:hover span,
-.nav-pills > li.notification > a:active span,
-.nav-pills > li.notification > a:focus span {
-    background-color: transparent;
-}
-
-.nav-pills li:nth-child(2n + 1) {
-    background: var(--base01);
-}
-
-.nav-pills > li > a {
-    color: var(--base05);
-}
-
-tr.bufferline:hover {
-    background-color: transparent;
-}
-
-.danger,
-.alert-danger,
-.badge .alert-danger,
-.badge.danger {
-    background-color: var(--base08);
-    color: var(--base00);
-}
-
-.alert-danger {
-    border-color: var(--base00);
-    color: var(--base00);
-}
-
-.btn-default {
-    background-color: var(--base00);
-    border-color: var(--base01);
-    color: var(--base04);
-}
-.btn-default:hover {
-    background-color: var(--base01);
-    border-color: var(--base02);
-    color: var(--base05);
-}
-.btn-default.active,
-.btn-default:active,
-.btn-default.focus,
-.btn-default:focus,
-.btn-default.active.focus,
-.btn-default.active:focus,
-.btn-default:active.focus,
-.btn-default:active:focus,
-.btn-default.active:hover,
-.btn-default:active:hover {
-    background-color: var(--base06);
-    border-color: var(--base05);
-    color: var(--base02);
-}
-
-.btn-primary {
-    background-color: var(--base01);
-    border-color: var(--base02);
-    color: var(--base05);
-}
-.btn-primary:hover {
-    background-color: var(--base02);
-    border-color: var(--base03);
-    color: var(--base06);
-}
-
-.btn-primary.active,
-.btn-primary:active,
-.btn-primary.focus,
-.btn-primary:focus,
-.btn-primary.active.focus,
-.btn-primary.active:focus,
-.btn-primary:active.focus,
-.btn-primary:active:focus,
-.btn-primary.active:hover,
-.btn-primary:active:hover {
-    background-color: var(--base07);
-    border-color: var(--base06);
-    color: var(--base01);
-}
-
-::-webkit-scrollbar-track-piece {
-    background-color: var(--base00);
-}
-::-webkit-scrollbar-thumb:vertical {
-    height: 15px;
-    background: var(--base02);
-}
-
-.gb-modal .backdrop {
-    background-color: rgba(0, 0, 0, 0.2);
-}
-
-input[type='text'],
-input[type='password'],
-#sendMessage,
-.badge {
-    box-shadow:
-        0px 1px 0px rgba(255, 255, 255, 0.1),
-        0px 1px 7px 0px rgba(0, 0, 0, 0.2) inset;
-}
-input[type='text'].is-invalid {
-    box-shadow:
-        0px 1px 0px rgba(255, 255, 255, 0.1),
-        0px 1px 7px 0px rgba(255, 0, 0, 0.6) inset;
-}
-
-input[type='text'],
-input[type='password'],
-#sendMessage,
-.btn-send,
-.btn-send-image,
-.btn-complete-nick {
-    color: var(--base05);
-    background: var(--base01);
-}
-
-input[type='text']::-webkit-input-placeholder,
-input[type='password']::-webkit-input-placeholder {
-    /* Chrome/Opera/Safari */
-    color: var(--base04);
-}
-input[type='text']::-moz-placeholder,
-input[type='password']::-moz-placeholder {
-    /* Firefox 19+ */
-    color: var(--base04);
-}
-input[type='text']:-ms-input-placeholder,
-input[type='password']:-ms-input-placeholder {
-    /* IE 10+ */
-    color: var(--base04);
-}
-input[type='text']:-moz-placeholder,
-input[type='password']:-moz-placeholder {
-    /* Firefox 18- */
-    color: var(--base04);
-}
-
-.badge,
-.nav-pills li span.badge {
-    color: var(--base06);
-    background: var(--base02);
-}
-
-.nav-pills li:nth-child(2n + 1) span.badge {
-    background: var(--base03);
-}
-
-.nav-pills li span.badge.danger {
-    color: var(--base00);
-    background: var(--base08);
-}
-
-.btn-complete-nick:hover,
-.btn-complete-nick:focus,
-.btn-send:hover,
-.btn-send:focus,
-.btn-send-image:hover,
-.btn-send-image:focus {
-    background-color: var(--base07);
-    color: var(--base01);
-}
-
-#connection-infos {
-    color: var(--base04);
-}
-
-.color-light-green {
-    color: var(--base0B);
-}
-
-.color-27 {
-    color: var(--base0D);
-}
-
-#topbar {
-    background: var(--base02);
-    color: var(--base05);
-}
-
-#topbar .actions {
-    background: var(--base02);
-}
-
-#topbar .actions > a {
-    background: transparent;
-}
-
-#topbar > .title > span:last-of-type:before {
-    color: var(--base04);
-}
-
-#sidebar,
-.panel,
-.dropdown-menu,
-.modal-content {
-    background: var(--base00);
-}
-
-.horizontal-line {
-    -webkit-box-shadow: rgba(255, 255, 255, 0.07) 0 1px 0;
-    -moz-box-shadow: rgba(255, 255, 255, 0.07) 0 1px 0;
-    box-shadow: rgba(255, 255, 255, 0.07) 0 1px 0;
-    border-bottom: 1px solid var(--base00);
-}
-.vertical-line {
-    -webkit-box-shadow: rgba(255, 255, 255, 0.07) 1px 0 0;
-    -moz-box-shadow: rgba(255, 255, 255, 0.07) 1px 0 0;
-    box-shadow: rgba(255, 255, 255, 0.07) 1px 0 0;
-    border-right: 1px solid var(--base00);
-}
-.vertical-line-left {
-    -webkit-box-shadow: rgba(255, 255, 255, 0.07) -1px 0 0;
-    -moz-box-shadow: rgba(255, 255, 255, 0.07) -1px 0 0;
-    box-shadow: rgba(255, 255, 255, 0.07) -1px 0 0;
-    border-left: 1px solid var(--base00);
-}
-.panel-group .panel-heading + .panel-collapse .panel-body,
-.modal-body,
-.modal-header,
-.modal-footer {
-    -webkit-box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
-    -moz-box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
-    box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
-    border-top: 1px solid var(--base00);
-}
-
-#readmarker {
-    border-top-color: var(--base05);
-    border-bottom-color: var(--base00);
-}
-
-button.close {
-    color: var(--base05);
-    opacity: 1;
-    text-shadow: none;
-}
-
-button.close:hover {
-    background-color: var(--base07);
-    color: var(--base01);
-}
-
-.toast {
-    background-color: var(--base01);
-}
-
-/****************************/
-/* Weechat colors and style */
-/****************************/
-/* style options, foreground */
+/* WeeChat colors */
 .cof-separator {
     color: var(--base05);
 }
@@ -2382,61 +1963,13 @@ button.close:hover {
     background-color: var(--base09);
 }
 
-/* attributes overrides */
-.a-b {
-    font-weight: bold;
+/* Color options added in recent WeeChat versions */
+.cof-chat_value_null {
+    color: var(--base0D);
 }
-.a-no-b {
-    font-weight: normal;
+.cof-chat_status_disabled {
+    color: var(--base08);
 }
-.a-i {
-    font-style: italic;
-}
-.a-no-i {
-    font-style: normal;
-}
-.a-u {
-    text-decoration: underline;
-}
-.a-no-u {
-    text-decoration: none;
-}
-.a-reset {
-    font-weight: normal;
-    font-style: normal;
-    text-decoration: none;
-}
-
-/* highlight messages */
-.bufferline .prefix .highlight {
-    color: var(--base03) !important;
-    background-color: var(--base07) !important;
-    font-weight: bold !important;
-}
-
-/* */
-/* Mobile layout */
-/* */
-@media (max-width: 968px) {
-    #nicklist {
-        box-shadow: 400px 0px 400px 400px var(--base00);
-    }
-
-    .cof-chat_time,
-    .cof-chat_time_delimiters,
-    .repeated-time .cob-chat_time,
-    .repeated-time .cob-chat_time_delimiters {
-        color: var(--base04);
-    }
-
-    .footer {
-        background: var(--base00);
-    }
-
-    .btn-complete-nick:hover,
-    .btn-send:hover,
-    .btn-send-image:hover {
-        background: var(--base01);
-        color: var(--base05);
-    }
+.cof-chat_status_enabled {
+    color: var(--base0B);
 }

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import { AtSign, SendHorizontal } from 'lucide-react';
+import { emojifyWord, loadShortcodes } from '../../lib/emoji';
 import { completeNick } from '../../lib/irc/completion';
 import type { Buffer } from '../../lib/state/model';
 import { session, setUi, uiStore, useUi } from '../chat';
@@ -12,22 +13,6 @@ import { RichText } from './RichText';
  * :shortcode: -> emoji, loaded on first use. Only segments that become
  * emoji-only are converted (not "std::io::foo").
  */
-type Emojify = (text: string) => string;
-let emojify: Emojify | null = null;
-let emojifyLoading = false;
-
-function loadEmojify(): void {
-    if (emojify || emojifyLoading) {
-        return;
-    }
-    emojifyLoading = true;
-    void import('node-emoji').then((m) => {
-        emojify = m.emojify;
-    });
-}
-
-const EMOJI_ONLY = /^\p{Extended_Pictographic}(‍?\p{Extended_Pictographic}|️)*$/u;
-
 function emojifyInput(
     text: string,
     caret: number,
@@ -35,8 +20,8 @@ function emojifyInput(
     if (!text.includes(':')) {
         return null;
     }
-    loadEmojify();
-    if (!emojify) {
+    const codes = loadShortcodes();
+    if (!codes) {
         return null;
     }
     let changed = false;
@@ -44,18 +29,15 @@ function emojifyInput(
     const segments = text.split(/(\s+)/).map((segment) => {
         const start = position;
         position += segment.length;
-        if (/^\s+$/.test(segment) || !segment.includes(':')) {
+        const emoji = emojifyWord(segment, codes);
+        if (emoji === null) {
             return segment;
         }
-        const converted = emojify!(segment);
-        if (converted !== segment && EMOJI_ONLY.test(converted)) {
-            changed = true;
-            if (caret >= start + segment.length) {
-                caret += converted.length - segment.length;
-            }
-            return converted;
+        changed = true;
+        if (caret >= start + segment.length) {
+            caret += emoji.length - segment.length;
         }
-        return segment;
+        return emoji;
     });
     return changed ? { text: segments.join(''), caret } : null;
 }
@@ -318,7 +300,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                     onKeyDown={onKeyDown}
                     onFocus={() => {
                         setUi({ sidebarOpen: false });
-                        loadEmojify();
+                        loadShortcodes();
                     }}
                     autoComplete="on"
                     autoCapitalize="sentences"

@@ -11,10 +11,9 @@ weechat.factory('handlers', [
     '$rootScope',
     '$log',
     'models',
-    'plugins',
     'notifications',
     'bufferResume',
-    function ($rootScope, $log, models, plugins, notifications, bufferResume) {
+    function ($rootScope, $log, models, notifications, bufferResume) {
         /*
          * Handle the response of GET /api/version
          */
@@ -159,7 +158,6 @@ weechat.factory('handlers', [
                 );
             }
 
-            message = plugins.PluginManager.contentForMessage(message);
             buffer.addLine(message);
 
             if (manually) {
@@ -443,11 +441,7 @@ weechat.factory('handlers', [
                 return;
             }
             var line = angular.extend({}, event.body, { buffer: event.buffer_id });
-            var message = new models.BufferLine(line);
-            if (buffer.bufferType === 0) {
-                message = plugins.PluginManager.contentForMessage(message);
-            }
-            buffer.replaceLine(message);
+            buffer.replaceLine(new models.BufferLine(line));
         };
 
         var nickGroupKey = function (buffer, groupId) {

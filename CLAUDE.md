@@ -28,7 +28,7 @@ The Karma config (`test/karma.conf.js`) auto-switches to `ChromeHeadlessNoSandbo
 
 ## Architecture
 
-Entry point is `src/main.js`, which imports every AngularJS module under `src/js/`. Webpack bundles everything; `src/index.html` is the shell that Angular boots into. There is **no router-driven view layout** — the whole UI lives in `src/index.html` with directives in `src/directives/` (`input.html`, `plugin.html`).
+Entry point is `src/main.js`, which imports every AngularJS module under `src/js/`. Webpack bundles everything; `src/index.html` is the shell that Angular boots into. There is **no router-driven view layout** — the whole UI lives in `src/index.html` with the input bar directive template in `src/directives/input.html`.
 
 The codebase splits cleanly into protocol vs. UI:
 
@@ -50,18 +50,14 @@ The codebase splits cleanly into protocol vs. UI:
 
 - **`src/js/glowingbear.js`** (~1000 lines) — the main `WeechatCtrl` controller. Handles settings defaults, theme switching, mobile swipe state, the buffer list, notifications wiring, focus/scroll. Imports `connectionFactory` from `connection.js` and registers it as the `connection` service.
 - **`src/js/inputbar.js`** (~800 lines) — chat input directive with readline-style keybindings, history, tab completion (delegates to `irc-utils.js` for nick completion).
-- **`src/js/plugin-directive.js`** + **`src/directives/plugin.html`** — renders embedded plugin output (image previews, video embeds, etc.).
 - **`src/js/imgur*.js`** — Imgur upload integration (drag-and-drop in `imgur-drop-directive.js`).
 - **`src/js/filters.js`** — Angular filters used in templates (highlighting, IRC color → HTML, etc.).
 - **`src/js/notifications.js`** — desktop notifications, sound, favicon badge (`favico.js`).
 - **`src/js/settings.js`** + **`src/js/localstorage.js`** — settings with localStorage persistence. Every setting must be declared in `settings.setDefaults({...})` in `glowingbear.js` or it won't persist.
 
-### Plugins (content embedding)
-
-- **`src/js/plugins.js`** defines `Plugin` (matches against message text) and `UrlPlugin` (matches URLs via a regex). The plugin registry lives in the `plugins` Angular module. To add an embed type, append a new `Plugin`/`UrlPlugin` to the array in this file. **Anything injected into the DOM via `innerHTML` must be sanitized** — the codebase has had XSS regressions here; see recent commits about sanitizing gist/tweet/tiktok HTML before insertion.
-
 ## Conventions
 
+- **Anything injected into the DOM via `innerHTML` (or compiled with `$compile`) must be sanitized or validated** — message text, nicks and buffer data come from IRC and other networks. The codebase has had XSS regressions here.
 - AngularJS 1.x dependency-injection arrays are used everywhere (`['$scope', ..., function($scope, ...){}]`). Adding a new dependency requires updating both the array and the function signature.
 - `jshint` is configured for `esversion: 11` with `laxbreak` (`.jshintrc`) so it agrees with Prettier; ES module syntax in source is handled by Babel via webpack.
 - Formatting is owned by Prettier (`.prettierrc.json`: 88 columns, 4-space indent, single quotes). Run `npm run format` rather than hand-formatting. HTML templates are excluded because Angular inline-element whitespace matters.

@@ -1,15 +1,13 @@
-<form class="form form-horizontal" id="inputform" ng-submit="sendMessage()" imgur-drop>
+<form id="inputform" ng-submit="sendMessage()" imgur-drop>
   <div class="input-group">
-    <textarea id="{{inputId}}" class="form-control favorite-font" ng-trim="false" rows="1" ng-change="inputChanged()" autocomplete="on" ng-model="command" ng-focus="hideSidebar()" ng-paste="inputPasted($event)">
-    </textarea>
-    <span class="input-group-btn">
-      <button class="btn btn-complete-nick unselectable mobile" title="Complete nick" ng-click="handleCompleteNickButton($event)"><i class="glyphicon glyphicon-bullhorn"></i></button>
-      <label class="btn btn-send-image unselectable" for="imgur-upload" title="Send image">
-        <i class="glyphicon glyphicon-picture"></i>
-        <input type="file" accept="image/*" multiple title="Send image" id="imgur-upload" class="imgur-upload" file-change="uploadImage($event, files)">
-      </label>
-      <button class="btn btn-send unselectable" title="Send"><i class="glyphicon glyphicon-send"></i></button>
-    </span>
+    <span class="input-group-text input-prompt d-none d-md-flex" ng-if="activeBuffer().inputPrompt[0].text" title="WeeChat input prompt"><span ng-repeat="part in activeBuffer().inputPrompt" ng-class="part.classes" ng-bind="part.text"></span></span>
+    <textarea id="{{inputId}}" class="form-control favorite-font" ng-trim="false" rows="1" ng-change="inputChanged()" autocomplete="on" autocapitalize="sentences" enterkeyhint="send" aria-label="Message" placeholder="Message {{ activeBuffer().shortName || activeBuffer().fullName }}" ng-model="command" ng-focus="hideSidebar()" ng-paste="inputPasted($event)"></textarea>
+    <button type="button" class="btn btn-input btn-complete-nick unselectable mobile" title="Complete nick" aria-label="Complete nick" ng-click="handleCompleteNickButton($event)"><gb-icon name="at-sign"></gb-icon></button>
+    <label class="btn btn-input btn-send-image unselectable mb-0" for="imgur-upload" title="Send image" aria-label="Send image">
+      <gb-icon name="image-plus"></gb-icon>
+      <input type="file" accept="image/*" multiple title="Send image" id="imgur-upload" class="imgur-upload" file-change="uploadImage($event, files)">
+    </label>
+    <button type="submit" class="btn btn-input btn-send unselectable" title="Send" aria-label="Send"><gb-icon name="send-horizontal"></gb-icon></button>
   </div>
   <div id="imgur-upload-progress"></div>
 </form>

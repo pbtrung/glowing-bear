@@ -3,8 +3,8 @@
 Glowing Bear is a web frontend for the [WeeChat](https://weechat.org) IRC client. It
 runs entirely in your browser and connects directly to WeeChat's relay plugin, using
 the JSON `api` protocol over WebSockets, so there is no backend service to run. It
-adds conveniences on top of WeeChat, such as embedded images and videos, desktop
-notifications, and a layout that works on phones and tablets.
+adds conveniences on top of WeeChat, such as desktop notifications, image uploads,
+and a layout that works on phones and tablets.
 
 ## Install
 

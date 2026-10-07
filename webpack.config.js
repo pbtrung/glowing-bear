@@ -16,6 +16,7 @@ module.exports = {
     },
     output: {
         path: path.resolve(__dirname, 'build'),
+        clean: true,
     },
     devServer: {
         static: {
@@ -46,8 +47,16 @@ module.exports = {
                     to: 'css/',
                 },
                 {
-                    from: '../node_modules/bootstrap/dist/fonts/glyphicons-halflings-regular.woff2',
-                    to: 'fonts/',
+                    from: '../node_modules/@fontsource-variable/inter/files/inter-*-wght-normal.woff2',
+                    to: 'fonts/[name][ext]',
+                },
+                {
+                    // Inter (variable weight) font faces, pointing at fonts/
+                    from: '../node_modules/@fontsource-variable/inter/wght.css',
+                    to: 'css/inter.css',
+                    transform: function (content) {
+                        return content.toString().replace(/\.\/files\//g, '../fonts/');
+                    },
                 },
                 { from: '../node_modules/emojione/lib/js/emojione.min.js' },
                 { from: '../node_modules/linkifyjs/dist/linkify.min.js' },

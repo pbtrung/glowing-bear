@@ -20,14 +20,20 @@ const debounce = function (func, wait, immediate) {
     };
 };
 
+// Default font of the chat area (the whole UI uses Inter)
+const DEFAULT_FONT = "'Inter Variable', Inter, system-ui, sans-serif";
+
+// Themes with a light background, the others use Bootstrap's dark mode
+const LIGHT_THEMES = ['light', 'base16-light', 'base16-solarized-light'];
+
 var weechat = angular.module(
     'weechat',
     [
+        'icons',
         'ngRoute',
         'localStorage',
         'weechatModels',
         'bufferResume',
-        'plugins',
         'IrcUtils',
         'ngSanitize',
         'ngWebsockets',
@@ -114,18 +120,15 @@ weechat.controller('WeechatCtrl', [
             tls: window.location.protocol === 'https:',
             savepassword: false,
             autoconnect: false,
-            nonicklist: utils.isMobileUi(),
+            nonicklist: false, // desktop only, mobile shows the nicklist on demand
             alwaysnicklist: false, // only significant on mobile
-            noembed: true,
             onlyUnread: false,
             hotlistsync: true,
             orderbyserver: true,
             useFavico: true,
             soundnotification: true,
             fontsize: '14px',
-            fontfamily: utils.isMobileUi()
-                ? 'sans-serif'
-                : 'Inconsolata, Consolas, Monaco, Ubuntu Mono, monospace',
+            fontfamily: DEFAULT_FONT,
             readlineBindings: false,
             enableMathjax: false,
             enableQuickKeys: true,
@@ -363,11 +366,11 @@ weechat.controller('WeechatCtrl', [
             models.reinitialize();
             $rootScope.$emit('notificationChanged');
             $scope.connectbutton = 'Connect';
-            $scope.connectbuttonicon = 'glyphicon-chevron-right';
+            $scope.connectbuttonicon = 'arrow-right';
             bufferResume.reset();
         });
         $scope.connectbutton = 'Connect';
-        $scope.connectbuttonicon = 'glyphicon-chevron-right';
+        $scope.connectbuttonicon = 'arrow-right';
 
         $scope.getBuffers = models.getBuffers.bind(models);
 
@@ -407,12 +410,7 @@ weechat.controller('WeechatCtrl', [
         });
 
         if (!settings.fontfamily) {
-            if (utils.isMobileUi()) {
-                settings.fontfamily = 'sans-serif';
-            } else {
-                settings.fontfamily =
-                    'Inconsolata, Consolas, Monaco, Ubuntu Mono, monospace';
-            }
+            settings.fontfamily = DEFAULT_FONT;
         }
 
         $scope.isSidebarVisible = function () {
@@ -572,6 +570,10 @@ weechat.controller('WeechatCtrl', [
 
             // Load new theme
             utils.inject_css('css/themes/' + theme + '.css', 'themeCSS');
+
+            // Bootstrap color mode matching the theme
+            var mode = LIGHT_THEMES.indexOf(theme) >= 0 ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-bs-theme', mode);
         });
 
         settings.addCallback('customCSS', function (css) {
@@ -852,7 +854,7 @@ weechat.controller('WeechatCtrl', [
             $rootScope.errorMessage = false;
             $rootScope.bufferBottom = true;
             $scope.connectbutton = 'Connecting';
-            $scope.connectbuttonicon = 'glyphicon-refresh glyphicon-spin';
+            $scope.connectbuttonicon = 'loader-circle';
             connection.connect(
                 settings.host,
                 settings.port,
@@ -864,7 +866,7 @@ weechat.controller('WeechatCtrl', [
 
         $scope.disconnect = function () {
             $scope.connectbutton = 'Connect';
-            $scope.connectbuttonicon = 'glyphicon-chevron-right';
+            $scope.connectbuttonicon = 'arrow-right';
             bufferResume.reset();
             connection.disconnect();
         };
@@ -897,7 +899,7 @@ weechat.controller('WeechatCtrl', [
             event.stopPropagation();
             event.preventDefault();
 
-            var target = event.target.parentNode.parentNode.parentNode;
+            var target = event.target.closest('.accordion-item');
             toggleAccordionByTarget(target);
         };
 
@@ -1054,6 +1056,20 @@ weechat.controller('WeechatCtrl', [
         // Helper function since the keypress handler is in a different scope
         $rootScope.toggleNicklist = function () {
             settings.nonicklist = !settings.nonicklist;
+        };
+
+        // Nicklist button of the top bar: on mobile the nicklist is a panel
+        // shown on demand, on desktop it's a setting
+        $scope.toggleNicklistPanel = function () {
+            if (!utils.isMobileUi()) {
+                $rootScope.toggleNicklist();
+            } else if ($scope.swipeStatus === -1) {
+                $scope.swipeRight();
+            } else {
+                $rootScope.hideSidebar();
+                $scope.swipeStatus = -1;
+                $scope.updateShowNicklist();
+            }
         };
 
         $rootScope.switchToAdjacentBuffer = function (direction) {

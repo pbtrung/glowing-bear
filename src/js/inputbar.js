@@ -86,6 +86,9 @@ weechat.directive('inputBar', function () {
                     return document.querySelector('textarea#' + $scope.inputId);
                 };
 
+                // Used by the template (input prompt, placeholder)
+                $scope.activeBuffer = models.getActiveBuffer;
+
                 $scope.hideSidebar = function () {
                     $rootScope.hideSidebar();
                 };
@@ -318,7 +321,7 @@ weechat.directive('inputBar', function () {
                     // Image got sucessfully deleted.
                     // Show toast with delete link
                     var toastDeleted = $compile(
-                        '<div class="toast toast-short">Successfully deleted.</div>',
+                        '<div class="gb-toast gb-toast-short">Successfully deleted.</div>',
                     )($scope)[0];
                     document.body.appendChild(toastDeleted);
                     setTimeout(function () {
@@ -417,8 +420,8 @@ weechat.directive('inputBar', function () {
                     if (buffer.type === 'channel' && !is_online) {
                         // show a toast that the user left
                         var toast = document.createElement('div');
-                        toast.className = 'toast toast-short';
-                        toast.innerHTML = nick + ' has left the room';
+                        toast.className = 'gb-toast gb-toast-short';
+                        toast.textContent = nick + ' has left the room';
                         document.body.appendChild(toast);
                         setTimeout(function () {
                             document.body.removeChild(toast);
@@ -963,9 +966,15 @@ weechat.directive('inputBar', function () {
                                 $rootScope.insertAtCaret(String(imageUrl));
                             }
 
+                            // The hash is compiled into a template: only accept
+                            // the alphanumeric hashes Imgur uses
+                            if (!/^[A-Za-z0-9]+$/.test(deleteHash || '')) {
+                                return;
+                            }
+
                             // Show toast with delete link
                             var toastImgur = $compile(
-                                '<div class="toast toast-long" data-imgur-deletehash=\'' +
+                                '<div class="gb-toast gb-toast-long" data-imgur-deletehash=\'' +
                                     deleteHash +
                                     '\'>Image uploaded to Imgur. <a id="deleteImgur" ng-click="imgurDelete(\'' +
                                     deleteHash +

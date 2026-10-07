@@ -5,6 +5,7 @@ import { session } from './chat';
 import { cancelNotifications, requestNotificationPermission } from './notifications';
 import {
     getSettings,
+    hashSettings,
     parseHashParams,
     parseHostField,
     updateSettings,
@@ -32,30 +33,20 @@ export async function connectWithSettings(password: string): Promise<void> {
 }
 
 /**
- * Apply the URL parameters (#host=...&port=...&password=...&autoconnect=true)
+ * Apply the URL parameters (#host=...&port=...&path=...&password=...&autoconnect=true)
  * and connect automatically if asked to.
  */
 export function initConnection(): void {
     const params = parseHashParams(location.hash);
-    if (params.host) {
-        updateSettings({ host: params.host, hostField: params.host });
+    if (location.hash) {
+        // Don't leave a password in the address bar and the history
+        history.replaceState(null, '', location.pathname + location.search);
     }
-    if (params.port) {
-        updateSettings({ port: Number(params.port) });
-    }
-    if (params.path) {
-        const s = getSettings();
-        updateSettings({
-            path: params.path,
-            hostField: `${s.host}:${s.port}/${params.path}`,
-        });
-    }
-    if (params.autoconnect !== undefined) {
-        updateSettings({ autoconnect: params.autoconnect });
-    }
+    updateSettings(hashSettings(getSettings(), params).changes);
     const s = getSettings();
     const password = params.password ?? (s.savepassword ? s.password : '');
-    if (s.autoconnect) {
+    // autoconnect in the URL applies to this page load only
+    if (params.autoconnect ?? s.autoconnect) {
         void connectWithSettings(password);
     }
 

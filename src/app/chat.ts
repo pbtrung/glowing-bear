@@ -269,17 +269,13 @@ export function activateBuffer(bufferId: number): void {
     setUi({ search: '', searchIndex: 0 });
 }
 
-/** Next/previous visible buffer in the list order */
+/** Next/previous buffer shown in the buffer list */
 export function switchToAdjacentBuffer(direction: 1 | -1): void {
-    const settings = getSettings();
-    const state = session.state;
-    const sorted = Object.values(state.buffers)
-        .filter((b) => !b.hidden || b.id === state.activeBufferId)
-        .sort(sortKey(settings.orderbyserver));
-    const index = sorted.findIndex((b) => b.id === state.activeBufferId);
-    const next = sorted[index + direction];
+    const listed = currentBufferList();
+    const index = listed.findIndex((l) => l.buffer.id === session.state.activeBufferId);
+    const next = listed[index + direction];
     if (next) {
-        activateBuffer(next.id);
+        activateBuffer(next.buffer.id);
     }
 }
 

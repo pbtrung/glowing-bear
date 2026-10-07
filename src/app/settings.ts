@@ -231,3 +231,54 @@ export function parseHashParams(hash: string): HashParams {
     }
     return params;
 }
+
+/**
+ * Settings changed by the URL parameters host, port and path. If they point
+ * to another relay, the saved password is forgotten: a link must not get the
+ * password of the user's relay sent to another one.
+ */
+export function hashSettings(
+    s: Settings,
+    params: HashParams,
+): { changes: Partial<Settings>; relayChanged: boolean } {
+    if (
+        params.host === undefined &&
+        params.port === undefined &&
+        params.path === undefined
+    ) {
+        return { changes: {}, relayChanged: false };
+    }
+    const current = parseHostField(s.hostField);
+    const fromHost = params.host !== undefined ? parseHostField(params.host) : null;
+    const host = fromHost?.host ?? current?.host ?? s.host;
+    const port =
+        params.port !== undefined && /^\d+$/.test(params.port)
+            ? params.port
+            : (fromHost?.port ?? current?.port ?? String(s.port));
+    const path = (params.path ?? fromHost?.path ?? current?.path ?? s.path).replace(
+        /^\/+/,
+        '',
+    );
+    const changes: Partial<Settings> = {
+        hostField: `${host}:${port}` + (path === 'api' ? '' : '/' + path),
+        host,
+        port: Number(port),
+        path,
+    };
+    if (fromHost?.tls !== undefined) {
+        changes.tls = fromHost.tls;
+    }
+    const relay = (h: string, p: string | number, pa: string) =>
+        `${h.toLowerCase()}:${p}/${pa}`;
+    const relayChanged =
+        relay(host, port, path) !==
+        relay(
+            current?.host ?? s.host,
+            current?.port ?? s.port,
+            current?.path ?? s.path,
+        );
+    if (relayChanged) {
+        changes.password = '';
+    }
+    return { changes, relayChanged };
+}

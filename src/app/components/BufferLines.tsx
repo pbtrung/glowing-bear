@@ -13,7 +13,9 @@ import { Icon } from './Icon';
 import { RichText, Time } from './RichText';
 import { useSwipe } from '../swipe';
 
-const shortTime = (date: Date) => `${date.getHours()}:${date.getMinutes()}`;
+/** Same minute (the time of a line is hidden when it repeats) */
+const sameMinute = (a: Date, b: Date) =>
+    Math.floor(a.getTime() / 60000) === Math.floor(b.getTime() / 60000);
 
 interface LineRowProps {
     line: Line;
@@ -30,8 +32,7 @@ const LineRow = memo(function LineRow({
     timeFormat,
     math,
 }: LineRowProps) {
-    const repeatedTime =
-        previous !== undefined && shortTime(previous.date) === shortTime(line.date);
+    const repeatedTime = previous !== undefined && sameMinute(previous.date, line.date);
     const repeatedPrefix =
         previous !== undefined && previous.prefixText === line.prefixText;
     const nick = line.prefix[line.prefix.length - 1]?.text ?? '';

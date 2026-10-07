@@ -34,6 +34,12 @@ function digitOf(event: KeyboardEvent): number | null {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
+    // Escape closes a dialog, also one left open after a disconnection
+    if (event.key === 'Escape' && uiStore.getState().modal) {
+        event.preventDefault();
+        setUi({ modal: null });
+        return;
+    }
     if (
         session.state.status !== 'connected' &&
         session.state.status !== 'reconnecting'
@@ -75,11 +81,6 @@ function onKeyDown(event: KeyboardEvent): void {
     }
 
     if (event.key === 'Escape') {
-        if (ui.modal) {
-            event.preventDefault();
-            setUi({ modal: null });
-            return;
-        }
         if (Date.now() - lastEscape <= 500) {
             session.disconnect();
         }

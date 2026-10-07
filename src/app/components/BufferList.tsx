@@ -34,6 +34,8 @@ function onSearchKey(
     switch (event.key) {
         case 'Escape':
             event.preventDefault();
+            // not counted for the double Escape that disconnects
+            event.stopPropagation();
             setUi({ search: '', searchIndex: 0 });
             break;
         case 'Enter':
@@ -49,7 +51,9 @@ function onSearchKey(
         case 'ArrowDown':
         case 'Tab':
             event.preventDefault();
-            setUi({ searchIndex: Math.min(count - 1, ui.searchIndex + 1) });
+            setUi({
+                searchIndex: Math.max(0, Math.min(count - 1, ui.searchIndex + 1)),
+            });
             break;
     }
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     DEFAULT_SETTINGS,
     loadSettings,
+    hashSettings,
     parseHashParams,
     parseHostField,
 } from './settings';
@@ -73,6 +74,54 @@ describe('URL parameters', () => {
             autoconnect: true,
         });
         expect(parseHashParams('')).toEqual({});
+    });
+
+    const saved = {
+        ...DEFAULT_SETTINGS,
+        hostField: 'example.com:9001',
+        host: 'example.com',
+        port: 9001,
+        savepassword: true,
+        password: 'secret',
+    };
+
+    it('sets the relay', () => {
+        expect(
+            hashSettings(saved, {
+                host: 'other.org',
+                port: '443',
+                path: 'weechat/api',
+            }),
+        ).toEqual({
+            changes: {
+                hostField: 'other.org:443/weechat/api',
+                host: 'other.org',
+                port: 443,
+                path: 'weechat/api',
+                password: '',
+            },
+            relayChanged: true,
+        });
+        // The port given with the host, or kept
+        expect(hashSettings(saved, { host: 'other.org:9002' }).changes.hostField).toBe(
+            'other.org:9002',
+        );
+        expect(hashSettings(saved, { host: 'other.org' }).changes.hostField).toBe(
+            'other.org:9001',
+        );
+        expect(hashSettings(saved, { host: 'wss://other.org' }).changes.tls).toBe(true);
+        // An invalid port is ignored
+        expect(hashSettings(saved, { port: 'x' }).changes.port).toBe(9001);
+        expect(hashSettings(saved, {})).toEqual({ changes: {}, relayChanged: false });
+    });
+
+    it('forgets the saved password only for another relay', () => {
+        const same = hashSettings(saved, { host: 'EXAMPLE.com', port: '9001' });
+        expect(same.relayChanged).toBe(false);
+        expect(same.changes.password).toBeUndefined();
+        expect(hashSettings(saved, { host: 'evil.example' }).changes.password).toBe('');
+        expect(hashSettings(saved, { port: '9002' }).changes.password).toBe('');
+        expect(hashSettings(saved, { path: 'x' }).changes.password).toBe('');
     });
 });
 

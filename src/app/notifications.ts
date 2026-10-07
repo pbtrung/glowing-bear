@@ -23,22 +23,54 @@ export function requestNotificationPermission(): void {
     }
 }
 
-function showNotification(title: string, body: string, onClick: () => void): void {
+/** Click handlers of the notifications shown by the service worker, by tag */
+const swClickHandlers = new Map<string, () => void>();
+
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
+        const data = event.data as { type?: string; tag?: string } | null;
+        if (data?.type === 'notificationclick' && data.tag) {
+            swClickHandlers.get(data.tag)?.();
+        }
+    });
+}
+
+/**
+ * Show a notification (one per buffer: a new one replaces it and alerts
+ * again). Pages can't create notifications on Android: the service worker
+ * shows them there, and sends clicks back.
+ */
+function showNotification(
+    tag: string,
+    title: string,
+    body: string,
+    onClick: () => void,
+): void {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
         return;
     }
-    if (serviceWorker) {
-        void serviceWorker.showNotification(title, {
+    let notification: Notification;
+    try {
+        notification = new Notification(title, {
             body,
-            icon: 'assets/img/glowing_bear_128x128.png',
-            tag: 'gb-highlight',
-        });
+            icon: 'assets/img/favicon.png',
+            tag,
+            renotify: true,
+        } as NotificationOptions);
+    } catch {
+        if (serviceWorker) {
+            swClickHandlers.set(tag, onClick);
+            void serviceWorker
+                .showNotification(title, {
+                    body,
+                    icon: 'assets/img/glowing_bear_128x128.png',
+                    tag,
+                    renotify: true,
+                } as NotificationOptions)
+                .catch(() => undefined);
+        }
         return;
     }
-    const notification = new Notification(title, {
-        body,
-        icon: 'assets/img/favicon.png',
-    });
     shown.push(notification);
     notification.onclick = () => {
         window.focus();
@@ -46,7 +78,10 @@ function showNotification(title: string, body: string, onClick: () => void): voi
         notification.close();
     };
     notification.onclose = () => {
-        shown.splice(shown.indexOf(notification), 1);
+        const index = shown.indexOf(notification);
+        if (index >= 0) {
+            shown.splice(index, 1);
+        }
     };
     setTimeout(() => notification.close(), 15000);
 }
@@ -72,7 +107,7 @@ export function notifyHighlight(buffer: Buffer, line: Line, onClick: () => void)
         body = `<${line.prefixText}> ${line.text}`;
     }
     title += buffer.shortName + (buffer.server ? ` (${buffer.server})` : '');
-    showNotification(title, body, onClick);
+    showNotification('gb-' + buffer.id, title, body, onClick);
     if (getSettings().soundnotification) {
         playSound();
     }
@@ -83,6 +118,11 @@ export function cancelNotifications(): void {
     for (const notification of [...shown]) {
         notification.close();
     }
+    swClickHandlers.clear();
+    void serviceWorker
+        ?.getNotifications()
+        .then((notifications) => notifications.forEach((n) => n.close()))
+        .catch(() => undefined);
 }
 
 /** Window title: "(highlights) Glowing Bear | buffer | title" */

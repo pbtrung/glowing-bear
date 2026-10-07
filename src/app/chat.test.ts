@@ -51,7 +51,7 @@ describe('buffer list', () => {
                 listBuffers(
                     buffers,
                     1,
-                    { orderbyserver: false, onlyUnread: false },
+                    { orderbyserver: false, onlyUnread: false, collapsedServers: [] },
                     ui,
                 ),
             ),
@@ -63,7 +63,12 @@ describe('buffer list', () => {
         ]);
         expect(
             names(
-                listBuffers(buffers, 1, { orderbyserver: true, onlyUnread: false }, ui),
+                listBuffers(
+                    buffers,
+                    1,
+                    { orderbyserver: true, onlyUnread: false, collapsedServers: [] },
+                    ui,
+                ),
             ),
         ).toEqual([
             'core.weechat',
@@ -77,7 +82,7 @@ describe('buffer list', () => {
         const list = listBuffers(
             buffers,
             1,
-            { orderbyserver: true, onlyUnread: false },
+            { orderbyserver: true, onlyUnread: false, collapsedServers: [] },
             { ...ui, search: 'WEE' },
         );
         expect(names(list)).toEqual(['core.weechat', 'irc.libera.#weechat']);
@@ -96,7 +101,7 @@ describe('buffer list', () => {
                 listBuffers(
                     withUnread,
                     4,
-                    { orderbyserver: true, onlyUnread: true },
+                    { orderbyserver: true, onlyUnread: true, collapsedServers: [] },
                     ui,
                 ),
             ),
@@ -113,16 +118,74 @@ describe('buffer list', () => {
         const pinned = { ...buffers, 3: { ...buffers[3], pinned: true } };
         expect(
             names(
-                listBuffers(pinned, 1, { orderbyserver: false, onlyUnread: true }, ui),
+                listBuffers(
+                    pinned,
+                    1,
+                    { orderbyserver: false, onlyUnread: true, collapsedServers: [] },
+                    ui,
+                ),
             ),
         ).toContain('irc.libera.#weechat');
+    });
+
+    it('collapses the buffers of a server, keeping the active one', () => {
+        const withUnread = {
+            ...buffers,
+            3: { ...buffers[3], unread: 2 },
+            4: { ...buffers[4], notification: 1 },
+        };
+        const list = listBuffers(
+            withUnread,
+            1,
+            {
+                orderbyserver: true,
+                onlyUnread: false,
+                collapsedServers: ['irc.libera'],
+            },
+            ui,
+        );
+        expect(names(list)).toEqual(['core.weechat', 'irc.server.libera']);
+        expect(list[1]).toMatchObject({
+            group: true,
+            collapsed: true,
+            hiddenUnread: 2,
+            hiddenNotification: 1,
+        });
+        const active = listBuffers(
+            withUnread,
+            3,
+            {
+                orderbyserver: true,
+                onlyUnread: false,
+                collapsedServers: ['irc.libera'],
+            },
+            ui,
+        );
+        expect(names(active)).toEqual([
+            'core.weechat',
+            'irc.server.libera',
+            'irc.libera.#weechat',
+        ]);
+        // Searching shows everything
+        const search = listBuffers(
+            withUnread,
+            1,
+            {
+                orderbyserver: true,
+                onlyUnread: false,
+                collapsedServers: ['irc.libera'],
+            },
+            { ...ui, search: 'libera' },
+        );
+        expect(search.length).toBe(4);
+        expect(search.every((l) => !l.group)).toBe(true);
     });
 
     it('assigns quick keys by buffer number and jump keys', () => {
         const list = listBuffers(
             buffers,
             1,
-            { orderbyserver: true, onlyUnread: false },
+            { orderbyserver: true, onlyUnread: false, collapsedServers: [] },
             ui,
         );
         expect(list.map((l) => [l.buffer.number, l.quickKey, l.jumpKey])).toEqual([
@@ -134,7 +197,7 @@ describe('buffer list', () => {
         const jump = listBuffers(
             buffers,
             1,
-            { orderbyserver: true, onlyUnread: false },
+            { orderbyserver: true, onlyUnread: false, collapsedServers: [] },
             { ...ui, jumpMode: true, jumpDigit: 0 },
         );
         expect(jump.map((l) => l.jumpKey).sort()).toEqual([1, 2, 3, 4, 5]);

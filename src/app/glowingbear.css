@@ -430,25 +430,21 @@ gb-icon,
 }
 
 /* Channel prefixes, shown in front of trimmed channel names */
-#topbar .channel::before,
-#sidebar .buffer.channel .buffername::before {
+#topbar .channel::before {
     color: var(--gb-muted);
     font-weight: 600;
     margin-right: 0.05em;
 }
 
-#topbar .channel_hash::before,
-#sidebar .buffer.channel_hash .buffername::before {
+#topbar .channel_hash::before {
     content: '#';
 }
 
-#topbar .channel_plus::before,
-#sidebar .buffer.channel_plus .buffername::before {
+#topbar .channel_plus::before {
     content: '+';
 }
 
-#topbar .channel_ampersand::before,
-#sidebar .buffer.channel_ampersand .buffername::before {
+#topbar .channel_ampersand::before {
     content: '&';
 }
 
@@ -527,16 +523,24 @@ gb-icon,
     font-size: 0.925rem;
 }
 
+.buffer {
+    position: relative;
+    margin: 1px 0;
+}
+
 .buffer a {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.5rem;
     min-height: 2.5rem;
-    padding: 0.25rem 0.625rem;
+    padding: 0.25rem 0.5rem;
     border-radius: var(--gb-radius);
-    color: var(--gb-chrome-fg);
+    color: var(--gb-muted);
     text-decoration: none;
     white-space: nowrap;
+    transition:
+        background-color 0.1s,
+        color 0.1s;
 }
 
 .buffer .buffername {
@@ -563,9 +567,20 @@ gb-icon,
     font-weight: 600;
 }
 
+/* Accent bar on the left of the active buffer */
+.buffer.active a::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 22%;
+    bottom: 22%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--gb-accent);
+}
+
 /* Buffer names without a color of their own follow the row's color */
-.buffer.active .buffername.cwf-default,
-.buffer.highlight .buffername.cwf-default {
+.buffer .buffername.cwf-default {
     color: inherit;
 }
 
@@ -575,15 +590,63 @@ gb-icon,
     color: var(--gb-accent-fg);
 }
 
-.buffer .badge {
-    display: none;
-    font-size: 0.7rem;
+/* Icon column: server, channel prefix, avatar, core buffer */
+.buffer-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.375rem;
+    color: var(--gb-muted);
+    opacity: 0.85;
+}
+
+.buffer-prefix {
     font-weight: 600;
 }
 
-.buffer.unread .badge,
-.buffer.notification .badge {
-    display: inline-block;
+.buffer.active .buffer-icon,
+.buffer.highlight .buffer-icon {
+    color: inherit;
+}
+
+.avatar {
+    --avatar-hue: 210;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: hsl(var(--avatar-hue) 45% 42%);
+    color: #fff;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.buffer-avatar {
+    width: 1.375rem;
+    height: 1.375rem;
+    font-size: 0.7rem;
+}
+
+/* Unread count (accent) and highlights (red) */
+.buffer-badge {
+    flex-shrink: 0;
+    min-width: 1.375rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--gb-accent) 22%, transparent);
+    color: var(--gb-fg);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.1;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.buffer-badge.highlight {
+    background: #dc3545;
+    color: #fff;
 }
 
 .buffer-pin {
@@ -591,23 +654,62 @@ gb-icon,
     color: var(--gb-muted);
 }
 
+/* Grouped by server: servers as section headers, their buffers indented */
 .buffer-list.indented .buffer.indent a {
-    padding-left: 1.5rem;
+    padding-left: 1.25rem;
 }
 
-.buffer-list.indented .buffer.server:not(:first-child) {
-    margin-top: 0.5rem;
+.buffer-list.indented .buffer.type-server:not(:first-child) {
+    margin-top: 0.625rem;
 }
 
-.buffer-list.indented .buffer.server a {
-    font-size: 0.75rem;
+.buffer-list.indented .buffer.group a {
+    padding-right: 2rem;
+}
+
+.buffer-list.indented .buffer.type-server .buffername {
+    font-size: 0.8rem;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
 }
 
-.buffer-list.indented .buffer.server:not(.active):not(.highlight) a {
+/* Collapse/expand the buffers of a server */
+.buffer-collapse {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    display: inline-flex;
+    padding: 0.3rem;
+    border: 0;
+    border-radius: calc(var(--gb-radius) - 0.125rem);
+    background: transparent;
     color: var(--gb-muted);
+    transform: translateY(-50%);
+}
+
+.buffer-collapse:hover {
+    background: var(--gb-hover-bg);
+    color: var(--gb-fg);
+}
+
+.buffer-collapse .gb-icon {
+    transition: transform 0.15s;
+}
+
+.buffer-collapse.collapsed .gb-icon {
+    transform: rotate(-90deg);
+}
+
+.buffer.group .buffer-badge {
+    margin-right: 0.25rem;
+}
+
+.buffer-empty,
+.nick-empty {
+    padding: 0.75rem 0.5rem;
+    color: var(--gb-muted);
+    font-size: 0.85rem;
 }
 
 /* Alt+number and Alt+j shortcuts */
@@ -675,12 +777,42 @@ gb-icon,
 .nicklist-header {
     position: sticky;
     top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
     padding: 0.75rem 0.875rem 0.5rem;
     background: var(--gb-chrome-bg);
     color: var(--gb-muted);
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    letter-spacing: 0.05em;
+}
+
+.nicklist-filter {
+    margin: 0 0.5rem 0.5rem;
+}
+
+.nick-section + .nick-section {
+    margin-top: 0.5rem;
+}
+
+.nick-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0;
+    padding: 0.35rem 0.875rem 0.25rem;
+    color: var(--gb-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.nick-section-count {
+    font-weight: 600;
+    letter-spacing: 0;
+    opacity: 0.8;
 }
 
 #nicklist ul {
@@ -689,23 +821,35 @@ gb-icon,
 }
 
 #nicklist a {
-    display: block;
-    padding: 0.35rem 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
     border-radius: calc(var(--gb-radius) - 0.125rem);
     color: inherit;
     text-decoration: none;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 #nicklist a:hover {
     background: var(--gb-hover-bg);
 }
 
+.nick-avatar {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.72rem;
+}
+
+.nick-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .nick-prefix {
-    display: inline-block;
-    min-width: 0.8em;
+    margin-right: 0.1em;
+    font-weight: 700;
 }
 
 /*
@@ -1081,8 +1225,7 @@ span.colourbox {
     text-transform: uppercase;
 }
 
-.settings-panes > .settings-heading:first-child,
-.settings-panes > .about-header:first-child + .settings-heading {
+.settings-panes > .settings-heading:first-child {
     margin-top: 0;
 }
 

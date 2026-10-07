@@ -104,7 +104,18 @@ export interface ListedBuffer {
     quickKey: string;
     /** Alt+J NN */
     jumpKey: number | null;
+    /** Server with buffers under it (when grouped by server) */
+    group: boolean;
+    /** Its buffers are collapsed */
+    collapsed: boolean;
+    /** Unread messages and highlights in the collapsed buffers */
+    hiddenUnread: number;
+    hiddenNotification: number;
 }
+
+/** Key of the server of a buffer ("irc.libera") */
+export const serverKeyOf = (buffer: Buffer): string =>
+    `${buffer.plugin}.${buffer.server}`;
 
 const sortKey = (orderByServer: boolean) => (a: Buffer, b: Buffer) =>
     orderByServer
@@ -128,7 +139,7 @@ function serverHasUnread(buffers: Buffer[], server: Buffer): boolean {
 export function listBuffers(
     buffersById: Record<number, Buffer>,
     activeId: number | null,
-    settings: Pick<Settings, 'orderbyserver' | 'onlyUnread'>,
+    settings: Pick<Settings, 'orderbyserver' | 'onlyUnread' | 'collapsedServers'>,
     ui: Pick<UiState, 'search' | 'jumpMode' | 'jumpDigit'>,
 ): ListedBuffer[] {
     const all = Object.values(buffersById);
@@ -139,7 +150,7 @@ export function listBuffers(
     const jumpKeys = new Map(byNumber.map((b, i) => [b.id, i < 99 ? i + 1 : null]));
 
     const search = ui.search.toLowerCase();
-    const visible = sorted.filter((buffer) => {
+    const shown = sorted.filter((buffer) => {
         if (ui.jumpMode) {
             const key = jumpKeys.get(buffer.id) ?? null;
             return (
@@ -166,6 +177,31 @@ export function listBuffers(
         return !buffer.hidden;
     });
 
+    // Group by server: buffers of collapsed servers are hidden (except the
+    // active one), their unread counts shown on the server
+    const grouped = settings.orderbyserver && !search && !ui.jumpMode;
+    const servers = new Map(
+        all.filter((b) => b.type === 'server').map((b) => [serverKeyOf(b), b]),
+    );
+    const collapsed = new Set(grouped ? settings.collapsedServers : []);
+    const children = new Map<string, number>();
+    const hidden = new Map<string, { unread: number; notification: number }>();
+    const visible = shown.filter((buffer) => {
+        const key = serverKeyOf(buffer);
+        if (buffer.type === 'server' || !servers.has(key)) {
+            return true;
+        }
+        children.set(key, (children.get(key) ?? 0) + 1);
+        if (!collapsed.has(key) || buffer.id === activeId) {
+            return true;
+        }
+        const counts = hidden.get(key) ?? { unread: 0, notification: 0 };
+        counts.unread += buffer.unread;
+        counts.notification += buffer.notification;
+        hidden.set(key, counts);
+        return false;
+    });
+
     // Quick keys: in the list order when filtering, else by number
     const filtered = Boolean(search) || settings.onlyUnread;
     const quickOrder = filtered
@@ -175,11 +211,30 @@ export function listBuffers(
         quickOrder.slice(0, 10).map((b, i) => [b.id, String((i + 1) % 10)]),
     );
 
-    return visible.map((buffer) => ({
-        buffer,
-        quickKey: quickKeys.get(buffer.id) ?? '',
-        jumpKey: jumpKeys.get(buffer.id) ?? null,
-    }));
+    return visible.map((buffer) => {
+        const key = serverKeyOf(buffer);
+        const group = grouped && buffer.type === 'server' && children.has(key);
+        return {
+            buffer,
+            quickKey: quickKeys.get(buffer.id) ?? '',
+            jumpKey: jumpKeys.get(buffer.id) ?? null,
+            group,
+            collapsed: group && collapsed.has(key),
+            hiddenUnread: group ? (hidden.get(key)?.unread ?? 0) : 0,
+            hiddenNotification: group ? (hidden.get(key)?.notification ?? 0) : 0,
+        };
+    });
+}
+
+/** Collapse or expand the buffers of a server in the buffer list */
+export function toggleServerCollapsed(buffer: Buffer): void {
+    const key = serverKeyOf(buffer);
+    const collapsed = getSettings().collapsedServers;
+    updateSettings({
+        collapsedServers: collapsed.includes(key)
+            ? collapsed.filter((k) => k !== key)
+            : [...collapsed, key],
+    });
 }
 
 export function currentBufferList(): ListedBuffer[] {

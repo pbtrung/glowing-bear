@@ -37,6 +37,8 @@ export interface Settings {
     customCSS: string;
     /** Buffer to show after connecting, per relay ("host:port/path" -> full name) */
     currentlyViewedBuffers: Record<string, string>;
+    /** Servers whose buffers are collapsed in the buffer list ("plugin.server") */
+    collapsedServers: string[];
 }
 
 const isSecurePage = typeof location !== 'undefined' && location.protocol === 'https:';
@@ -65,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableQuickKeys: true,
     customCSS: '',
     currentlyViewedBuffers: {},
+    collapsedServers: [],
 };
 
 function storage(): Storage | null {

@@ -13,6 +13,7 @@ import {
     type ChatState,
 } from './reducers';
 import { apiBuffer, apiLine, apiNick } from './fixtures.test-helper';
+import { nickColorClasses } from './model';
 
 const root: ApiNickGroup = {
     id: 0,
@@ -166,6 +167,37 @@ describe('lines', () => {
     it('guesses the read marker from the unread count', () => {
         const lines = [apiLine(1, 'a'), apiLine(2, 'b'), apiLine(3, 'c')];
         expect(applyLines(setup(), 2, lines, 100, 2).buffers[2].lastReadKey).toBe('l1');
+        // Everything is unread
+        expect(applyLines(setup(), 2, lines, 100, 5).buffers[2].lastReadKey).toBeNull();
+    });
+
+    it('counts only the lines that notify to guess the read marker', () => {
+        const join = (id: number) => apiLine(id, 'joined', { notify_level: 0 });
+        const lines = [
+            apiLine(1, 'a'),
+            apiLine(2, 'b'),
+            join(3),
+            apiLine(4, 'c'),
+            join(5),
+        ];
+        expect(applyLines(setup(), 2, lines, 100, 2).buffers[2].lastReadKey).toBe('l1');
+    });
+
+    it('keeps the local read marker over WeeChat one', () => {
+        let state = applyLines(setup(), 2, [apiLine(1, 'a'), apiLine(2, 'b')], 100);
+        state = setActiveBuffer(setActiveBuffer(state, 2), 1);
+        expect(state.buffers[2].lastReadKey).toBe('l2');
+        // Buffer events carry WeeChat's (older) read marker
+        state = send(
+            state,
+            'buffer_title_changed',
+            2,
+            apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat', {
+                last_read_line_id: 1,
+            }),
+        ).state;
+        state = applyLines(state, 2, [apiLine(1, 'a'), apiLine(2, 'b')], 100);
+        expect(state.buffers[2].lastReadKey).toBe('l2');
     });
 
     it('skips lines that are not displayed', () => {
@@ -324,6 +356,30 @@ describe('events', () => {
         let { state } = send(setup(), 'buffer_line_added', 2, apiLine(5, 'typo'));
         state = send(state, 'buffer_line_data_changed', 2, apiLine(5, 'fixed')).state;
         expect(state.buffers[2].lines.map((l) => l.text)).toEqual(['fixed']);
+    });
+
+    it('removes lines that get filtered, inserts lines that get displayed', () => {
+        let state = applyLines(
+            setup(),
+            2,
+            [apiLine(1, 'a'), apiLine(2, 'b', { displayed: false }), apiLine(3, 'c')],
+            100,
+        );
+        const texts = (s: ChatState) =>
+            s.buffers[2].lines.filter((l) => !l.isDateChange).map((l) => l.text);
+        expect(texts(state)).toEqual(['a', 'c']);
+        state = send(state, 'buffer_line_data_changed', 2, apiLine(2, 'b')).state;
+        expect(texts(state)).toEqual(['a', 'b', 'c']);
+        state = send(
+            state,
+            'buffer_line_data_changed',
+            2,
+            apiLine(3, 'c', { displayed: false }),
+        ).state;
+        expect(texts(state)).toEqual(['a', 'b']);
+        // Lines older than the loaded ones are not inserted
+        state = send(state, 'buffer_line_data_changed', 2, apiLine(0, 'old')).state;
+        expect(texts(state)).toEqual(['a', 'b']);
     });
 
     it('stores free buffer lines by index', () => {
@@ -553,11 +609,43 @@ describe('events', () => {
         expect(state.buffers[2].lines).toEqual([]);
     });
 
-    it('closes buffers and switches away from the active one', () => {
-        let state = setActiveBuffer(setup(), 2);
-        state = send(state, 'buffer_closed', 2).state;
-        expect(state.buffers[2]).toBeUndefined();
-        expect(state.activeBufferId).toBe(1);
+    it('closes buffers and switches to the previous one', () => {
+        const state = setActiveBuffer(setActiveBuffer(setup(), 3), 2);
+        const r = send(state, 'buffer_closed', 2);
+        expect(r.state.buffers[2]).toBeUndefined();
+        expect(r.state.previousBufferId).toBeNull();
+        // The session activates it (loading its lines)
+        expect(r.state.activeBufferId).toBeNull();
+        expect(r.effects).toEqual([{ type: 'activate', bufferId: 3 }]);
+    });
+
+    it('closes buffers and switches to the first visible one', () => {
+        let state = applyBuffers(setup(), [
+            apiBuffer(1, 1, 'core.weechat', 'weechat', { hidden: true }),
+            apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat'),
+            apiBuffer(3, 3, 'irc.libera.#test', '#test'),
+        ]);
+        state = { ...setActiveBuffer(state, 3), previousBufferId: null };
+        expect(send(state, 'buffer_closed', 3).effects).toEqual([
+            { type: 'activate', bufferId: 2 },
+        ]);
+        // Closing another buffer doesn't switch
+        expect(send(state, 'buffer_closed', 2).effects).toEqual([]);
+    });
+
+    it('reloads the lines when the type of a buffer changes', () => {
+        let state = applyLines(setup(), 2, [apiLine(1, 'one')], 100);
+        state = send(
+            state,
+            'buffer_type_changed',
+            2,
+            apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat', { type: 'free' }),
+        ).state;
+        const b = state.buffers[2];
+        expect(b.free).toBe(true);
+        expect(b.lines).toEqual([]);
+        expect(b.linesFetched).toBe(false);
+        expect(b.allLinesFetched).toBe(false);
     });
 
     it('maintains the nicklist', () => {
@@ -568,6 +656,8 @@ describe('events', () => {
                 .sort();
         expect(nicks(state)).toEqual(['alice']);
         expect(state.buffers[2].nicks[101].prefixClasses).toEqual(['cwf-lightgreen']);
+        // bar_fg is the default color of the nicklist bar
+        expect(state.buffers[2].nicks[101].nameClasses).toEqual(['cwf-default']);
         expect(state.buffers[2].nickGroups[100].name).toBe('000|o');
 
         state = send(state, 'nicklist_nick_added', 2, apiNick(102, 100, 'bob')).state;
@@ -644,6 +734,15 @@ describe('hotlist', () => {
         expect(state.buffers[2].unread).toBe(0);
     });
 
+    it('keeps what the active buffer counted while the window was not focused', () => {
+        let state = setActiveBuffer(setup(), 3);
+        state = send(state, 'buffer_line_added', 3, apiLine(1, 'missed'), {
+            windowFocused: false,
+        }).state;
+        expect(state.buffers[3].unread).toBe(1);
+        expect(applyHotlist(state, []).buffers[3].unread).toBe(1);
+    });
+
     it('marks everything read', () => {
         let state = applyHotlist(setup(), [
             {
@@ -655,5 +754,22 @@ describe('hotlist', () => {
         ]);
         state = markAllRead(state);
         expect(state.buffers[3].unread + state.buffers[3].notification).toBe(0);
+    });
+});
+
+describe('nick colors', () => {
+    it('makes classes from color names and options', () => {
+        expect(nickColorClasses('lightred')).toEqual(['cwf-lightred']);
+        expect(nickColorClasses('*lightred')).toEqual(['cwf-lightred']);
+        expect(nickColorClasses('_%cyan')).toEqual(['cwf-cyan']);
+        expect(nickColorClasses('209')).toEqual(['cef-209']);
+        expect(nickColorClasses('209:52')).toEqual(['cef-209', 'ceb-52']);
+        expect(nickColorClasses('yellow:blue')).toEqual(['cwf-yellow', 'cwb-blue']);
+        expect(nickColorClasses('weechat.color.chat_nick_self')).toEqual([
+            'cof-chat_nick_self',
+            'cob-chat_nick_self',
+            'coa-chat_nick_self',
+        ]);
+        expect(nickColorClasses(undefined)).toEqual(['cwf-default']);
     });
 });

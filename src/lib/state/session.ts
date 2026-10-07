@@ -32,6 +32,28 @@ export const WEECHAT_OPTIONS: Record<string, string> = {
 /** Commands opening a buffer: switch to it once WeeChat opened it */
 const OPEN_COMMANDS = ['/query', '/join', '/j', '/q'];
 
+/**
+ * Name of the buffer a command opens ("/join -server x #a,#b" → "#a"), or
+ * undefined (not such a command, or with -noswitch).
+ */
+export function openedBufferName(text: string): string | undefined {
+    const words = text.trim().split(/\s+/);
+    if (!OPEN_COMMANDS.includes(words[0])) {
+        return undefined;
+    }
+    let i = 1;
+    for (; i < words.length && words[i].startsWith('-'); i++) {
+        if (words[i] === '-noswitch') {
+            return undefined;
+        }
+        if (words[i] === '-server') {
+            // its value
+            i++;
+        }
+    }
+    return words[i]?.split(',')[0] || undefined;
+}
+
 /** A connection attempt replaced by a newer one, or by a disconnect */
 class Cancelled extends Error {
     constructor() {
@@ -378,7 +400,10 @@ export class Session {
         const unread = before.unread + before.notification;
         this.update((s) => setActiveBuffer(s, bufferId));
         const buffer = this.state.buffers[bufferId];
-        if (buffer.requestedLines < linesWanted && !buffer.allLinesFetched) {
+        if (
+            (!buffer.linesFetched || buffer.requestedLines < linesWanted) &&
+            !buffer.allLinesFetched
+        ) {
             void this.fetchLines(
                 bufferId,
                 Math.max(linesWanted, Math.min(unread, 4 * linesWanted)),
@@ -403,17 +428,28 @@ export class Session {
     /**
      * Fetch the last lines of a buffer (replacing the loaded ones).
      *
-     * @param count number of lines (at least twice the current number)
+     * @param count number of lines (at least twice the number fetched)
      */
     async fetchLines(bufferId: number, count?: number, unreadHint = 0): Promise<void> {
         const buffer = this.state.buffers[bufferId];
         if (!this.api || !buffer) {
             return;
         }
-        const wanted = Math.max(count ?? 0, buffer.requestedLines * 2, 1);
+        // Free buffers (e.g. /fset) are fetched whole: their lines are a screen
+        const wanted = buffer.free
+            ? Infinity
+            : Math.max(
+                  count ?? 0,
+                  buffer.linesFetched ? buffer.requestedLines * 2 : 0,
+                  1,
+              );
         this.set({ loadingLines: true });
         try {
-            const lines = await this.api.lines(bufferId, -wanted, 'weechat');
+            const lines = await this.api.lines(
+                bufferId,
+                buffer.free ? undefined : -wanted,
+                'weechat',
+            );
             this.update((s) => applyLines(s, bufferId, lines, wanted, unreadHint));
         } catch {
             // connection lost (the reconnection reloads them), or buffer closed
@@ -480,15 +516,14 @@ export class Session {
             return;
         }
         this.addToHistory(bufferId, text);
-        const firstWord = text.split(' ', 1)[0];
-        if (OPEN_COMMANDS.includes(firstWord) && text.includes(' ')) {
-            const name = text
-                .substring(text.indexOf(' ') + 1)
-                .trim()
-                .split(/\s+/)[0];
-            this.set({ outgoingQueries: [...this.state.outgoingQueries, name] });
+        const opened = openedBufferName(text);
+        if (opened) {
+            this.expectBuffer(opened);
         }
         for (const line of text.split(/\r?\n/)) {
+            if (line === '') {
+                continue;
+            }
             if ((line === '/quit' || line.startsWith('/quit ')) && !confirmQuit()) {
                 continue;
             }
@@ -517,10 +552,15 @@ export class Session {
         if (!buffer) {
             return;
         }
-        const fullName =
-            buffer.fullName.substring(0, buffer.fullName.lastIndexOf('.') + 1) + nick;
+        // IRC buffers are named irc.<server>.<channel or nick>
+        const fullName = (
+            buffer.plugin === 'irc' && buffer.server
+                ? `irc.${buffer.server}.${nick}`
+                : buffer.fullName.substring(0, buffer.fullName.lastIndexOf('.') + 1) +
+                  nick
+        ).toLowerCase();
         const existing = Object.values(this.state.buffers).find(
-            (b) => b.fullName === fullName,
+            (b) => b.fullName.toLowerCase() === fullName,
         );
         if (existing) {
             this.activate(existing.id);
@@ -528,8 +568,13 @@ export class Session {
         }
         // Channel names start with #, &, + or ! (RFC 2811)
         const command = /^[#&+!]/.test(nick) ? '/join -noswitch ' : '/query -noswitch ';
-        this.set({ outgoingQueries: [...this.state.outgoingQueries, nick] });
+        this.expectBuffer(nick);
         void this.input(command + nick, bufferId).catch(() => undefined);
+    }
+
+    /** Switch to the buffer with this short name once WeeChat opens it */
+    private expectBuffer(name: string): void {
+        this.set({ outgoingQueries: [...this.state.outgoingQueries, name] });
     }
 
     /*

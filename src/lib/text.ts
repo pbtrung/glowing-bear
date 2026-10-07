@@ -43,10 +43,15 @@ function scanPlain(text: string): Match[] {
         });
     }
     for (const m of text.matchAll(CHANNEL)) {
+        // Punctuation ending a sentence is not part of the name
+        const name = m[2].replace(/[.!?)\]}'">]+$/, '');
         const start = m.index + m[1].length;
-        const end = start + m[2].length;
-        if (!matches.some((x) => start < x.end && end > x.start)) {
-            matches.push({ start, end, token: { type: 'channel', text: m[2] } });
+        const end = start + name.length;
+        if (
+            /[a-z]/i.test(name) &&
+            !matches.some((x) => start < x.end && end > x.start)
+        ) {
+            matches.push({ start, end, token: { type: 'channel', text: name } });
         }
     }
     return matches;

@@ -13,6 +13,12 @@ describe('formatTime', () => {
         expect(formatTimeText(date, '%k')).toBe(' 7');
     });
 
+    it('keeps escaped percent signs literal', () => {
+        expect(formatTimeText(date, '%%T')).toBe('%T');
+        expect(formatTimeText(date, '%%%T')).toBe('%07:08:09');
+        expect(formatTimeText(date, '100%')).toBe('100%');
+    });
+
     it('formats 12h times', () => {
         const evening = new Date(2024, 2, 5, 19, 8, 9);
         expect(formatTimeText(evening, '%I:%M %p')).toBe('07:08 PM');

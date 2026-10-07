@@ -106,7 +106,8 @@ export function formatTime(
     format: string = DEFAULT_TIME_FORMAT,
 ): TimePart[] {
     let fmt = (format || DEFAULT_TIME_FORMAT).replace(/\$\{[^}]*\}/g, '');
-    fmt = fmt.replace(/%([TRrDF])/g, (_, spec: string) => COMPOSITES[spec]);
+    // (matching "%%" too, so that "%%T" stays a literal "%T")
+    fmt = fmt.replace(/%([%TRrDF])/g, (all, spec: string) => COMPOSITES[spec] ?? all);
 
     const parts: TimePart[] = [];
     const push = (text: string, delimiter: boolean) => {

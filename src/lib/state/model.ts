@@ -90,8 +90,10 @@ export interface Buffer {
     keys: { key: string; command: string }[];
 
     lines: Line[];
-    /** Number of lines requested (to know how many to fetch next) */
+    /** Number of lines held (to know how many to fetch next) */
     requestedLines: number;
+    /** Lines were fetched (else only the lines received since are held) */
+    linesFetched: boolean;
     allLinesFetched: boolean;
     /** Key of the last line read: the read marker is shown after it */
     lastReadKey: string | null;
@@ -165,6 +167,7 @@ export function createBuffer(api: ApiBuffer): Buffer {
         notify: 3,
         lines: [],
         requestedLines: 0,
+        linesFetched: false,
         allLinesFetched: false,
         lastReadKey: null,
         lastReadLineId: -1,
@@ -217,6 +220,8 @@ export function nickColorClasses(color: string | undefined): string[] {
         const name = color.match(/[a-zA-Z0-9_]+$/)?.[0] ?? 'default';
         return ['cof-' + name, 'cob-' + name, 'coa-' + name];
     }
+    // Attributes (e.g. "*lightred" for bold) are not used
+    color = color.replace(/^[*!/_%.|]+/, '');
     let classes = ['cwf-default'];
     const fgName = color.match(/^([a-zA-Z]+)(:|$)/);
     const fgExt = color.match(/^([0-9]+)(:|$)/);

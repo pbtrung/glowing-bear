@@ -6,7 +6,7 @@ import {
     nextSocket,
 } from '../relay/fake-websocket.test-helper';
 import { apiBuffer, apiLine } from './fixtures.test-helper';
-import { Session, type SessionOptions } from './session';
+import { openedBufferName, Session, type SessionOptions } from './session';
 
 const OPTIONS = {
     host: 'localhost',
@@ -224,6 +224,95 @@ describe('connection', () => {
         await acceptConnection();
         await reconnecting;
         expect(session.state.activeBufferId).toBe(2);
+    });
+});
+
+describe('buffers', () => {
+    it('fetches free buffers whole', async () => {
+        const { session, ws } = await connected();
+        ws.receive({
+            code: 0,
+            message: 'OK',
+            event_name: 'buffer_opened',
+            buffer_id: 5,
+            body_type: 'buffer',
+            body: apiBuffer(5, 3, 'fset.fset', 'fset', {
+                type: 'free',
+                local_variables: { plugin: 'fset' },
+            }),
+        });
+        session.activate(5);
+        expect(ws.sent.map((r) => r.request)).toContain(
+            'GET /api/buffers/5/lines?colors=weechat',
+        );
+    });
+
+    it('fetches the lines of a buffer that received lines before being shown', async () => {
+        const { session, ws } = await connected();
+        for (let id = 1; id <= 150; id++) {
+            ws.receive(lineEvent(2, id, 'line ' + id));
+        }
+        // (with the 150 unread lines)
+        session.activate(2);
+        expect(ws.sent.map((r) => r.request)).toContain(
+            'GET /api/buffers/2/lines?lines=-150&colors=weechat',
+        );
+    });
+
+    it('shows and loads another buffer when the active one is closed', async () => {
+        const { session, ws } = await connected();
+        session.activate(2);
+        ws.receive({
+            code: 0,
+            message: 'OK',
+            event_name: 'buffer_closed',
+            buffer_id: 2,
+            body_type: null,
+            body: null,
+        });
+        expect(session.state.activeBufferId).toBe(1);
+    });
+
+    it('opens queries and channels on the server of the buffer', async () => {
+        const { session, ws } = await connected();
+        session.activate(2);
+        session.openQuery(2, '#WeeChat');
+        // already open (names are case insensitive)
+        expect(session.state.activeBufferId).toBe(2);
+        session.openQuery(1, 'bob');
+        expect(ws.sent[ws.sent.length - 1]).toMatchObject({
+            request: 'POST /api/input',
+            body: { buffer_id: 1, command: '/query -noswitch bob' },
+        });
+        expect(session.state.outgoingQueries).toEqual(['bob']);
+    });
+
+    it('sends each line of a text, skipping empty ones', async () => {
+        const { session, ws } = await connected();
+        const count = ws.sent.length;
+        const sending = session.send(2, 'one\n\ntwo\n');
+        await flush();
+        ws.reply(204);
+        await flush();
+        ws.reply(204);
+        await sending;
+        expect(
+            ws.sent.slice(count).map((r) => (r.body as { command: string }).command),
+        ).toEqual(['one', 'two']);
+    });
+});
+
+describe('commands opening a buffer', () => {
+    it('finds the name of the buffer', () => {
+        expect(openedBufferName('/join #a')).toBe('#a');
+        expect(openedBufferName('/j #a,#b key')).toBe('#a');
+        expect(openedBufferName('/join -server libera #a')).toBe('#a');
+        expect(openedBufferName('/query bob hello')).toBe('bob');
+        expect(openedBufferName('/q  bob')).toBe('bob');
+        expect(openedBufferName('/join -noswitch #a')).toBeUndefined();
+        expect(openedBufferName('/join')).toBeUndefined();
+        expect(openedBufferName('/msg bob hi')).toBeUndefined();
+        expect(openedBufferName('hello')).toBeUndefined();
     });
 });
 

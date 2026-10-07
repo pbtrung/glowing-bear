@@ -65,7 +65,7 @@ export type Effect =
     | { type: 'highlight'; bufferId: number; line: Line }
     /** A line was added to the active buffer */
     | { type: 'activeBufferLine'; bufferId: number }
-    /** Switch to a buffer (one we opened with /query or /join) */
+    /** Switch to a buffer (one we opened, or after closing the active one) */
     | { type: 'activate'; bufferId: number }
     /** WeeChat is upgrading: the connection must be reopened */
     | { type: 'upgrade' };
@@ -210,6 +210,26 @@ function addNewLine(
 }
 
 /**
+ * Key of the last read line, given the number of unread lines: they are
+ * counted like the unread counters, from the lines that notify.
+ */
+function guessLastRead(lines: Line[], unread: number): string | null {
+    let i = lines.length;
+    for (let remaining = unread; remaining > 0;) {
+        if (i === 0) {
+            // everything loaded is unread
+            return null;
+        }
+        i--;
+        const line = lines[i];
+        if (!line.isDateChange && (line.notifyLevel >= 1 || line.highlight)) {
+            remaining--;
+        }
+    }
+    return lines.slice(0, i).findLast((l) => !l.isDateChange)?.key ?? null;
+}
+
+/**
  * Lines fetched for a buffer (GET /api/buffers/{id}/lines), oldest first:
  * they replace the current lines.
  *
@@ -244,19 +264,18 @@ export function applyLines(
         if (buffer.free) {
             return;
         }
-        // Read marker: WeeChat's one the first time, else guess from the
-        // number of unread lines
-        if (buffer.lastReadLineId >= 0) {
+        // Read marker, if none yet: WeeChat's one, else guess from the number
+        // of unread lines (WeeChat's marker comes again with each buffer
+        // event, and must not replace the local one)
+        if (buffer.lastReadKey === null && buffer.lastReadLineId >= 0) {
             const key = 'l' + buffer.lastReadLineId;
             if (buffer.lines.some((l) => l.key === key)) {
                 buffer.lastReadKey = key;
             }
-            buffer.lastReadLineId = -1;
         } else if (buffer.lastReadKey === null && unreadHint > 0) {
-            const messages = buffer.lines.filter((l) => !l.isDateChange);
-            const lastRead = messages[messages.length - 1 - unreadHint];
-            buffer.lastReadKey = lastRead ? lastRead.key : null;
+            buffer.lastReadKey = guessLastRead(buffer.lines, unreadHint);
         }
+        buffer.linesFetched = true;
         // Show a date change before today's first message
         const last = buffer.lines[buffer.lines.length - 1];
         if (
@@ -306,15 +325,18 @@ export function applyBuffers(state: ChatState, apiBuffers: ApiBuffer[]): ChatSta
 /** Response of GET /api/hotlist */
 export function applyHotlist(state: ChatState, hotlist: ApiHotlist[]): ChatState {
     return produce(state, (draft) => {
+        // The active buffer may be in WeeChat's hotlist if it's not the
+        // current buffer in WeeChat: ignore it, and keep the lines it counted
+        // while the window was not focused
+        const others = Object.values(draft.buffers).filter(
+            (b) => b.id !== draft.activeBufferId,
+        );
         // The hotlist only has buffers with unread lines: reset the others
-        for (const buffer of Object.values(draft.buffers)) {
-            buffer.unread = 0;
-            buffer.notification = 0;
+        for (const buffer of others) {
+            clearCounts(buffer);
         }
         for (const entry of hotlist) {
             const buffer = draft.buffers[entry.buffer_id];
-            // The active buffer may be in WeeChat's hotlist if it's not the
-            // current buffer in WeeChat: ignore it
             if (!buffer || buffer.id === draft.activeBufferId) {
                 continue;
             }
@@ -377,9 +399,7 @@ export function setActiveBuffer(state: ChatState, bufferId: number): ChatState {
             previous.lastReadKey = last ? last.key : null;
             draft.previousBufferId = previous.id;
         }
-        const buffer = draft.buffers[bufferId];
-        buffer.unread = 0;
-        buffer.notification = 0;
+        clearCounts(draft.buffers[bufferId]);
         draft.activeBufferId = bufferId;
     });
 }
@@ -389,8 +409,7 @@ export function markRead(state: ChatState, bufferId: number): ChatState {
     return produce(state, (draft) => {
         const buffer = draft.buffers[bufferId];
         if (buffer) {
-            buffer.unread = 0;
-            buffer.notification = 0;
+            clearCounts(buffer);
         }
     });
 }
@@ -399,8 +418,7 @@ export function markRead(state: ChatState, bufferId: number): ChatState {
 export function markAllRead(state: ChatState): ChatState {
     return produce(state, (draft) => {
         for (const buffer of Object.values(draft.buffers)) {
-            buffer.unread = 0;
-            buffer.notification = 0;
+            clearCounts(buffer);
         }
     });
 }
@@ -421,14 +439,27 @@ const eventBuffer = (
     event: ApiEvent,
 ): Draft<Buffer> | undefined => draft.buffers[event.buffer_id];
 
+function clearCounts(buffer: Draft<Buffer>): void {
+    buffer.unread = 0;
+    buffer.notification = 0;
+}
+
+function resetLines(buffer: Draft<Buffer>): void {
+    buffer.lines = [];
+    buffer.requestedLines = 0;
+    buffer.linesFetched = false;
+    buffer.lastReadKey = null;
+}
+
 /** Switch to buffers we opened ourselves (/query, /join) */
 function checkOutgoingQuery(
     draft: Draft<ChatState>,
     buffer: Draft<Buffer>,
     effects: Effect[],
 ): void {
-    const index = draft.outgoingQueries.indexOf(buffer.shortName);
-    if (buffer.shortName && index >= 0) {
+    const name = buffer.shortName.toLowerCase();
+    const index = draft.outgoingQueries.findIndex((q) => q.toLowerCase() === name);
+    if (name && index >= 0) {
         draft.outgoingQueries.splice(index, 1);
         effects.push({ type: 'activate', bufferId: buffer.id });
     }
@@ -438,7 +469,13 @@ function checkOutgoingQuery(
 const bufferChanged: EventHandler = (draft, event) => {
     const buffer = eventBuffer(draft, event);
     if (buffer && event.body) {
+        const wasFree = buffer.free;
         Object.assign(buffer, bufferProperties(event.body as ApiBuffer));
+        if (buffer.free !== wasFree) {
+            // Lines are addressed differently (y instead of id): reload them
+            resetLines(buffer);
+            buffer.allLinesFetched = false;
+        }
     }
 };
 
@@ -468,27 +505,32 @@ const bufferRenamed: EventHandler = (draft, event, ctx, effects) => {
 const bufferCleared: EventHandler = (draft, event) => {
     const buffer = eventBuffer(draft, event);
     if (buffer) {
-        buffer.lines = [];
-        buffer.requestedLines = 0;
+        resetLines(buffer);
         buffer.allLinesFetched = true;
-        buffer.lastReadKey = null;
     }
 };
 
-const bufferClosed: EventHandler = (draft, event) => {
+const bufferClosed: EventHandler = (draft, event, _ctx, effects) => {
     delete draft.buffers[event.buffer_id];
     if (draft.previousBufferId === event.buffer_id) {
         draft.previousBufferId = null;
     }
     if (draft.activeBufferId === event.buffer_id) {
-        // Switch to the buffer with the lowest number
-        const next = Object.values(draft.buffers).sort(
-            (a, b) => a.number - b.number,
-        )[0];
-        draft.activeBufferId = next ? next.id : null;
+        // Switch to the previous buffer, else the visible one with the lowest
+        // number (activated by the session, which loads its lines)
+        draft.activeBufferId = null;
+        const previous =
+            draft.previousBufferId !== null
+                ? draft.buffers[draft.previousBufferId]
+                : undefined;
+        const next =
+            previous ??
+            Object.values(draft.buffers)
+                .filter((b) => !b.hidden)
+                .sort((a, b) => a.number - b.number)[0];
+        draft.previousBufferId = null;
         if (next) {
-            next.unread = 0;
-            next.notification = 0;
+            effects.push({ type: 'activate', bufferId: next.id });
         }
     }
 };
@@ -512,7 +554,25 @@ const lineDataChanged: EventHandler = (draft, event) => {
     }
     const index = buffer.lines.findIndex((l) => l.key === line.key);
     if (index >= 0) {
-        buffer.lines[index] = line as Draft<Line>;
+        if (line.displayed) {
+            buffer.lines[index] = line as Draft<Line>;
+        } else {
+            // filtered
+            buffer.lines.splice(index, 1);
+        }
+    } else if (
+        line.displayed &&
+        buffer.lines.some((l) => !l.isDateChange && l.id < line.id)
+    ) {
+        // A line hidden by a filter is displayed: insert it among the loaded
+        // ones (ids grow with time), before the date change of the next one
+        let next = buffer.lines.findIndex((l) => !l.isDateChange && l.id > line.id);
+        if (next === -1) {
+            next = buffer.lines.length;
+        } else if (buffer.lines[next - 1]?.isDateChange) {
+            next--;
+        }
+        buffer.lines.splice(next, 0, line as Draft<Line>);
     }
 };
 

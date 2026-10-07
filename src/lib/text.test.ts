@@ -43,6 +43,23 @@ describe('tokenize', () => {
         expect(tokenize('##chat')).toEqual([{ type: 'channel', text: '##chat' }]);
     });
 
+    it('leaves the punctuation ending a sentence out of channels', () => {
+        expect(tokenize('join #foo. or (see #bar) now!')).toEqual([
+            { type: 'text', text: 'join ' },
+            { type: 'channel', text: '#foo' },
+            { type: 'text', text: '. or (see ' },
+            { type: 'channel', text: '#bar' },
+            { type: 'text', text: ') now!' },
+        ]);
+        expect(tokenize('#c++')).toEqual([{ type: 'channel', text: '#c++' }]);
+    });
+
+    it('never links javascript: or data: URLs', () => {
+        for (const text of ['javascript:alert(1)', 'data:text/html,<b>x</b>']) {
+            expect(tokenize(text).some((t) => t.type === 'url')).toBe(false);
+        }
+    });
+
     it('does not find channels in links', () => {
         expect(tokenize('https://example.com/#anchor')).toEqual([
             {

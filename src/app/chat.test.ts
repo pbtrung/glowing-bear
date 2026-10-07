@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { applyBuffers, initialState } from '../lib/state/reducers';
 import type { ApiBuffer } from '../lib/relay/types';
+import { apiBuffer as fixtureBuffer } from '../lib/state/fixtures.test-helper';
 import type { Buffer } from '../lib/state/model';
 import { activityOrder, listBuffers, session, setUi, uiStore } from './chat';
 import './input';
 
+/** A buffer of the IRC server libera (short name from the name) */
 const apiBuffer = (
     id: number,
     number: number,
@@ -12,27 +14,11 @@ const apiBuffer = (
     type: string,
     extra: Partial<ApiBuffer> = {},
 ): ApiBuffer =>
-    ({
-        id,
-        name,
-        short_name: name.split('.').pop(),
-        number,
-        type: 'formatted',
-        hidden: false,
-        title: '',
-        modes: '',
-        input_prompt: '',
-        input: '',
-        input_position: 0,
-        input_multiline: false,
+    fixtureBuffer(id, number, name, name.split('.').pop()!, {
         nicklist: false,
-        nicklist_case_sensitive: false,
-        nicklist_display_groups: false,
-        time_displayed: true,
         local_variables: { plugin: 'irc', server: 'libera', type },
-        keys: [],
         ...extra,
-    }) as ApiBuffer;
+    });
 
 const buffers = applyBuffers(initialState, [
     apiBuffer(1, 1, 'core.weechat', 'other', { local_variables: { plugin: 'core' } }),

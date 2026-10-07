@@ -3,6 +3,7 @@
  */
 import {
     activateBuffer,
+    focusInput,
     currentBufferList,
     session,
     setUi,
@@ -17,14 +18,6 @@ import { getSettings } from './settings';
 
 let lastEscape = 0;
 let quickKeysTimer: ReturnType<typeof setTimeout> | undefined;
-
-const focusInput = () => {
-    const input = document.getElementById('sendMessage') as HTMLTextAreaElement | null;
-    if (input) {
-        input.focus();
-        input.setSelectionRange(input.value.length, input.value.length);
-    }
-};
 
 const isEditable = (target: EventTarget | null): boolean =>
     target instanceof HTMLElement &&

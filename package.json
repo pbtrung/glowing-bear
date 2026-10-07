@@ -30,7 +30,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "typecheck": "tsc -p . && tsc -p src/sw",
+    "typecheck": "tsc -p . && tsc -p tsconfig.node.json && tsc -p src/sw",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:relay": "vitest run --config vitest.relay.config.mts",

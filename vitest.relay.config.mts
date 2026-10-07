@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// Integration tests against a real WeeChat relay (see test/relay/README.md)
+// Integration tests against a real WeeChat relay (see test/relay/global-setup.ts)
 export default defineConfig({
     test: {
         environment: 'node',

@@ -16,7 +16,7 @@ npm start                # Vite dev server on http://localhost:8000 (same as npm
 npm run build            # production build into build/
 npm run preview          # serve build/
 npm run lint             # ESLint (typescript-eslint, React hooks)
-npm run typecheck        # tsc (TypeScript 6, target ES2025)
+npm run typecheck        # tsc: app (browser types), tsconfig.node.json (configs, relay tests), src/sw (WebWorker)
 npm test                 # Vitest unit tests (src/**/*.test.{ts,tsx}, jsdom)
 npm run test:relay       # relay "api" compliance tests against a real WeeChat in Docker (see below)
 npm run format           # Prettier (88 columns)
@@ -30,7 +30,7 @@ Single tests: `npx vitest run src/lib/state` or `npx vitest run -t "name"`.
 
 ## Architecture
 
-`src/index.html` loads `src/app/main.tsx`; `src/` is Vite's root. Static files (images, sounds, theme stylesheets, manifests) are in `public/` and served as-is; `vite.config.mts` uses `base: './'` so the app works from any path.
+`src/index.html` loads `src/app/main.tsx`; `src/` is Vite's root (built files go to `build/static/`, apart from `public/assets/`; the service worker must stay import-free, the build checks it). Static files (images, sounds, theme stylesheets, manifests) are in `public/` and served as-is; `vite.config.mts` uses `base: './'` so the app works from any path.
 
 ### TypeScript core (`src/lib/`, framework-agnostic)
 

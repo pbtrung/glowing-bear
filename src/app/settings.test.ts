@@ -153,6 +153,21 @@ describe('stored settings', () => {
         expect(settings.currentlyViewedBuffers.x).toBe('irc.libera.#weechat');
     });
 
+    it('ignores values of another type', () => {
+        const settings = loadSettings(
+            fakeStorage({
+                hostField: 'null',
+                port: '{}',
+                collapsedServers: '{"a":1}',
+                currentlyViewedBuffers: '[1]',
+            }),
+        );
+        expect(settings.hostField).toBe(DEFAULT_SETTINGS.hostField);
+        expect(settings.port).toBe(DEFAULT_SETTINGS.port);
+        expect(settings.collapsedServers).toEqual([]);
+        expect(settings.currentlyViewedBuffers).toEqual({});
+    });
+
     it('ignores a password that was not meant to be saved', () => {
         expect(loadSettings(fakeStorage({ password: '"secret"' })).password).toBe('');
         expect(

@@ -15,22 +15,27 @@ export const notificationPermission = (): NotificationPermissionState =>
 
 /**
  * Ask for the permission to show notifications (browsers only ask from a
- * click), register the service worker. Resolves with the permission.
+ * click). Resolves with the permission.
  */
 export async function requestNotificationPermission(): Promise<NotificationPermissionState> {
     let permission = notificationPermission();
     if (permission === 'default') {
         permission = await Notification.requestPermission().catch(() => permission);
     }
-    if ('serviceWorker' in navigator && serviceWorker === null) {
-        navigator.serviceWorker.register('serviceworker.js').then(
-            (registration) => {
-                serviceWorker = registration;
-            },
-            () => undefined,
-        );
-    }
     return permission;
+}
+
+/** Register the service worker (notifications on Android), at startup */
+export function registerServiceWorker(): void {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+        return;
+    }
+    navigator.serviceWorker.register('serviceworker.js').then(
+        (registration) => {
+            serviceWorker = registration;
+        },
+        () => undefined,
+    );
 }
 
 /** Click handlers of the notifications shown by the service worker, by tag */

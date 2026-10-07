@@ -11,16 +11,25 @@ import {
     updateSettings,
 } from './settings';
 
-/** Connect with the current settings and the given password */
-export async function connectWithSettings(password: string): Promise<void> {
+/**
+ * Connect with the current settings and the given password.
+ *
+ * @param byUser from the Connect button (not autoconnecting): browsers only
+ *               show the notification permission prompt after a click
+ */
+export async function connectWithSettings(
+    password: string,
+    byUser = true,
+): Promise<void> {
     const s = getSettings();
     const parsed = parseHostField(s.hostField);
     if (!parsed) {
         return;
     }
-    // (from the Connect button: autoconnecting can't show the prompt, see the
-    // notification settings)
-    void requestNotificationPermission();
+    if (byUser) {
+        // (else see the notification settings)
+        void requestNotificationPermission();
+    }
     try {
         await session.connect({
             host: parsed.host,
@@ -49,7 +58,7 @@ export function initConnection(): void {
     const password = params.password ?? (s.savepassword ? s.password : '');
     // autoconnect in the URL applies to this page load only
     if (params.autoconnect ?? s.autoconnect) {
-        void connectWithSettings(password);
+        void connectWithSettings(password, false);
     }
 
     session.store.subscribe((state, previous) => {

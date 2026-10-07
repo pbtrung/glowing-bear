@@ -381,5 +381,14 @@ export function addMention(nick: string): void {
         value += ': ';
     }
     setUi({ input: value });
-    document.getElementById('sendMessage')?.focus();
+    focusInput();
+}
+
+/** Focus the input bar, with the caret at the end */
+export function focusInput(): void {
+    const input = document.getElementById('sendMessage') as HTMLTextAreaElement | null;
+    if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+    }
 }

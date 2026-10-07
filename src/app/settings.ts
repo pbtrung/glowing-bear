@@ -107,13 +107,24 @@ export function loadSettings(store: Storage | null = storage()): Settings {
             value = raw;
         }
         const defaultValue = DEFAULT_SETTINGS[key];
+        // Values of another type are ignored (e.g. a null host field broke the
+        // page at load)
         if (typeof defaultValue === 'boolean') {
             value = value === true || value === 'true';
-        } else if (typeof defaultValue === 'string' && typeof value === 'number') {
-            value = String(value);
+        } else if (typeof defaultValue === 'string') {
+            if (typeof value === 'number') {
+                value = String(value);
+            } else if (typeof value !== 'string') {
+                continue;
+            }
+        } else if (typeof defaultValue === 'number') {
+            if (typeof value !== 'number' && typeof value !== 'string') {
+                continue;
+            }
         } else if (
-            typeof defaultValue === 'object' &&
-            (typeof value !== 'object' || value === null)
+            typeof value !== 'object' ||
+            value === null ||
+            Array.isArray(value) !== Array.isArray(defaultValue)
         ) {
             continue;
         }

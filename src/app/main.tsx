@@ -10,10 +10,12 @@ import { initConnection } from './connect';
 // Drafts and the input shared with WeeChat
 import './input';
 import { initKeyboard } from './keyboard';
+import { registerServiceWorker } from './notifications';
 import { initAppearance } from './theme';
 
 initKeyboard();
 initConnection();
+registerServiceWorker();
 
 // Render once the theme is loaded (no flash of the default colors)
 void initAppearance().then(() =>

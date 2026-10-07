@@ -17,6 +17,16 @@ const SERVICE_WORKER = 'sw/serviceworker.ts';
 function serviceWorker(): Plugin {
     return {
         name: 'glowing-bear-service-worker',
+        // It's registered as a classic script: an import would break it
+        generateBundle(_options, bundle) {
+            const chunk = bundle['serviceworker.js'];
+            if (
+                chunk?.type === 'chunk' &&
+                (chunk.imports.length > 0 || chunk.exports.length > 0)
+            ) {
+                this.error('serviceworker.js must not import or export anything');
+            }
+        },
         configureServer(server) {
             server.middlewares.use('/serviceworker.js', (_req, res, next) => {
                 server
@@ -39,6 +49,8 @@ export default defineConfig({
     // The app (index.html) is in src/, the static files in public/
     root: path('./src'),
     publicDir: path('./public'),
+    // (not in src/node_modules)
+    cacheDir: path('./node_modules/.vite'),
     // Relative URLs: Glowing Bear can be served from any path
     base: './',
     plugins: [react(), serviceWorker()],
@@ -52,6 +64,8 @@ export default defineConfig({
         outDir: path('./build'),
         emptyOutDir: true,
         sourcemap: true,
+        // Built files apart from those of public/assets
+        assetsDir: 'static',
         rollupOptions: {
             input: {
                 main: path('./src/index.html'),
@@ -61,7 +75,7 @@ export default defineConfig({
                 entryFileNames: (chunk) =>
                     chunk.name === 'serviceworker'
                         ? 'serviceworker.js'
-                        : 'assets/[name]-[hash].js',
+                        : 'static/[name]-[hash].js',
             },
         },
     },

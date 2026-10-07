@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyBuffers, applyNicklist, initialState } from '../lib/state/reducers';
 import type { ApiBuffer, ApiNick, ApiNickGroup } from '../lib/relay/types';
-import {
-    groupTitle,
-    initial,
-    nameHue,
-    nickSections,
-    withoutNickPrivilege,
-} from './nicks';
+import { groupTitle, initial, nameHue, nickSections, promptNick } from './nicks';
 
 const nick = (id: number, groupId: number, name: string, visible = true): ApiNick => ({
     id,
@@ -96,27 +90,30 @@ describe('nicklist display', () => {
         expect(nameHue('alice')).not.toBe(nameHue('bob'));
     });
 
-    it('hides the privilege in front of the nick of the input prompt', () => {
+    it('keeps only the nick of the input prompt', () => {
         const part = (text: string, classes: string[] = []) => ({ text, classes });
         const texts = (parts: { text: string }[]) => parts.map((p) => p.text);
         // The prefix in its own color, then the nick and the modes
         expect(
             texts(
-                withoutNickPrivilege([
+                promptNick([
                     part(''),
                     part('@', ['cwf-lightgreen']),
                     part('gbuser', ['cwf-cyan']),
-                    part('(+i)'),
+                    part('('),
+                    part('+i'),
+                    part(')'),
                 ]),
             ),
-        ).toEqual(['gbuser', '(+i)']);
-        expect(texts(withoutNickPrivilege([part('~&gbuser')]))).toEqual(['gbuser']);
-        expect(withoutNickPrivilege([part('+v', ['cwf-yellow'])])).toEqual([
+        ).toEqual(['gbuser']);
+        expect(promptNick([part('+v(+Zi)', ['cwf-yellow'])])).toEqual([
             part('v', ['cwf-yellow']),
         ]);
+        expect(texts(promptNick([part('~&gbuser')]))).toEqual(['gbuser']);
+        expect(texts(promptNick([part('gbuser (+i)')]))).toEqual(['gbuser']);
         // Nick characters that look like symbols stay
-        expect(texts(withoutNickPrivilege([part('[yasmin]')]))).toEqual(['[yasmin]']);
-        expect(texts(withoutNickPrivilege([part('_xavier')]))).toEqual(['_xavier']);
-        expect(withoutNickPrivilege([])).toEqual([]);
+        expect(texts(promptNick([part('[yasmin]')]))).toEqual(['[yasmin]']);
+        expect(texts(promptNick([part('_xavier')]))).toEqual(['_xavier']);
+        expect(promptNick([])).toEqual([]);
     });
 });

@@ -3,7 +3,7 @@ import { AtSign, SendHorizontal } from 'lucide-react';
 import { completeNick } from '../../lib/irc/completion';
 import type { Buffer } from '../../lib/state/model';
 import { session, setUi, uiStore, useUi } from '../chat';
-import { withoutNickPrivilege } from '../nicks';
+import { promptNick } from '../nicks';
 import { getSettings } from '../settings';
 import { Icon } from './Icon';
 import { RichText } from './RichText';
@@ -287,7 +287,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
         }
     };
 
-    const prompt = withoutNickPrivilege(buffer.inputPrompt);
+    const prompt = promptNick(buffer.inputPrompt);
     const hasPrompt = prompt.some((part) => part.text !== '');
 
     return (

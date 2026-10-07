@@ -75,11 +75,8 @@ export function initial(name: string): string {
     return (letter ?? name.charAt(0) ?? '?').toUpperCase();
 }
 
-/**
- * Input prompt without the privilege in front of the nick ("@nick(+i)" ->
- * "nick(+i)"): IRC prefixes (~ & @ % + !) at the start of its text.
- */
-export function withoutNickPrivilege(prompt: RichText[]): RichText[] {
+/** Prompt without the IRC prefixes (~ & @ % + !) in front of the nick */
+function withoutPrivilege(prompt: RichText[]): RichText[] {
     const index = prompt.findIndex((part) => part.text !== '');
     if (index < 0) {
         return prompt;
@@ -90,7 +87,25 @@ export function withoutNickPrivilege(prompt: RichText[]): RichText[] {
     }
     const rest = prompt.slice(index + 1);
     // The prefix often has its own color, so it can be a whole part
-    return text === ''
-        ? withoutNickPrivilege(rest)
-        : [{ ...prompt[index], text }, ...rest];
+    return text === '' ? withoutPrivilege(rest) : [{ ...prompt[index], text }, ...rest];
+}
+
+/**
+ * Only the nick of an input prompt: "@nick(+i)" -> "nick", without the
+ * privilege in front or the user modes after it (nicks have no "(").
+ */
+export function promptNick(prompt: RichText[]): RichText[] {
+    const nick: RichText[] = [];
+    for (const part of withoutPrivilege(prompt)) {
+        const end = part.text.indexOf('(');
+        if (end >= 0) {
+            const text = part.text.slice(0, end).trimEnd();
+            if (text !== '') {
+                nick.push({ ...part, text });
+            }
+            break;
+        }
+        nick.push(part);
+    }
+    return nick;
 }

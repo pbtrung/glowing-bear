@@ -1,6 +1,7 @@
 /*
  * Nicklist display: groups with readable titles, filtering, avatar colors.
  */
+import type { RichText } from '../lib/relay/colors';
 import type { Buffer, Nick } from '../lib/state/model';
 
 /** Titles of IRC mode groups ("000|o" -> "o") */
@@ -72,4 +73,24 @@ export function nameHue(name: string): number {
 export function initial(name: string): string {
     const letter = [...name].find((ch) => /[\p{L}\p{N}]/u.test(ch));
     return (letter ?? name.charAt(0) ?? '?').toUpperCase();
+}
+
+/**
+ * Input prompt without the privilege in front of the nick ("@nick(+i)" ->
+ * "nick(+i)"): IRC prefixes (~ & @ % + !) at the start of its text.
+ */
+export function withoutNickPrivilege(prompt: RichText[]): RichText[] {
+    const index = prompt.findIndex((part) => part.text !== '');
+    if (index < 0) {
+        return prompt;
+    }
+    const text = prompt[index].text.replace(/^[~&@%+!]+/, '');
+    if (text === prompt[index].text) {
+        return prompt;
+    }
+    const rest = prompt.slice(index + 1);
+    // The prefix often has its own color, so it can be a whole part
+    return text === ''
+        ? withoutNickPrivilege(rest)
+        : [{ ...prompt[index], text }, ...rest];
 }

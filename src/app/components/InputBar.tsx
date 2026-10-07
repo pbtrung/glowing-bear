@@ -3,6 +3,7 @@ import { AtSign, SendHorizontal } from 'lucide-react';
 import { completeNick } from '../../lib/irc/completion';
 import type { Buffer } from '../../lib/state/model';
 import { session, setUi, uiStore, useUi } from '../chat';
+import { withoutNickPrivilege } from '../nicks';
 import { getSettings } from '../settings';
 import { Icon } from './Icon';
 import { RichText } from './RichText';
@@ -286,7 +287,8 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
         }
     };
 
-    const hasPrompt = buffer.inputPrompt.some((part) => part.text !== '');
+    const prompt = withoutNickPrivilege(buffer.inputPrompt);
+    const hasPrompt = prompt.some((part) => part.text !== '');
 
     return (
         <form
@@ -302,7 +304,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                         className="input-group-text input-prompt d-none d-md-flex"
                         title="WeeChat input prompt"
                     >
-                        <RichText parts={buffer.inputPrompt} links={false} />
+                        <RichText parts={prompt} links={false} />
                     </span>
                 )}
                 <textarea

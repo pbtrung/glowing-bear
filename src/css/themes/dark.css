@@ -5,7 +5,9 @@ body {
 
 .form-control {
     color: #ccc;
-    box-shadow: 0px 1px 0px rgba(255, 255, 255, 0.1), 0px 1px 7px 0px rgba(0, 0, 0, 0.8) inset;
+    box-shadow:
+        0px 1px 0px rgba(255, 255, 255, 0.1),
+        0px 1px 7px 0px rgba(0, 0, 0, 0.8) inset;
     background: none repeat scroll 0% 0% rgba(0, 0, 0, 0.3);
     border: 0px none;
 }
@@ -15,8 +17,8 @@ body {
 }
 
 .form-control option {
-   color: #eee;
-   background: #282828;
+    color: #eee;
+    background: #282828;
 }
 
 html {
@@ -34,21 +36,27 @@ html {
 }
 
 /* fix for mobile firefox which ignores :hover */
-.nav-pills > li > a:active, .nav-pills > li > a:active span, .nav-pills > li.active > a:hover {
+.nav-pills > li > a:active,
+.nav-pills > li > a:active span,
+.nav-pills > li.active > a:hover {
     background-color: #eee;
     color: #222;
 }
 
-.nav-pills > li.highlight > a, .nav-pills > li.highlight > a span {
+.nav-pills > li.highlight > a,
+.nav-pills > li.highlight > a span {
     color: #fff;
-    background: #428BCA;
+    background: #428bca;
 }
 
 tr.bufferline:hover {
     background-color: #222222;
 }
 
-.danger, .alert-danger, .badge .alert-danger, .badge.danger {
+.danger,
+.alert-danger,
+.badge .alert-danger,
+.badge.danger {
     background-color: rgb(217, 83, 79);
     color: #ddd;
 }
@@ -70,33 +78,49 @@ li.notification {
     color: green;
 }
 
-::-webkit-scrollbar-track-piece  {
+::-webkit-scrollbar-track-piece {
     background-color: black;
 }
 ::-webkit-scrollbar-thumb:vertical {
     height: 15px;
-    background: rgba(255,255,255,0.5);
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .gb-modal .backdrop {
-    background-color:rgba(0, 0, 0, 0.5)
+    background-color: rgba(0, 0, 0, 0.5);
 }
 
-input[type=text], input[type=password], #sendMessage, .badge {
-    box-shadow: 0px 1px 0px rgba(255, 255, 255, 0.1), 0px 1px 7px 0px rgba(0, 0, 0, 0.8) inset;
+input[type='text'],
+input[type='password'],
+#sendMessage,
+.badge {
+    box-shadow:
+        0px 1px 0px rgba(255, 255, 255, 0.1),
+        0px 1px 7px 0px rgba(0, 0, 0, 0.8) inset;
 }
 
-input[type=text], input[type=password], #sendMessage, .badge, .btn-send, .btn-send-image, .btn-complete-nick {
+input[type='text'],
+input[type='password'],
+#sendMessage,
+.badge,
+.btn-send,
+.btn-send-image,
+.btn-complete-nick {
     color: #ccc;
     background: none repeat scroll 0% 0% rgba(0, 0, 0, 0.3);
 }
-input[type=text].is-invalid{
-    box-shadow: 0px 1px 0px rgba(255, 255, 255, 0.1), 0px 1px 7px 0px rgba(255, 0, 0, 0.8) inset;
+input[type='text'].is-invalid {
+    box-shadow:
+        0px 1px 0px rgba(255, 255, 255, 0.1),
+        0px 1px 7px 0px rgba(255, 0, 0, 0.8) inset;
 }
 
-.btn-complete-nick:hover, .btn-complete-nick:focus,
-.btn-send:hover, .btn-send:focus,
-.btn-send-image:hover, .btn-send-image:focus {
+.btn-complete-nick:hover,
+.btn-complete-nick:focus,
+.btn-send:hover,
+.btn-send:focus,
+.btn-send-image:hover,
+.btn-send-image:focus {
     background-color: #555;
     color: white;
 }
@@ -113,7 +137,8 @@ input[type=text].is-invalid{
     color: #ddd;
 }
 
-.nav-pills > li > a:hover, .nav-pills > li > a:hover span {
+.nav-pills > li > a:hover,
+.nav-pills > li > a:hover span {
     color: #222;
 }
 
@@ -130,7 +155,11 @@ input[type=text].is-invalid{
     color: #666;
 }
 
-#topbar, #sidebar, .panel, .dropdown-menu, .modal-content {
+#topbar,
+#sidebar,
+.panel,
+.dropdown-menu,
+.modal-content {
     background: #282828;
 }
 
@@ -156,7 +185,10 @@ input[type=text].is-invalid{
     box-shadow: rgba(255, 255, 255, 0.07) -1px 0 0;
     border-left: 1px solid #121212;
 }
-.panel-group .panel-heading + .panel-collapse .panel-body, .modal-body, .modal-header, .modal-footer {
+.panel-group .panel-heading + .panel-collapse .panel-body,
+.modal-body,
+.modal-header,
+.modal-footer {
     -webkit-box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
     -moz-box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
     box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
@@ -2122,8 +2154,8 @@ button.close:hover {
 }
 
 code {
-  background-color: #444;
-  color: #fff;
+    background-color: #444;
+    color: #fff;
 }
 
 .toast {
@@ -2147,7 +2179,7 @@ code {
     }
 
     .footer {
-        background: rgb(24,24,24);
+        background: rgb(24, 24, 24);
     }
 
     .btn-complete-nick:hover,
@@ -2157,7 +2189,3 @@ code {
         color: #ccc;
     }
 }
-
-
-
-

@@ -1,19 +1,21 @@
 {
-  "browser": true,
-  "esversion": 6,
-  "node": true,
-  "devel": true,
-  "globals": {
-    "angular": false,
-    "weeChat": false,
-    "Notification": false,
-    "linkifyStr": false,
-    "renderMathInElement": false,
-    "describe": false,
-    "it": false,
-    "expect": false,
-    "beforeEach": false,
-    "escape": true,
-    "emojione": true
-  }
+    "browser": true,
+    "esversion": 11,
+    "laxbreak": true,
+    "node": true,
+    "devel": true,
+    "globals": {
+        "angular": false,
+        "weeChat": false,
+        "Notification": false,
+        "crypto": false,
+        "linkifyStr": false,
+        "renderMathInElement": false,
+        "describe": false,
+        "it": false,
+        "expect": false,
+        "beforeEach": false,
+        "escape": true,
+        "emojione": true
+    }
 }

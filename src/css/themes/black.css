@@ -1,10 +1,15 @@
-@import "dark.css";
+@import 'dark.css';
 
-body, .modal-content {
-   background-color: #000;
+body,
+.modal-content {
+    background-color: #000;
 }
 
-#topbar, #sidebar, .panel, .dropdown-menu, #topbar .actions {
+#topbar,
+#sidebar,
+.panel,
+.dropdown-menu,
+#topbar .actions {
     background: #080808;
 }
 
@@ -12,11 +17,15 @@ body, .modal-content {
     background: #000;
 }
 
-.form-control option, input.form-control, select.form-control {
-   color: #ccc;
-   background: #080808;
+.form-control option,
+input.form-control,
+select.form-control {
+    color: #ccc;
+    background: #080808;
 }
 
-.close, .close:hover, .close:focus {
+.close,
+.close:hover,
+.close:focus {
     color: #ddd;
 }

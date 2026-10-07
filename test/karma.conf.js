@@ -1,73 +1,69 @@
 const webpackConfig = require('../webpack.config');
 
 module.exports = function (config) {
-  config.set({
+    config.set({
+        basePath: '../',
 
-    basePath: '../',
+        files: [
+            'node_modules/linkifyjs/dist/linkify.js',
+            'node_modules/linkify-string/dist/linkify-string.js',
+            'test/unit/main.test.js',
+        ],
 
-    files: [
-      'node_modules/linkifyjs/dist/linkify.js',
-      'node_modules/linkify-string/dist/linkify-string.js',
-      'test/unit/main.test.js'
-    ],
+        autoWatch: true,
 
-    autoWatch: true,
+        frameworks: ['jasmine'],
 
-    frameworks: ['jasmine'],
+        browsers: ['Chrome', 'ChromeHeadless', 'ChromeHeadlessNoSandbox'],
 
-    browsers: ['Chrome', 'ChromeHeadless', 'ChromeHeadlessNoSandbox'],
+        singleRun: true,
 
-    singleRun: true,
+        plugins: [
+            'karma-chrome-launcher',
+            'karma-jasmine',
+            'karma-junit-reporter',
+            'karma-webpack',
+        ],
 
-    plugins: [
-      'karma-chrome-launcher',
-      'karma-jasmine',
-      'karma-junit-reporter',
-      'karma-webpack'
-    ],
+        customLaunchers: {
+            ChromeHeadlessNoSandbox: {
+                base: 'ChromeHeadless',
+                flags: ['--no-sandbox'],
+            },
+        },
 
-    customLaunchers: {
-      ChromeHeadlessNoSandbox: {
-        base: 'ChromeHeadless',
-        flags: ['--no-sandbox']
-      }
-      
-    },
+        junitReporter: {
+            outputFile: 'test_out/unit.xml',
+            suite: 'unit',
+        },
 
-    junitReporter: {
-      outputFile: 'test_out/unit.xml',
-      suite: 'unit'
-    },
-
-    /* karma-webpack config
+        /* karma-webpack config
        pass your webpack configuration for karma
        add `babel-loader` to the webpack configuration to make 
        the ES6+ code in the test files readable to the browser  
        eg. import, export keywords */
-    webpack: {
-      devtool: webpackConfig.devtool,
-      module: webpackConfig.module,
-      optimization: {
-        runtimeChunk: false,
-        splitChunks: false
-      },
-    },
+        webpack: {
+            devtool: webpackConfig.devtool,
+            module: webpackConfig.module,
+            optimization: {
+                runtimeChunk: false,
+                splitChunks: false,
+            },
+        },
 
-    preprocessors: {
-      //add webpack as preprocessor to support require() in test-suits .js files
-      './test/unit/*.js': ['webpack'],
-      './src/**/*.js': ['webpack']
-    },
-    // webpackMiddleware: {
-    //   //turn off webpack bash output when run the tests
-    //   noInfo: true,
-    //   stats: 'errors-only'
-    // }
+        preprocessors: {
+            //add webpack as preprocessor to support require() in test-suits .js files
+            './test/unit/*.js': ['webpack'],
+            './src/**/*.js': ['webpack'],
+        },
+        // webpackMiddleware: {
+        //   //turn off webpack bash output when run the tests
+        //   noInfo: true,
+        //   stats: 'errors-only'
+        // }
+    });
 
-  });
-
-  if(process.env.TRAVIS){
-    config.browsers = ['ChromeHeadlessNoSandbox'];
-  }
+    if (process.env.TRAVIS) {
+        config.browsers = ['ChromeHeadlessNoSandbox'];
+    }
 };
-

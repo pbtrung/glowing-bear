@@ -2,7 +2,8 @@ body {
     background-color: #fdfdfd;
     color: #181818;
 }
-#nicklist, .footer {
+#nicklist,
+.footer {
     background-color: #f7f7f7;
 }
 
@@ -17,28 +18,33 @@ html {
 }
 
 /* fix for mobile firefox which ignores :hover */
-.nav-pills > li > a:active, .nav-pills > li > a:active span {
+.nav-pills > li > a:active,
+.nav-pills > li > a:active span {
     color: #eee;
     background-color: #222;
 }
 
-.nav-pills > li.highlight > a, .nav-pills > li.highlight > a span {
+.nav-pills > li.highlight > a,
+.nav-pills > li.highlight > a span {
     color: #fff;
-    background: #428BCA;
+    background: #428bca;
 }
 
 .btn-complete-nick,
 .btn-send,
-.btn-send-image, {
+.btn-send-image {
     background: none repeat scroll 0% 0% rgba(255, 255, 255, 0.3);
-    color: #428BCA;
+    color: #428bca;
 }
 
 tr.bufferline:hover {
     background-color: #efefef;
 }
 
-.danger, .alert-danger, .badge .alert-danger, .badge.danger {
+.danger,
+.alert-danger,
+.badge .alert-danger,
+.badge.danger {
     background-color: rgb(217, 83, 79);
     color: #ddd;
 }
@@ -51,21 +57,28 @@ li.notification {
     color: green;
 }
 
-::-webkit-scrollbar-track-piece  {
+::-webkit-scrollbar-track-piece {
     background-color: black;
 }
 ::-webkit-scrollbar-thumb:vertical {
     height: 15px;
-    background: rgba(255,255,255,0.5);
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .gb-modal .backdrop {
-    background-color:rgba(255, 255, 255, 0.5)
+    background-color: rgba(255, 255, 255, 0.5);
 }
 
-select.form-control, select option, input[type=text], input[type=password], #sendMessage, .badge {
+select.form-control,
+select option,
+input[type='text'],
+input[type='password'],
+#sendMessage,
+.badge {
     color: #333;
-    box-shadow: 0px 1px 0px rgba(0, 0, 0, 0.1), 0px 1px 7px 0px rgba(255, 255, 255, 0.8) inset;
+    box-shadow:
+        0px 1px 0px rgba(0, 0, 0, 0.1),
+        0px 1px 7px 0px rgba(255, 255, 255, 0.8) inset;
     background: none repeat scroll 0% 0% rgba(255, 255, 255, 0.3);
 }
 
@@ -73,8 +86,10 @@ select.form-control, select option, input[type=text], input[type=password], #sen
     background: none repeat scroll 0% 0% rgba(134, 134, 134, 0.3);
 }
 
-input[type=text].is-invalid{
-    box-shadow: 0px 1px 0px rgba(0, 0, 0, 0.1), 0px 1px 7px 0px rgba(255, 0, 0, 0.8) inset;
+input[type='text'].is-invalid {
+    box-shadow:
+        0px 1px 0px rgba(0, 0, 0, 0.1),
+        0px 1px 7px 0px rgba(255, 0, 0, 0.8) inset;
 }
 
 #connection-infos {
@@ -89,7 +104,8 @@ input[type=text].is-invalid{
     color: #222;
 }
 
-.nav-pills > li > a:hover, .nav-pills > li > a:hover span {
+.nav-pills > li > a:hover,
+.nav-pills > li > a:hover span {
     color: #555;
 }
 
@@ -105,19 +121,24 @@ input[type=text].is-invalid{
     background: #e7e7e7;
 }
 
-#topbar, #sidebar, .panel, .dropdown-menu, .modal-content {
+#topbar,
+#sidebar,
+.panel,
+.dropdown-menu,
+.modal-content {
     background: #e7e7e7;
 }
 
 #sidebar .buffer .buffer-quick-key {
-    text-shadow: -1px 0px 4px rgba(0, 0, 0, 0.2),
-    0px -1px 4px rgba(0, 0, 0, 0.2),
-    1px 0px 4px rgba(0, 0, 0, 0.2),
-    0px 1px 4px rgba(0, 0, 0, 0.2);
+    text-shadow:
+        -1px 0px 4px rgba(0, 0, 0, 0.2),
+        0px -1px 4px rgba(0, 0, 0, 0.2),
+        1px 0px 4px rgba(0, 0, 0, 0.2),
+        0px 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 #nicklist a:hover {
-     background: #eee;
+    background: #eee;
 }
 
 .horizontal-line {
@@ -138,7 +159,10 @@ input[type=text].is-invalid{
     box-shadow: rgba(255, 255, 255, 0.07) -1px 0 0;
     border-left: 1px solid #121212;
 }
-.panel-group .panel-heading + .panel-collapse .panel-body, .modal-body, .modal-header, .modal-footer {
+.panel-group .panel-heading + .panel-collapse .panel-body,
+.modal-body,
+.modal-header,
+.modal-footer {
     -webkit-box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
     -moz-box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
     box-shadow: rgba(255, 255, 255, 0.07) 0 -1px 0;
@@ -155,7 +179,7 @@ input[type=text].is-invalid{
 /****************************/
 /* style options, foreground */
 .cof-separator {
-    color: #345A6A;
+    color: #345a6a;
 }
 .cof-chat {
     color: #575757;
@@ -164,10 +188,10 @@ input[type=text].is-invalid{
     color: #636363;
 }
 .cof-chat_time_delimiters {
-    color: #66421E;
+    color: #66421e;
 }
 .cof-chat_prefix_error {
-    color: #80723C;
+    color: #80723c;
 }
 .cof-chat_prefix_network {
     color: #644764;
@@ -176,19 +200,19 @@ input[type=text].is-invalid{
     color: #636363;
 }
 .cof-chat_prefix_join {
-    color: #525F2A;
+    color: #525f2a;
 }
 .cof-chat_prefix_quit {
-    color: #642B23;
+    color: #642b23;
 }
 .cof-chat_prefix_more {
     color: #644764;
 }
 .cof-chat_prefix_suffix {
-    color: #525F2A;
+    color: #525f2a;
 }
 .cof-chat_buffer {
-    color: #4A4A4A;
+    color: #4a4a4a;
 }
 .cof-chat_server {
     color: #523518;
@@ -200,7 +224,7 @@ input[type=text].is-invalid{
     color: #305956;
 }
 .cof-chat_nick_self {
-    color: #4C4C4C;
+    color: #4c4c4c;
     font-weight: bold;
 }
 .cof-chat_nick_other {
@@ -208,24 +232,24 @@ input[type=text].is-invalid{
 }
 .cof-invalid {
     /* should never happen */
-    color: #4A4A4A;
+    color: #4a4a4a;
     background-color: transparent;
 }
 .cof-chat_host {
     color: #305956;
 }
 .cof-chat_delimiters {
-    color: #525F2A;
+    color: #525f2a;
 }
 .cof-chat_highlight {
-    color: #665B30;
+    color: #665b30;
     background-color: #504054;
 }
 .cof-chat_read_marker {
     color: #644764;
 }
 .cof-chat_text_found {
-    color: #665B30;
+    color: #665b30;
 }
 .cof-chat_value {
     color: #305956;
@@ -234,32 +258,32 @@ input[type=text].is-invalid{
     color: #523518;
 }
 .cof-chat_tags {
-    color: #50221C;
+    color: #50221c;
 }
 .cof-chat_inactive_window {
-    color: #2E2E2E;
+    color: #2e2e2e;
 }
 .cof-chat_inactive_buffer {
-    color: #2E2E2E;
+    color: #2e2e2e;
 }
 .cof-chat_prefix_buffer_inactive_buffer {
-    color: #2E2E2E;
+    color: #2e2e2e;
 }
 .cof-chat_nick_offline {
-    color: #2E2E2E;
+    color: #2e2e2e;
 }
 .cof-chat_nick_offline_highlight {
     color: #636363;
     background-color: #5d5d5d;
 }
 .cof-chat_nick_prefix {
-    color: #525F2A;
+    color: #525f2a;
 }
 .cof-chat_nick_suffix {
-    color: #525F2A;
+    color: #525f2a;
 }
 .cof-emphasis {
-    color: #80723C;
+    color: #80723c;
     background-color: #645068;
 }
 .cof-chat_day_change {
@@ -423,16 +447,16 @@ input[type=text].is-invalid{
     color: #000000;
 }
 .cwf-darkgray {
-    color: #2E2E2E;
+    color: #2e2e2e;
 }
 .cwf-red {
-    color: #642B23;
+    color: #642b23;
 }
 .cwf-lightred {
-    color: #704B48;
+    color: #704b48;
 }
 .cwf-green {
-    color: #475A1E;
+    color: #475a1e;
 }
 .cwf-lightgreen {
     color: #667734;
@@ -441,13 +465,13 @@ input[type=text].is-invalid{
     color: #593919;
 }
 .cwf-yellow {
-    color: #80723C;
+    color: #80723c;
 }
 .cwf-blue {
-    color: #395A66;
+    color: #395a66;
 }
 .cwf-lightblue {
-    color: #4E6C78;
+    color: #4e6c78;
 }
 .cwf-magenta {
     color: #504054;
@@ -456,16 +480,16 @@ input[type=text].is-invalid{
     color: #644764;
 }
 .cwf-cyan {
-    color: #10434A;
+    color: #10434a;
 }
 .cwf-lightcyan {
-    color: #182D2B;
+    color: #182d2b;
 }
 .cwf-gray {
     color: #464646;
 }
 .cwf-white {
-    color: #4A4A4A;
+    color: #4a4a4a;
 }
 
 /* WeeChat colors, background */
@@ -476,16 +500,16 @@ input[type=text].is-invalid{
     background-color: #000000;
 }
 .cwb-darkgray {
-    background-color: #2E2E2E;
+    background-color: #2e2e2e;
 }
 .cwb-red {
-    background-color: #642B23;
+    background-color: #642b23;
 }
 .cwb-lightred {
-    background-color: #704B48;
+    background-color: #704b48;
 }
 .cwb-green {
-    background-color: #475A1E;
+    background-color: #475a1e;
 }
 .cwb-lightgreen {
     background-color: #667734;
@@ -494,13 +518,13 @@ input[type=text].is-invalid{
     background-color: #593919;
 }
 .cwb-yellow {
-    background-color: #80723C;
+    background-color: #80723c;
 }
 .cwb-blue {
-    background-color: #395A66;
+    background-color: #395a66;
 }
 .cwb-lightblue {
-    background-color: #4E6C78;
+    background-color: #4e6c78;
 }
 .cwb-magenta {
     background-color: #504054;
@@ -509,16 +533,16 @@ input[type=text].is-invalid{
     background-color: #644764;
 }
 .cwb-cyan {
-    background-color: #10434A;
+    background-color: #10434a;
 }
 .cwb-lightcyan {
-    background-color: #182D2B;
+    background-color: #182d2b;
 }
 .cwb-gray {
     background-color: #464646;
 }
 .cwb-white {
-    background-color: #4A4A4A;
+    background-color: #4a4a4a;
 }
 
 /* extended colors, foreground */
@@ -559,7 +583,7 @@ input[type=text].is-invalid{
     color: #d4d420; /* 011 LightYellow*/
 }
 .cef-12 {
-    color: #4E80ff; /* 012 LightBlue */
+    color: #4e80ff; /* 012 LightBlue */
 }
 .cef-13 {
     color: #e407e4; /* 013 LightMagenta */
@@ -568,7 +592,7 @@ input[type=text].is-invalid{
     color: #18e1e1; /* 014 LightCyan */
 }
 .cef-15 {
-    color: #4A4A4A; /* 015 White */
+    color: #4a4a4a; /* 015 White */
 }
 .cef-16 {
     color: #000000; /* 016 Grey0 */
@@ -2110,17 +2134,15 @@ input[type=text].is-invalid{
         -webkit-box-shadow: 0px 0px 120px #999;
         box-shadow: 0px 0px 120px #999;
         background: #e7e7e7;
-
     }
 
     .footer {
-        background: rgb(230,230,230);
+        background: rgb(230, 230, 230);
     }
 
     .btn-complete-nick:hover,
     .btn-send:hover,
     .btn-send-image:hover {
-        color: #428BCA;
+        color: #428bca;
     }
-
 }

@@ -1,6 +1,7 @@
 import type { KeyboardEvent, CSSProperties } from 'react';
 import {
     ChevronDown,
+    Hash,
     Pin,
     Search,
     Server,
@@ -66,6 +67,14 @@ function BufferIcon({ buffer }: { buffer: Buffer }) {
             </span>
         );
     }
+    if (buffer.channelPrefix === '#') {
+        return (
+            <span className="buffer-icon">
+                <Icon icon={Hash} />
+            </span>
+        );
+    }
+    // Other channel types (&, +, !) keep their prefix as text
     if (buffer.channelPrefix) {
         return (
             <span className="buffer-icon buffer-prefix" aria-hidden="true">

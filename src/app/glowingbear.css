@@ -882,7 +882,7 @@ tr.fetch-more td {
 
 td.time {
     padding: 0.1rem 0.625rem 0.1rem 0;
-    vertical-align: top;
+    vertical-align: baseline;
     white-space: nowrap;
     font-size: 0.85em;
     font-variant-numeric: tabular-nums;
@@ -892,7 +892,7 @@ td.time {
 td.prefix {
     padding: 0.1rem 0.5rem 0.1rem 0;
     text-align: right;
-    vertical-align: top;
+    vertical-align: baseline;
     white-space: pre;
     border-right: 1px solid var(--gb-border);
 }
@@ -905,7 +905,7 @@ td.prefix a {
 td.message {
     width: 100%;
     padding: 0.1rem 0 0.1rem 0.625rem;
-    vertical-align: top;
+    vertical-align: baseline;
     overflow-wrap: anywhere;
     word-break: break-word;
     hyphens: auto;

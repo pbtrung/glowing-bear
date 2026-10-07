@@ -31,17 +31,11 @@ module.exports = {
         }),
         new CopyWebpackPlugin({
             patterns: [
-                '**/*.css',
-                '**/*.mp3',
-                '**/*.ogg',
-                '**/*.svg',
-                '**/*.png',
+                // Static files, shared with the Vite build
+                { from: '../public', to: '.' },
+                { from: 'app/glowingbear.css', to: 'css/' },
                 'directives/*.html',
-                'serviceworker.js',
                 '../package.json',
-                'manifest.json',
-                'manifest.webapp',
-                'webapp.manifest.json',
                 {
                     from: '../node_modules/bootstrap/dist/css/bootstrap.min.css',
                     to: 'css/',

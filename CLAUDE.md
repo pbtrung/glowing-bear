@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Glowing Bear is a browser-based frontend for the WeeChat IRC client. It speaks the WeeChat relay **`api` protocol** (JSON over HTTP + WebSocket) directly — there is **no backend service**. The UI is AngularJS 1.x (`src/js/`, being replaced by React + Vite + TypeScript); the protocol and state core is TypeScript in `src/lib/`. The user's browser connects straight to their WeeChat instance.
+Glowing Bear is a browser-based frontend for the WeeChat IRC client. It speaks the WeeChat relay **`api` protocol** (JSON over HTTP + WebSocket) directly — there is **no backend service**. The UI is being moved from AngularJS 1.x (`src/js/`, webpack) to React + Vite + TypeScript (`src/app/`, entry `index.html`); the protocol and state core is TypeScript in `src/lib/`. Static files (images, sounds, themes, manifests, service worker) are in `public/`, shared by both builds. The user's browser connects straight to their WeeChat instance.
 
 Requires WeeChat ≥ 4.1 with an `api` relay (`/relay add api <port>`). The binary `weechat` relay protocol is no longer supported. Protocol spec: https://weechat.org/files/doc/weechat/stable/weechat_relay_api.en.html
 
@@ -13,7 +13,9 @@ Requires WeeChat ≥ 4.1 with an `api` relay (`/relay add api <port>`). The bina
 ```bash
 npm install              # install deps (runs automatically before `start`)
 npm start                # webpack dev server on http://localhost:8000 with live reload
-npm run build            # production build into build/
+npm run build            # AngularJS production build into build/ (webpack)
+npm run dev              # React app: Vite dev server (http://localhost:5173)
+npm run build:app        # React app: production build into dist/
 npm run lint             # jshint (src/js, test/unit) + eslint (TypeScript)
 npm run typecheck        # tsc (TypeScript 6, target ES2025)
 npm test                 # vitest (src/**/*.test.ts) + karma/jasmine (AngularJS, test/unit)
@@ -43,7 +45,15 @@ The Karma config (`test/karma.conf.js`) auto-switches to `ChromeHeadlessNoSandbo
 - **`state/session.ts`** — `Session`: zustand store, connect/initial sync/reconnect/upgrade handling, user actions, input history.
 - **`time-format.ts`** (strftime → text parts), **`irc/completion.ts`** (nick completion).
 
-### AngularJS app (`src/js/`, to be replaced)
+### React app (`src/app/`)
+
+- **`main.tsx`** imports Bootstrap, Inter and `glowingbear.css` (in this order; the theme stylesheet `public/css/themes/<theme>.css` is appended after them by `theme.ts`), then renders `App`.
+- **`settings.ts`** — settings in localStorage, one JSON value per key, compatible with the AngularJS app; `parseHostField`, `parseHashParams`.
+- **`chat.ts`** — the `Session` instance, the UI store (panels, dialogs, search, jump/quick keys, input text), `listBuffers` (buffer list filtering and keys) and actions.
+- **`keyboard.ts`** (global shortcuts), **`swipe.ts`** (mobile gestures), **`notifications.ts`** (desktop notifications, sound, title, favicon and app badges), **`theme.ts`** (themes, fonts, custom CSS), **`connect.ts`** (URL parameters, autoconnect).
+- **`components/`** — `RichText` renders message text as React elements (tokens from `src/lib/text.ts`: links, channels, color swatches, code; never HTML strings; KaTeX output is the only `dangerouslySetInnerHTML`, loaded on demand), `BufferLines`, `BufferList`, `NickList`, `TopBar`, `InputBar`, `SettingsDialog`, `TopicDialog`, `Login`.
+
+### AngularJS app (`src/js/`, to be removed)
 
 Entry point is `src/main.js`, which imports every AngularJS module under `src/js/`. Webpack bundles everything; `src/index.html` is the shell that Angular boots into. There is **no router-driven view layout** — the whole UI lives in `src/index.html` with the input bar directive template in `src/directives/input.html`.
 

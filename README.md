@@ -16,6 +16,7 @@ cd glowing-bear
 npm install
 npm start        # development server on http://localhost:8000
 npm run build    # production bundle in build/
+npm run dev      # new React app: development server on http://localhost:5173
 ```
 
 To host it yourself, serve the `build/` directory with any static web server (Caddy,

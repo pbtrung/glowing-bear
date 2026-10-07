@@ -76,6 +76,16 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
+/* Chat text font, from the settings */
+.favorite-font {
+    font-family: var(--gb-chat-font, inherit);
+    font-size: var(--gb-chat-size, inherit);
+}
+
+#root {
+    min-height: 100%;
+}
+
 body.no-overflow {
     overflow: hidden;
 }
@@ -213,7 +223,8 @@ pre {
 }
 
 /* Icons (see js/icons.js) */
-gb-icon {
+gb-icon,
+.gb-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -629,6 +640,7 @@ gb-icon {
 }
 
 .content[sidebar-state='visible'] .panel-backdrop,
+.content[data-sidebar='visible'] .panel-backdrop,
 .content:has(#nicklist) .panel-backdrop {
     display: block;
 }
@@ -843,7 +855,8 @@ td.message a {
     text-decoration: none;
 }
 
-div.colourbox {
+div.colourbox,
+span.colourbox {
     display: inline-block;
     width: 14px;
     height: 14px;
@@ -1254,6 +1267,10 @@ label.settings-row:hover {
     margin: 0;
 }
 
+.shortcut-table .contents {
+    display: contents;
+}
+
 .shortcut-table dt {
     font-weight: normal;
     white-space: nowrap;
@@ -1433,6 +1450,7 @@ label.settings-row:hover {
 
     .panel-backdrop,
     .content[sidebar-state='visible'] .panel-backdrop,
+    .content[data-sidebar='visible'] .panel-backdrop,
     .content:has(#nicklist) .panel-backdrop {
         display: none;
     }

@@ -6,3 +6,4 @@ build/
 
 # IntelliJ / WebStorm
 .idea/
+dist/

@@ -1,0 +1,88 @@
+import { describe, expect, it } from 'vitest';
+import { tokenize } from './text';
+
+describe('tokenize', () => {
+    it('keeps plain text', () => {
+        expect(tokenize('hello world')).toEqual([
+            { type: 'text', text: 'hello world' },
+        ]);
+        expect(tokenize('')).toEqual([]);
+    });
+
+    it('finds links', () => {
+        expect(tokenize('see https://weechat.org/doc now')).toEqual([
+            { type: 'text', text: 'see ' },
+            {
+                type: 'url',
+                text: 'https://weechat.org/doc',
+                href: 'https://weechat.org/doc',
+            },
+            { type: 'text', text: ' now' },
+        ]);
+        expect(tokenize('www.example.com')[0]).toMatchObject({
+            type: 'url',
+            href: 'http://www.example.com',
+        });
+    });
+
+    it('does not link emails nor when disabled', () => {
+        expect(tokenize('~alice@example.com')).toEqual([
+            { type: 'text', text: '~alice@example.com' },
+        ]);
+        expect(tokenize('https://weechat.org', false)).toEqual([
+            { type: 'text', text: 'https://weechat.org' },
+        ]);
+    });
+
+    it('finds channels with a letter', () => {
+        expect(tokenize('join #weechat, not #1')).toEqual([
+            { type: 'text', text: 'join ' },
+            { type: 'channel', text: '#weechat' },
+            { type: 'text', text: ', not #1' },
+        ]);
+        expect(tokenize('##chat')).toEqual([{ type: 'channel', text: '##chat' }]);
+    });
+
+    it('does not find channels in links', () => {
+        expect(tokenize('https://example.com/#anchor')).toEqual([
+            {
+                type: 'url',
+                text: 'https://example.com/#anchor',
+                href: 'https://example.com/#anchor',
+            },
+        ]);
+    });
+
+    it('finds colors', () => {
+        expect(tokenize('red is #ff0000 or rgb(255, 0, 0)')).toEqual([
+            { type: 'text', text: 'red is ' },
+            { type: 'color', text: '#ff0000', color: '#ff0000' },
+            { type: 'text', text: ' or ' },
+            { type: 'color', text: 'rgb(255, 0, 0)', color: 'rgb(255, 0, 0)' },
+        ]);
+        // 3 digits and HTML entities are not colors
+        expect(tokenize('issue #123 &#123456;').some((t) => t.type === 'color')).toBe(
+            false,
+        );
+    });
+
+    it('finds code', () => {
+        expect(tokenize('run `make test` or ```npm test```')).toEqual([
+            { type: 'text', text: 'run ' },
+            { type: 'code', text: 'make test', fence: '`' },
+            { type: 'text', text: ' or ' },
+            { type: 'code', text: 'npm test', fence: '```' },
+        ]);
+        // not in the middle of a word
+        expect(tokenize('weird`stuff`').some((t) => t.type === 'code')).toBe(false);
+    });
+
+    it('never produces HTML', () => {
+        const tokens = tokenize(
+            '<img src=x onerror=alert(1)> https://e.com/"><script>',
+        );
+        expect(tokens.map((t) => t.text).join('')).toBe(
+            '<img src=x onerror=alert(1)> https://e.com/"><script>',
+        );
+    });
+});

@@ -29,6 +29,7 @@ export function TopicDialog() {
                         {buffer.titleText ? (
                             <RichText
                                 parts={buffer.title}
+                                links={buffer.free ? 'scheme' : true}
                                 onChannel={(channel) =>
                                     session.openQuery(buffer.id, channel)
                                 }

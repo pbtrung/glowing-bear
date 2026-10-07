@@ -61,6 +61,21 @@ describe('tokenize', () => {
         expect(performance.now() - start).toBeLessThan(500);
     });
 
+    it('links only URLs with a scheme when asked (free buffers)', () => {
+        const urls = (text: string) =>
+            tokenize(text, 'scheme')
+                .filter((t) => t.type === 'url')
+                .map((t) => t.text);
+        expect(urls('weechat.look.bar_more_up string')).toEqual([]);
+        expect(urls('see www.weechat.org or weechat.org')).toEqual([]);
+        expect(urls('home: https://weechat.org/doc and ftp://x.org')).toEqual([
+            'https://weechat.org/doc',
+            'ftp://x.org',
+        ]);
+        // All of them otherwise
+        expect(tokenize('weechat.org').map((t) => t.type)).toEqual(['url']);
+    });
+
     it('never links javascript: or data: URLs', () => {
         for (const text of ['javascript:alert(1)', 'data:text/html,<b>x</b>']) {
             expect(tokenize(text).some((t) => t.type === 'url')).toBe(false);

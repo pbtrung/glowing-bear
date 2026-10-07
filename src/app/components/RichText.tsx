@@ -1,12 +1,12 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import type { RichText as RichTextPart } from '../../lib/relay/colors';
-import { tokenize, type Token } from '../../lib/text';
+import { tokenize, type LinkMode, type Token } from '../../lib/text';
 import { formatTime } from '../../lib/time-format';
 
 interface RichTextProps {
     parts: RichTextPart[];
-    /** Detect links (not for hostmasks, see cof-chat_host) */
-    links?: boolean;
+    /** Links to detect (none in hostmasks, see cof-chat_host) */
+    links?: LinkMode;
     /** Called when a channel name is clicked */
     onChannel?: (channel: string) => void;
     /** Render LaTeX math */
@@ -85,7 +85,7 @@ export function RichText({
                 if (maxLength !== undefined && text.length > maxLength) {
                     text = text.substring(0, maxLength) + '+';
                 }
-                const linkify = links && !part.classes.includes('cof-chat_host');
+                const linkify = part.classes.includes('cof-chat_host') ? false : links;
                 return (
                     <span key={i} className={part.classes.join(' ')} dir="auto">
                         {math && hasMath(text) ? (

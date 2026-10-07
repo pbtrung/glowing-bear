@@ -80,4 +80,12 @@ describe('Time', () => {
         expect(spans[1].className).toContain('cof-chat_time_delimiters');
         expect(spans[0].className).toContain('cof-chat_time ');
     });
+
+    it('links only URLs with a scheme in free buffers', () => {
+        const parts = parseRichText('weechat.look.bar https://weechat.org');
+        const { container } = render(<RichText parts={parts} links="scheme" />);
+        expect([...container.querySelectorAll('a')].map((a) => a.textContent)).toEqual([
+            'https://weechat.org',
+        ]);
+    });
 });

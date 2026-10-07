@@ -76,13 +76,22 @@ function toTokens(text: string, matches: Match[]): Token[] {
     return tokens;
 }
 
+/**
+ * Links to detect: all (also bare domains like "weechat.org"), only URLs with
+ * a scheme ("https://...", e.g. in free buffers where "weechat.look.bar" is an
+ * option, not a domain), or none
+ */
+export type LinkMode = boolean | 'scheme';
+
+const hasScheme = (url: string) => /^[a-z][a-z0-9+.-]*:/i.test(url);
+
 /** Tokens of a text without code */
-function tokenizeInline(text: string, links: boolean): Token[] {
+function tokenizeInline(text: string, links: LinkMode): Token[] {
     const matches: Match[] = [];
     if (links) {
         for (const link of find(text)) {
             // Don't link emails (e.g. in hostmasks)
-            if (link.type === 'url') {
+            if (link.type === 'url' && (links !== 'scheme' || hasScheme(link.value))) {
                 matches.push({
                     start: link.start,
                     end: link.end,
@@ -107,9 +116,9 @@ function tokenizeInline(text: string, links: boolean): Token[] {
 /**
  * Tokenize a message text.
  *
- * @param links whether to detect links (disabled e.g. for hostmasks)
+ * @param links links to detect (none e.g. for hostmasks)
  */
-export function tokenize(text: string, links = true): Token[] {
+export function tokenize(text: string, links: LinkMode = true): Token[] {
     const tokens: Token[] = [];
     let pos = 0;
     for (const m of text.matchAll(CODE)) {

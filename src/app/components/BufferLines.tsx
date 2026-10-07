@@ -21,6 +21,8 @@ interface LineRowProps {
     line: Line;
     previous: Line | undefined;
     bufferId: number;
+    /** Line of a free buffer (/fset...): only links with a scheme */
+    free: boolean;
     timeFormat: string;
     math: boolean;
 }
@@ -29,6 +31,7 @@ const LineRow = memo(function LineRow({
     line,
     previous,
     bufferId,
+    free,
     timeFormat,
     math,
 }: LineRowProps) {
@@ -73,7 +76,12 @@ const LineRow = memo(function LineRow({
                 </span>
             </td>
             <td className="message">
-                <RichText parts={line.content} onChannel={openChannel} math={math} />
+                <RichText
+                    parts={line.content}
+                    onChannel={openChannel}
+                    math={math}
+                    links={free ? 'scheme' : true}
+                />
             </td>
         </tr>
     );
@@ -132,6 +140,7 @@ function Lines({ buffer }: { buffer: Buffer }) {
                     line={line}
                     previous={lines[i - 1]}
                     bufferId={buffer.id}
+                    free={buffer.free}
                     timeFormat={timeFormat}
                     math={math}
                 />

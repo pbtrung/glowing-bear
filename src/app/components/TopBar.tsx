@@ -68,7 +68,10 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                             </span>
                         )}
                         <span className="buffer-title desktop">
-                            <RichText parts={buffer.title} />
+                            <RichText
+                                parts={buffer.title}
+                                links={buffer.free ? 'scheme' : true}
+                            />
                         </span>
                     </>
                 )}

@@ -19,11 +19,11 @@ import { Modal } from './Modal';
 
 type Tab = 'appearance' | 'chat' | 'notifications' | 'shortcuts' | 'about';
 
-const TABS: { id: Tab; label: string; icon: LucideIcon; desktop?: boolean }[] = [
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'chat', label: 'Chat', icon: MessagesSquare },
     { id: 'notifications', label: 'Notifications', icon: BellRing },
-    { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard, desktop: true },
+    { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
     { id: 'about', label: 'About', icon: Info },
 ];
 
@@ -501,7 +501,7 @@ function SectionMenu({ tab, onSelect }: { tab: Tab; onSelect: (tab: Tab) => void
                 className={`dropdown-menu dropdown-menu-end${open ? ' show' : ''}`}
                 role="menu"
             >
-                {TABS.filter((t) => !t.desktop).map((t) => (
+                {TABS.map((t) => (
                     <li key={t.id} role="none">
                         <button
                             type="button"
@@ -566,7 +566,7 @@ export function SettingsDialog() {
                             type="button"
                             role="tab"
                             aria-selected={tab === t.id}
-                            className={`settings-nav-item${tab === t.id ? ' active' : ''}${t.desktop ? ' desktop' : ''}`}
+                            className={`settings-nav-item${tab === t.id ? ' active' : ''}`}
                             onClick={() => setTab(t.id)}
                         >
                             <Icon icon={t.icon} />

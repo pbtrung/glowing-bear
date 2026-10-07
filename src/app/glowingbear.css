@@ -383,8 +383,16 @@ gb-icon,
     width: 1.6rem;
 }
 
+/* Unread and highlight totals, in front of the buttons */
+#topbar .totals {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-right: 0.25rem;
+}
+
 /* Same metrics as the buffer list badges, which center the digits in Inter */
-#topbar .brand .badge {
+#topbar .totals .badge {
     min-width: 1.375rem;
     padding: 0.15rem 0.4rem;
     font-size: 0.7rem;
@@ -430,6 +438,7 @@ gb-icon,
 
 #topbar .actions {
     display: flex;
+    align-items: center;
     gap: 0.125rem;
     flex-shrink: 0;
 }

@@ -47,16 +47,6 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
             >
                 <Icon icon={Menu} className="mobile" />
                 <img alt="" src="assets/img/favicon.png" className="desktop" />
-                {unread > 0 && (
-                    <span className="badge rounded-pill text-bg-secondary">
-                        {unread}
-                    </span>
-                )}
-                {notifications > 0 && (
-                    <span className="badge rounded-pill text-bg-danger">
-                        {notifications}
-                    </span>
-                )}
             </button>
 
             <div
@@ -80,6 +70,24 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
             </div>
 
             <div className="actions">
+                {(unread > 0 || notifications > 0) && (
+                    <div
+                        className="totals"
+                        role="status"
+                        aria-label={`${unread} unread, ${notifications} highlights`}
+                    >
+                        {unread > 0 && (
+                            <span className="badge rounded-pill text-bg-secondary">
+                                {unread}
+                            </span>
+                        )}
+                        {notifications > 0 && (
+                            <span className="badge rounded-pill text-bg-danger">
+                                {notifications}
+                            </span>
+                        )}
+                    </div>
+                )}
                 {buffer?.hasNicklist && (
                     <button
                         type="button"

@@ -1439,15 +1439,40 @@ label.settings-row:hover {
 }
 
 /*
- * Desktop layout: buffer list | buffer lines | nicklist
+ * Desktop layout: buffer list | buffer lines | nicklist, the buffer list and
+ * the nicklist taking the whole height (the top bar is over the lines only)
  */
 @media (min-width: 968px) {
     .content {
         grid-template-columns: var(--gb-sidebar-width) minmax(0, 1fr) auto;
         grid-template-areas:
-            'top top top'
+            'side top nick'
             'side lines nick'
             'side input nick';
+    }
+
+    /* Same height and border as the top bar, so their bottoms line up */
+    .bufferfilter,
+    .nicklist-header {
+        display: flex;
+        align-items: center;
+        height: var(--gb-topbar-height);
+        border-bottom: 1px solid var(--gb-border);
+    }
+
+    .bufferfilter {
+        padding: 0 0.625rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .bufferfilter .search-box {
+        flex: 1;
+    }
+
+    .nicklist-header {
+        gap: 0.35rem;
+        padding: 0 0.875rem;
+        margin-bottom: 0.5rem;
     }
 
     #sidebar {

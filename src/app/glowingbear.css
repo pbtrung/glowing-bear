@@ -927,7 +927,6 @@ td.message a {
 }
 
 #bufferlines.hideTime td.time,
-#bufferlines.hidePrefix td.prefix,
 #bufferlines.freeBuffer td.time,
 #bufferlines.freeBuffer td.prefix,
 #bufferlines.freeBuffer tr.fetch-more {

@@ -1,5 +1,5 @@
 /*
- * Client for the WeeChat relay "api" protocol (WeeChat >= 4.1).
+ * Client for the WeeChat relay "api" protocol (relay API >= 0.6.0, WeeChat >= 4.10).
  *
  * Connecting:
  *   1. POST /api/handshake (HTTP, no authentication) to agree on the password
@@ -44,7 +44,12 @@ export type ConnectErrorKind =
     /** no common password hash algorithm */
     | 'hash'
     /** unencrypted relay from a page loaded over https */
-    | 'insecure';
+    | 'insecure'
+    /** relay API older than MIN_RELAY_API */
+    | 'version';
+
+/** Oldest relay API supported (that of WeeChat 4.10) */
+export const MIN_RELAY_API = { version: '0.6.0', number: 0x000600, weechat: '4.10' };
 
 export class ConnectError extends Error {
     readonly kind: ConnectErrorKind;

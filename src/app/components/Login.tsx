@@ -9,7 +9,7 @@ import {
     LockOpen,
     Server,
 } from 'lucide-react';
-import type { ConnectErrorKind } from '../../lib/relay/client';
+import { MIN_RELAY_API, type ConnectErrorKind } from '../../lib/relay/client';
 import { useChat } from '../chat';
 import { parseHostField, updateSettings, useSettings } from '../settings';
 import { connectWithSettings } from '../connect';
@@ -71,14 +71,20 @@ function ErrorAlert({
                     from localhost).
                 </Alert>
             );
+        case 'version':
+            return (
+                <Alert icon={CircleAlert}>
+                    <strong>WeeChat is too old.</strong> {message}
+                </Alert>
+            );
         default:
             return (
                 <Alert icon={CircleAlert}>
                     <strong>Connection error.</strong> The client was unable to connect
                     to the WeeChat relay ({message}
                     ). Check the host and port, that an "api" relay is set up in WeeChat
-                    4.1 or later (<code>/relay add api {port}</code>), and, with TLS,
-                    that your browser trusts the relay's certificate.
+                    {MIN_RELAY_API.weechat} or later (<code>/relay add api {port}</code>
+                    ), and, with TLS, that your browser trusts the relay's certificate.
                 </Alert>
             );
     }
@@ -321,7 +327,7 @@ function Help() {
             <HelpItem title="Getting started">
                 <p>
                     <span className="badge text-bg-danger">
-                        WeeChat 4.1 or later is required.
+                        WeeChat {MIN_RELAY_API.weechat} or later is required.
                     </span>
                 </p>
                 <p>

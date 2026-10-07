@@ -55,7 +55,7 @@ function setup(): ChatState {
             local_variables: { plugin: 'core', name: 'weechat' },
         }),
         apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat'),
-        apiBuffer(3, 3, 'irc.libera.#test', '#test', { notify: 'all' }),
+        apiBuffer(3, 3, 'irc.libera.#test', '#test'),
     ]);
     state = setActiveBuffer(state, 1);
     return state;
@@ -81,7 +81,6 @@ describe('buffers', () => {
         expect(buffer.channelPrefix).toBe('#');
         expect(buffer.titleText).toBe('Title of irc.libera.#weechat');
         expect(buffer.serverSortKey).toBe('irc.libera.#weechat');
-        expect(state.buffers[3].notify).toBe(3);
         expect(state.activeBufferId).toBe(1);
     });
 
@@ -97,10 +96,7 @@ describe('buffers', () => {
         const state = applyBuffers(initialState, [
             apiBuffer(5, 5, 'fset.fset', '', {
                 type: 'free',
-                notify: 'highlight',
                 time_displayed: false,
-                prefix_displayed: false,
-                day_change: false,
                 hidden: true,
                 modes: '+nt',
                 input_prompt: '\x19F05@nick',
@@ -109,10 +105,7 @@ describe('buffers', () => {
         ]);
         const b = state.buffers[5];
         expect(b.free).toBe(true);
-        expect(b.notify).toBe(1);
         expect(b.hideTime).toBe(true);
-        expect(b.hidePrefix).toBe(true);
-        expect(b.dayChange).toBe(false);
         expect(b.hidden).toBe(true);
         expect(b.pinned).toBe(true);
         expect(b.modes).toBe('+nt');
@@ -251,10 +244,7 @@ describe('events', () => {
                 'buffer_renamed',
                 'buffer_title_changed',
                 'buffer_modes_changed',
-                'buffer_notify_changed',
                 'buffer_time_for_each_line_changed',
-                'buffer_prefix_for_each_line_changed',
-                'buffer_day_change_changed',
                 'buffer_localvar_added',
                 'buffer_localvar_changed',
                 'buffer_localvar_removed',
@@ -275,7 +265,6 @@ describe('events', () => {
                 'upgrade',
                 'upgrade_ended',
                 'quit',
-                'day_changed',
             ].sort(),
         );
     });
@@ -322,23 +311,6 @@ describe('events', () => {
         ]);
         expect(buffer.unread).toBe(1);
         expect(buffer.notification).toBe(2);
-    });
-
-    it('follows the notify level of the buffer', () => {
-        let state = applyBuffers(setup(), [
-            apiBuffer(1, 1, 'core.weechat', 'weechat'),
-            apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat', { notify: 'highlight' }),
-            apiBuffer(3, 3, 'irc.libera.#test', '#test', { notify: 'none' }),
-        ]);
-        state = send(state, 'buffer_line_added', 2, apiLine(1, 'msg')).state;
-        state = send(
-            state,
-            'buffer_line_added',
-            3,
-            apiLine(2, 'hi', { highlight: true }),
-        ).state;
-        expect(state.buffers[2].unread).toBe(0);
-        expect(state.buffers[3].notification).toBe(0);
     });
 
     it('counts lines of the active buffer only when the window is not focused', () => {
@@ -510,30 +482,12 @@ describe('events', () => {
             ['buffer_hidden', { hidden: true }, (s) => s.buffers[2].hidden, true],
             ['buffer_unhidden', { hidden: false }, (s) => s.buffers[2].hidden, false],
             ['buffer_modes_changed', { modes: '+s' }, (s) => s.buffers[2].modes, '+s'],
-            [
-                'buffer_notify_changed',
-                { notify: 'none' },
-                (s) => s.buffers[2].notify,
-                0,
-            ],
             ['buffer_type_changed', { type: 'free' }, (s) => s.buffers[2].free, true],
             [
                 'buffer_time_for_each_line_changed',
                 { time_displayed: false },
                 (s) => s.buffers[2].hideTime,
                 true,
-            ],
-            [
-                'buffer_prefix_for_each_line_changed',
-                { prefix_displayed: false },
-                (s) => s.buffers[2].hidePrefix,
-                true,
-            ],
-            [
-                'buffer_day_change_changed',
-                { day_change: false },
-                (s) => s.buffers[2].dayChange,
-                false,
             ],
             [
                 'buffer_localvar_added',
@@ -707,8 +661,6 @@ describe('events', () => {
         expect(r.state.upgrading).toBe(false);
         expect(r.effects).toEqual([]);
         expect(send(setup(), 'quit', -1).state.quitting).toBe(true);
-        const state = setup();
-        expect(send(state, 'day_changed', -1).state).toBe(state);
     });
 });
 

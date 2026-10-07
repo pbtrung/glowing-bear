@@ -10,7 +10,6 @@ import type {
     ApiHotlist,
     ApiLine,
     ApiNickGroup,
-    ApiOption,
     ApiPing,
     ApiScript,
     ApiVersion,
@@ -110,11 +109,6 @@ export class RelayApi {
     /** GET /api/scripts */
     scripts(): Promise<ApiScript[]> {
         return this.get('/api/scripts');
-    }
-
-    /** GET /api/options/{option_name} (newer than WeeChat 4.10) */
-    option(name: string): Promise<ApiOption> {
-        return this.get('/api/options/' + encodeURIComponent(name));
     }
 
     /** POST /api/input: send text or a command to a buffer (core.weechat by default) */

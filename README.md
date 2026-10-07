@@ -23,7 +23,7 @@ nginx, Apache, …).
 
 ## Usage
 
-1. In WeeChat (4.1 or later), set a password and add an `api` relay:
+1. In WeeChat (4.10 or later), set a password and add an `api` relay:
 
    ```
    /set relay.network.password YOURPASSWORD

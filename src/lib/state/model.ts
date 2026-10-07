@@ -5,14 +5,6 @@
 import { parseRichText, plainText, type RichText } from '../relay/colors';
 import type { ApiBuffer, ApiLine, ApiNick, ApiNickGroup } from '../relay/types';
 
-/** Buffer notify levels, as numbers to compare them */
-export const NOTIFY_LEVELS: Record<string, number> = {
-    none: 0,
-    highlight: 1,
-    message: 2,
-    all: 3,
-};
-
 export interface Line {
     /** Unique key in the buffer */
     key: string;
@@ -70,8 +62,6 @@ export interface Buffer {
     number: number;
     hidden: boolean;
     free: boolean;
-    /** 0: none, 1: highlight, 2: message, 3: all */
-    notify: number;
     localVariables: Record<string, string>;
     /** channel, private, server, other... (local variable "type") */
     type: string;
@@ -81,8 +71,6 @@ export interface Buffer {
     /** Key to sort the buffer list by server */
     serverSortKey: string;
     hideTime: boolean;
-    hidePrefix: boolean;
-    dayChange: boolean;
     hasNicklist: boolean;
     inputPrompt: RichText[];
     input: string;
@@ -144,17 +132,12 @@ export function bufferProperties(api: ApiBuffer): Partial<Buffer> {
             (type === 'server' ? '' : '.' + shortName)
         ).toLowerCase(),
         hideTime: type === 'relay' || api.time_displayed === false,
-        hidePrefix: api.prefix_displayed === false,
-        dayChange: api.day_change !== false,
         hasNicklist: api.nicklist !== false,
         inputPrompt: parseRichText(api.input_prompt),
         input: api.input ?? '',
         inputPosition: api.input_position ?? 0,
         keys: api.keys ?? [],
     };
-    if (api.notify !== undefined && api.notify in NOTIFY_LEVELS) {
-        props.notify = NOTIFY_LEVELS[api.notify];
-    }
     if (api.last_read_line_id !== undefined) {
         props.lastReadLineId = api.last_read_line_id;
     }
@@ -164,7 +147,6 @@ export function bufferProperties(api: ApiBuffer): Partial<Buffer> {
 export function createBuffer(api: ApiBuffer): Buffer {
     return {
         id: api.id,
-        notify: 3,
         lines: [],
         requestedLines: 0,
         linesFetched: false,

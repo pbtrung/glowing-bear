@@ -390,10 +390,6 @@ describe('resources', () => {
             [() => api.hotlist(), { request: 'GET /api/hotlist' }],
             [() => api.scripts(), { request: 'GET /api/scripts' }],
             [
-                () => api.option('weechat.look.buffer_time_format'),
-                { request: 'GET /api/options/weechat.look.buffer_time_format' },
-            ],
-            [
                 () => api.input('hello'),
                 { request: 'POST /api/input', body: { command: 'hello' } },
             ],

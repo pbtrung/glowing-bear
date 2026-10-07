@@ -36,8 +36,7 @@ export interface ApiLine {
     y: number;
     /** ISO 8601 date (UTC) */
     date: string;
-    /** Removed in WeeChat 5.0 */
-    date_printed?: string;
+    date_printed: string;
     displayed: boolean;
     highlight: boolean;
     /** -1: none, 0: low, 1: message, 2: private, 3: highlight */
@@ -77,8 +76,6 @@ export interface ApiBuffer {
     short_name: string;
     number: number;
     type: 'formatted' | 'free';
-    /** Notify level: "none", "highlight", "message" or "all" (newer WeeChat) */
-    notify?: string;
     hidden: boolean;
     title: string;
     modes: string;
@@ -90,12 +87,10 @@ export interface ApiBuffer {
     nicklist_case_sensitive: boolean;
     nicklist_display_groups: boolean;
     time_displayed: boolean;
-    prefix_displayed?: boolean;
-    day_change?: boolean;
     local_variables: Record<string, string>;
     keys: ApiKey[];
     /** Id of the last line read, -1 if there is no read marker */
-    last_read_line_id?: number;
+    last_read_line_id: number;
     lines?: ApiLine[];
     nicklist_root?: ApiNickGroup;
 }
@@ -127,15 +122,6 @@ export interface ApiCompletion {
     list: string[];
 }
 
-/** GET /api/options/{name} (WeeChat > 4.10) */
-export interface ApiOption {
-    name: string;
-    type: string;
-    value: string | number | boolean | null;
-    default_value: string | number | boolean | null;
-    description: string;
-}
-
 export interface ApiPing {
     data: string;
 }
@@ -162,10 +148,7 @@ export type EventName =
     | 'buffer_renamed'
     | 'buffer_title_changed'
     | 'buffer_modes_changed'
-    | 'buffer_notify_changed'
     | 'buffer_time_for_each_line_changed'
-    | 'buffer_prefix_for_each_line_changed'
-    | 'buffer_day_change_changed'
     | 'buffer_localvar_added'
     | 'buffer_localvar_changed'
     | 'buffer_localvar_removed'
@@ -185,8 +168,7 @@ export type EventName =
     | 'nicklist_nick_removing'
     | 'upgrade'
     | 'upgrade_ended'
-    | 'quit'
-    | 'day_changed';
+    | 'quit';
 
 /** Event pushed by WeeChat once synchronization is enabled (code 0) */
 export interface ApiEvent {

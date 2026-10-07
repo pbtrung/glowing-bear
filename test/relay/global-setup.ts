@@ -3,13 +3,22 @@
  * integration tests, or use an existing one:
  *   WEECHAT_RELAY=host:port WEECHAT_PASSWORD=... npm run test:relay
  * (the test fixtures script must then be loaded, see fixtures/gbtest.py).
+ *
+ * The WeeChat is the package of Alpine edge: the newest release, with the
+ * relay API version Glowing Bear targets. WEECHAT_IMAGE=... uses another
+ * image (with weechat-headless and the python plugin, user "user").
  */
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 import type { TestProject } from 'vitest/node';
 
-const IMAGE = process.env.WEECHAT_IMAGE ?? 'weechat/weechat:latest-alpine';
+const EDGE_IMAGE = 'glowing-bear-weechat:alpine-edge';
+const EDGE_DOCKERFILE = `FROM alpine:edge
+RUN apk add --no-cache weechat weechat-python && adduser -D user
+USER user
+WORKDIR /home/user
+`;
 const CONTAINER = 'glowing-bear-relay-test';
 const PASSWORD = 'relay-test-password';
 
@@ -35,6 +44,19 @@ function freePort(): Promise<number> {
 
 const docker = (...args: string[]) =>
     execFileSync('docker', args, { encoding: 'utf8' }).trim();
+
+/** The image to run: WEECHAT_IMAGE, else built from Alpine edge's package */
+function image(): string {
+    if (process.env.WEECHAT_IMAGE) {
+        return process.env.WEECHAT_IMAGE;
+    }
+    // --pull: get the latest edge (cached when unchanged)
+    execFileSync('docker', ['build', '--pull', '-q', '-t', EDGE_IMAGE, '-'], {
+        input: EDGE_DOCKERFILE,
+        encoding: 'utf8',
+    });
+    return EDGE_IMAGE;
+}
 
 async function waitForRelay(port: number): Promise<void> {
     for (let i = 0; i < 100; i++) {
@@ -94,7 +116,7 @@ export default async function setup(project: TestProject) {
         CONTAINER,
         '-p',
         `127.0.0.1:${port}:9000`,
-        IMAGE,
+        image(),
         'weechat-headless',
         '--stdout',
         '-r',

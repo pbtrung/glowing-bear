@@ -17,11 +17,11 @@ const OPTIONS = {
 };
 
 const VERSION = {
-    weechat_version: '4.4.0',
+    weechat_version: '4.10.1',
     weechat_version_git: '',
-    weechat_version_number: 0x04040000,
-    relay_api_version: '0.2.0',
-    relay_api_version_number: 0x000200,
+    weechat_version_number: 0x040a0100,
+    relay_api_version: '0.6.0',
+    relay_api_version_number: 0x000600,
 };
 
 const BUFFERS = [
@@ -44,9 +44,22 @@ afterEach(() => {
 const newSession = (options: Partial<SessionOptions> = {}) =>
     new Session({ hotlistSync: () => false, pingInterval: 0, ...options });
 
+/** Let pending promises run (also with fake timers) */
+async function ticks(): Promise<void> {
+    for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+    }
+}
+
+/** Answer the version request, sent first */
+async function answerVersion(ws: FakeWebSocket, version = VERSION): Promise<void> {
+    ws.replyTo('GET /api/version', 200, version, 'version');
+    await ticks();
+}
+
 /** Answer the initial requests of a connection */
-function answerInitialSync(ws: FakeWebSocket): void {
-    ws.replyTo('GET /api/version', 200, VERSION, 'version');
+async function answerInitialSync(ws: FakeWebSocket): Promise<void> {
+    await answerVersion(ws);
     ws.replyTo('GET /api/buffers', 200, BUFFERS, 'buffer');
     ws.replyTo('GET /api/hotlist', 200, [], 'hotlist');
     ws.replyTo('POST /api/sync', 204);
@@ -57,7 +70,7 @@ async function acceptConnection(): Promise<FakeWebSocket> {
     const ws = await nextSocket();
     ws.open();
     await flush();
-    answerInitialSync(ws);
+    await answerInitialSync(ws);
     await flush();
     return ws;
 }
@@ -80,10 +93,10 @@ const lineEvent = (bufferId: number, id: number, message: string) => ({
 });
 
 describe('connection', () => {
-    it('loads everything with one batch, then shows the first buffer', async () => {
+    it('checks the version, loads everything with one batch, shows the first buffer', async () => {
         const { session, ws } = await connected();
-        expect(ws.frames[0]).toEqual([
-            expect.objectContaining({ request: 'GET /api/version' }),
+        expect(ws.frames[0]).toMatchObject({ request: 'GET /api/version' });
+        expect(ws.frames[1]).toEqual([
             expect.objectContaining({ request: 'GET /api/buffers?colors=weechat' }),
             expect.objectContaining({ request: 'GET /api/hotlist' }),
             expect.objectContaining({
@@ -128,7 +141,7 @@ describe('connection', () => {
         ws.open();
         await flush();
         session.disconnect();
-        answerInitialSync(ws);
+        await answerVersion(ws);
         await connecting;
         expect(session.state.status).toBe('disconnected');
         expect(session.state.buffers).toEqual({});
@@ -140,6 +153,7 @@ describe('connection', () => {
         const ws = await nextSocket();
         ws.open();
         await flush();
+        await answerVersion(ws);
         ws.replyTo('GET /api/buffers', 500, { error: 'oops' });
         await expect(connecting).rejects.toThrow();
         expect(session.state.status).toBe('disconnected');
@@ -147,6 +161,46 @@ describe('connection', () => {
         // Events of the dropped connection are ignored
         ws.receive(lineEvent(2, 1, 'late'));
         expect(session.state.buffers).toEqual({});
+    });
+
+    it('refuses relay API versions older than 0.6.0, without retrying', async () => {
+        const { session, ws } = await connected({ reconnectDelay: 1 });
+        ws.refuse(1006);
+        await vi.waitFor(() => expect(FakeWebSocket.last).not.toBe(ws));
+        const old = FakeWebSocket.last;
+        old.open();
+        await flush();
+        await answerVersion(old, {
+            ...VERSION,
+            weechat_version: '4.9.0',
+            relay_api_version: '0.5.0',
+            relay_api_version_number: 0x000500,
+        });
+        await flush();
+        expect(session.state.status).toBe('disconnected');
+        expect(session.state.error?.kind).toBe('version');
+        expect(session.state.error?.message).toContain('WeeChat 4.10 or later');
+        expect(old.readyState).toBe(FakeWebSocket.CLOSED);
+        // The batch was not sent
+        expect(old.sent.map((r) => r.request)).toEqual(['GET /api/version']);
+        const count = FakeWebSocket.instances.length;
+        await new Promise((r) => setTimeout(r, 20));
+        expect(FakeWebSocket.instances).toHaveLength(count);
+    });
+
+    it('reports an old relay API when connecting', async () => {
+        const session = newSession();
+        const connecting = session.connect(OPTIONS);
+        const ws = await nextSocket();
+        ws.open();
+        await flush();
+        await answerVersion(ws, {
+            ...VERSION,
+            relay_api_version: '0.1.0',
+            relay_api_version_number: 0x000100,
+        });
+        await expect(connecting).rejects.toMatchObject({ kind: 'version' });
+        expect(session.state.error?.kind).toBe('version');
     });
 
     it('reconnects with a growing delay, and gives up', async () => {
@@ -161,7 +215,7 @@ describe('connection', () => {
             const ws = FakeWebSocket.last;
             ws.open();
             await vi.advanceTimersByTimeAsync(0);
-            answerInitialSync(ws);
+            await answerInitialSync(ws);
             await connecting;
             return { session, ws };
         })();

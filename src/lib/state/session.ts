@@ -5,7 +5,12 @@
  */
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { RelayApi } from '../relay/api';
-import { ConnectError, RelayClient, type ConnectOptions } from '../relay/client';
+import {
+    ConnectError,
+    MIN_RELAY_API,
+    RelayClient,
+    type ConnectOptions,
+} from '../relay/client';
 import type { ApiEvent, ApiCompletion } from '../relay/types';
 import type { Line } from './model';
 import {
@@ -22,7 +27,10 @@ import {
     type Effect,
 } from './reducers';
 
-/** WeeChat options used, with defaults (/api/options is newer than WeeChat 4.10) */
+/**
+ * WeeChat options used: their default values (relay API 0.6.0 can't read
+ * options)
+ */
 export const WEECHAT_OPTIONS: Record<string, string> = {
     'weechat.look.buffer_time_format': '%H:%M:%S',
     'weechat.completion.nick_completer': ':',
@@ -192,9 +200,9 @@ export class Session {
     }
 
     /**
-     * Load everything and enable the synchronization. The requests are sent
-     * in one frame so that no event is missed between the buffer list and the
-     * sync.
+     * Check the relay API version, then load everything and enable the
+     * synchronization. These requests are sent in one frame so that no event
+     * is missed between the buffer list and the sync.
      *
      * @param current throws if the connection attempt was cancelled
      */
@@ -207,11 +215,22 @@ export class Session {
             this.state.activeBufferId !== null
                 ? this.state.buffers[this.state.activeBufferId]?.fullName
                 : undefined;
-        const [version, buffers, hotlist] = await Promise.all(
+        // Alone first: older relays may not answer the batch
+        const version = await api.version();
+        current();
+        if (version.relay_api_version_number < MIN_RELAY_API.number) {
+            throw new ConnectError(
+                'version',
+                `WeeChat ${version.weechat_version} has relay API ` +
+                    `${version.relay_api_version}: Glowing Bear needs relay API ` +
+                    `${MIN_RELAY_API.version} or newer (WeeChat ` +
+                    `${MIN_RELAY_API.weechat} or later).`,
+            );
+        }
+        const [buffers, hotlist] = await Promise.all(
             client.batch(
                 () =>
                     [
-                        api.version(),
                         api.buffers({ colors: 'weechat' }),
                         api.hotlist(),
                         api.sync({
@@ -237,23 +256,7 @@ export class Session {
             error: null,
         });
 
-        // Options and scripts are not needed right away
-        for (const name of Object.keys(WEECHAT_OPTIONS)) {
-            api.option(name).then(
-                (option) => {
-                    let value = option.value;
-                    if (typeof value === 'boolean') {
-                        value = value ? 'on' : 'off';
-                    }
-                    if (value !== null) {
-                        this.set({
-                            options: { ...this.state.options, [name]: String(value) },
-                        });
-                    }
-                },
-                () => undefined,
-            );
-        }
+        // Scripts are not needed right away
         api.scripts().then(
             (scripts) => this.set({ scripts }),
             () => undefined,
@@ -314,6 +317,11 @@ export class Session {
             await this.open(this.connectOptions);
         } catch (e) {
             if (e instanceof Cancelled) {
+                return;
+            }
+            if (e instanceof ConnectError && e.kind === 'version') {
+                // retrying won't help
+                this.set({ status: 'disconnected', error: e });
                 return;
             }
             const next = delay * 1.5;

@@ -126,7 +126,7 @@ export function dateChangeLine(previous: Date, date: Date, key: string): Line {
 /** Insert a date change line before `line` if the day changed */
 function addDateChange(buffer: Draft<Buffer>, line: Line): void {
     const last = buffer.lines[buffer.lines.length - 1];
-    if (!last || !buffer.dayChange) {
+    if (!last) {
         return;
     }
     if (startOfDay(last.date) !== startOfDay(line.date)) {
@@ -201,10 +201,10 @@ function addNewLine(
     }
     const isPrivate = line.notifyLevel === 2;
     const isHighlight = line.highlight || line.notifyLevel === 3;
-    if (buffer.notify !== 0 && (isHighlight || isPrivate)) {
+    if (isHighlight || isPrivate) {
         buffer.notification++;
         effects.push({ type: 'highlight', bufferId: buffer.id, line });
-    } else if (buffer.notify > 1 && line.notifyLevel === 1) {
+    } else if (line.notifyLevel === 1) {
         buffer.unread++;
     }
 }
@@ -278,11 +278,7 @@ export function applyLines(
         buffer.linesFetched = true;
         // Show a date change before today's first message
         const last = buffer.lines[buffer.lines.length - 1];
-        if (
-            last &&
-            buffer.dayChange &&
-            startOfDay(last.date) !== startOfDay(new Date())
-        ) {
+        if (last && startOfDay(last.date) !== startOfDay(new Date())) {
             const now = new Date();
             buffer.lines.push(dateChangeLine(last.date, now, 'dtoday') as Draft<Line>);
         }
@@ -662,10 +658,7 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
     buffer_renamed: bufferRenamed,
     buffer_title_changed: bufferChanged,
     buffer_modes_changed: bufferChanged,
-    buffer_notify_changed: bufferChanged,
     buffer_time_for_each_line_changed: bufferChanged,
-    buffer_prefix_for_each_line_changed: bufferChanged,
-    buffer_day_change_changed: bufferChanged,
     buffer_localvar_added: bufferChanged,
     buffer_localvar_changed: bufferChanged,
     buffer_localvar_removed: bufferChanged,
@@ -695,8 +688,6 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
     quit: (draft) => {
         draft.quitting = true;
     },
-    // Date changes are shown by adding lines when needed
-    day_changed: () => undefined,
 };
 
 /** Names of all the events handled */

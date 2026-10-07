@@ -196,7 +196,6 @@ export function BufferLines() {
 
     const classes = ['favorite-font'];
     if (buffer.hideTime) classes.push('hideTime');
-    if (buffer.hidePrefix) classes.push('hidePrefix');
     if (buffer.free) classes.push('freeBuffer');
 
     return (

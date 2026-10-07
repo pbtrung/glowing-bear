@@ -6,7 +6,7 @@
  * The tests run in order: /upgrade and /quit come last.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { RelayClient, RequestError } from '../../src/lib/relay/client';
+import { MIN_RELAY_API, RelayClient, RequestError } from '../../src/lib/relay/client';
 import type {
     ApiBuffer,
     ApiLine,
@@ -35,12 +35,13 @@ const BUFFER_KEYS = [
     'time_displayed',
     'local_variables',
     'keys',
+    'last_read_line_id',
 ];
-// (and date_printed before WeeChat 5.0)
 const LINE_KEYS = [
     'id',
     'y',
     'date',
+    'date_printed',
     'displayed',
     'highlight',
     'notify_level',
@@ -217,7 +218,7 @@ describe('resources', () => {
         gbtest = await admin.api.buffer('python.gbtest');
     });
 
-    it('GET /api/version', async () => {
+    it('GET /api/version, with the relay API version targeted', async () => {
         const version = await admin.api.version();
         expect(version).toEqual({
             weechat_version: expect.stringMatching(/^\d+\.\d+/),
@@ -226,16 +227,16 @@ describe('resources', () => {
             relay_api_version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
             relay_api_version_number: expect.any(Number),
         });
+        expect(version.relay_api_version_number).toBeGreaterThanOrEqual(
+            MIN_RELAY_API.number,
+        );
     });
 
     it('GET /api/buffers', async () => {
         const buffers = await admin.api.buffers();
         expect(buffers.length).toBeGreaterThanOrEqual(2);
         for (const buffer of buffers) {
-            for (const key of BUFFER_KEYS) {
-                expect(buffer).toHaveProperty(key);
-            }
-            expect(buffer.lines).toBeUndefined();
+            expect(Object.keys(buffer).sort()).toEqual([...BUFFER_KEYS].sort());
         }
         const core = buffers.find((b) => b.name === 'core.weechat');
         expect(core?.number).toBe(1);
@@ -377,6 +378,26 @@ describe('resources', () => {
         expect(entry!.count[1]).toBeGreaterThan(0);
     });
 
+    it('applies the notify level of buffers to the hotlist only', async () => {
+        // Relay API 0.6.0 doesn't send the notify level of buffers: the counts
+        // of new lines can't follow it, the hotlist refresh corrects them
+        await admin.weechat('/buffer add gbnotify');
+        try {
+            await admin.weechat('/buffer set notify highlight', 'core.gbnotify');
+            await admin.weechat(
+                '/print -tags notify_message,nick_bob,irc_privmsg message',
+                'core.gbnotify',
+            );
+            const [line] = await admin.api.lines('core.gbnotify', -1, 'strip');
+            expect(line.notify_level).toBe(1);
+            const buffer = await admin.api.buffer('core.gbnotify');
+            const hotlist = await admin.api.hotlist();
+            expect(hotlist.find((h) => h.buffer_id === buffer.id)).toBeUndefined();
+        } finally {
+            await admin.weechat('/buffer close core.gbnotify');
+        }
+    });
+
     it('GET /api/scripts', async () => {
         const scripts = await admin.api.scripts();
         expect(scripts).toContainEqual({
@@ -386,20 +407,6 @@ describe('resources', () => {
             author: 'glowing-bear',
             license: 'GPL3',
         });
-    });
-
-    it('GET /api/options/{name} (or 404 on WeeChat <= 4.10)', async () => {
-        try {
-            const option = await admin.api.option('weechat.look.buffer_time_format');
-            expect(option).toMatchObject({
-                name: 'weechat.look.buffer_time_format',
-                type: 'string',
-            });
-            expect(typeof option.value).toBe('string');
-        } catch (e) {
-            expect(e).toBeInstanceOf(RequestError);
-            expect((e as RequestError).response.code).toBe(404);
-        }
     });
 
     it('POST /api/input, by buffer id and by name', async () => {
@@ -511,11 +518,7 @@ describe('events', () => {
         );
         expect(event.body_type).toBe('line');
         const line = event.body as ApiLine;
-        expect(
-            Object.keys(line)
-                .filter((k) => k !== 'date_printed')
-                .sort(),
-        ).toEqual([...LINE_KEYS].sort());
+        expect(Object.keys(line).sort()).toEqual([...LINE_KEYS].sort());
         expect(line.message).toContain('hello');
     });
 
@@ -583,21 +586,6 @@ describe('events', () => {
     it('buffer_merged, buffer_unmerged', async () => {
         await expectEvent('/buffer merge core.weechat', 'buffer_merged', bufferId);
         await expectEvent('/buffer unmerge', 'buffer_unmerged', bufferId);
-    });
-
-    // Sent by relay API >= 0.7.0 (newer than WeeChat 4.10), as
-    // buffer_prefix_for_each_line_changed and buffer_day_change_changed
-    it('buffer_notify_changed (relay API >= 0.7.0)', async (ctx) => {
-        const version = await c.api.version();
-        if (version.relay_api_version_number < 0x000700) {
-            ctx.skip();
-        }
-        const event = await expectEvent(
-            '/buffer set notify highlight',
-            'buffer_notify_changed',
-            bufferId,
-        );
-        expect(event.body_type).toBe('buffer');
     });
 
     it('buffer_modes_changed', async () => {

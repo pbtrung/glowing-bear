@@ -1,7 +1,7 @@
 import type { KeyboardEvent, CSSProperties } from 'react';
 import {
     ChevronDown,
-    Hash,
+    MessagesSquare,
     Pin,
     Search,
     Server,
@@ -54,7 +54,7 @@ function onSearchKey(
     }
 }
 
-/** Icon of a buffer: server, channel prefix, avatar of a private chat... */
+/** Icon of a buffer: server, channel, avatar of a private chat... */
 function BufferIcon({ buffer }: { buffer: Buffer }) {
     if (buffer.type === 'private') {
         return (
@@ -67,24 +67,11 @@ function BufferIcon({ buffer }: { buffer: Buffer }) {
             </span>
         );
     }
-    if (buffer.channelPrefix === '#') {
-        return (
-            <span className="buffer-icon">
-                <Icon icon={Hash} />
-            </span>
-        );
-    }
-    // Other channel types (&, +, !) keep their prefix as text
-    if (buffer.channelPrefix) {
-        return (
-            <span className="buffer-icon buffer-prefix" aria-hidden="true">
-                {buffer.channelPrefix}
-            </span>
-        );
-    }
     let icon: LucideIcon | null = null;
     if (buffer.type === 'server') {
         icon = Server;
+    } else if (buffer.type === 'channel') {
+        icon = MessagesSquare;
     } else if (buffer.plugin === 'core') {
         icon = SquareTerminal;
     }

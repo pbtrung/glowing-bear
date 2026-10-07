@@ -601,10 +601,6 @@ gb-icon,
     opacity: 0.85;
 }
 
-.buffer-prefix {
-    font-weight: 600;
-}
-
 .buffer.active .buffer-icon,
 .buffer.highlight .buffer-icon {
     color: inherit;

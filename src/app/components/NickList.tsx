@@ -1,13 +1,10 @@
 import { useState, type CSSProperties } from 'react';
-import { Search, Users } from 'lucide-react';
+import { Search } from 'lucide-react';
 import type { Buffer } from '../../lib/state/model';
 import { session } from '../chat';
 import { initial, nameHue, nickSections } from '../nicks';
 import { useSwipe } from '../swipe';
 import { Icon } from './Icon';
-
-/** Show a filter when there are more nicks than this */
-const FILTER_THRESHOLD = 10;
 
 export function NickList({ buffer }: { buffer: Buffer }) {
     const swipe = useSwipe();
@@ -20,18 +17,12 @@ export function NickList({ buffer }: { buffer: Buffer }) {
     return (
         <aside id="nicklist" aria-label="Nicklist" {...swipe}>
             <div className="nicklist-header">
-                <Icon icon={Users} />
-                <span>
-                    {total} {total === 1 ? 'user' : 'users'}
-                </span>
-            </div>
-            {total > FILTER_THRESHOLD && (
-                <div className="nicklist-filter search-box">
+                <div className="search-box">
                     <Icon icon={Search} className="search-box-icon" />
                     <input
                         type="search"
                         className="form-control form-control-sm"
-                        placeholder="Filter users"
+                        placeholder={`Filter ${total} ${total === 1 ? 'user' : 'users'}`}
                         aria-label="Filter users"
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
@@ -43,7 +34,7 @@ export function NickList({ buffer }: { buffer: Buffer }) {
                         }}
                     />
                 </div>
-            )}
+            </div>
             {sections.map((section) => (
                 <section key={section.id} className="nick-section">
                     {titled && (

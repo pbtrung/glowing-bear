@@ -17,7 +17,7 @@
 
     --gb-topbar-height: 3rem;
     --gb-sidebar-width: 15rem;
-    --gb-nicklist-width: 11rem;
+    --gb-nicklist-width: 12.5rem;
     --gb-radius: 0.5rem;
 
     /* Default palette (dark), overridden by themes */
@@ -774,22 +774,17 @@ gb-icon,
     }
 }
 
+/* The header is the filter, like the search of the buffer list */
 .nicklist-header {
     position: sticky;
     top: 0;
     z-index: 1;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.75rem 0.875rem 0.5rem;
+    padding: 0.625rem;
     background: var(--gb-chrome-bg);
-    color: var(--gb-muted);
-    font-size: 0.8rem;
-    font-weight: 600;
 }
 
-.nicklist-filter {
-    margin: 0 0.5rem 0.5rem;
+.nicklist-header .search-box {
+    flex: 1;
 }
 
 .nick-section + .nick-section {
@@ -1630,8 +1625,7 @@ label.settings-row:hover {
     }
 
     .nicklist-header {
-        gap: 0.35rem;
-        padding: 0 0.875rem;
+        padding: 0 0.625rem;
         margin-bottom: 0.5rem;
     }
 
@@ -1683,7 +1677,7 @@ label.settings-row:hover {
 @media (min-width: 1400px) {
     :root {
         --gb-sidebar-width: 17rem;
-        --gb-nicklist-width: 13rem;
+        --gb-nicklist-width: 14rem;
     }
 }
 

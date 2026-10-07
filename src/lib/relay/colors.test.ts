@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { COLOR_OPTION_NAMES, parseRichText, plainText, stripColors } from './colors';
 
 const classesOf = (text: string) => parseRichText(text).map((p) => [p.text, p.classes]);
+/** Attributes set on the first part */
+const attrsOf = (text: string) =>
+    parseRichText(text)[0].classes.filter(
+        (c) => c.startsWith('a-') && !c.startsWith('a-no-'),
+    );
 
 describe('WeeChat color codes', () => {
     it('returns plain text with default colors', () => {
@@ -85,6 +90,30 @@ describe('WeeChat color codes', () => {
         expect(parts.map((p) => p.text)).toEqual(['a', 'b', 'c']);
         expect(parts[1].classes).toContain('a-b');
         expect(parts[2].classes).toContain('a-no-b');
+    });
+
+    it('parses the blink (%) and dim (.) attributes (WeeChat >= 3.8)', () => {
+        expect(classesOf('\x19F%05x')[0][1]).toEqual([
+            'cwf-green',
+            'cwb-default',
+            'a-no-b',
+            'a-no-r',
+            'a-no-i',
+            'a-no-u',
+            'a-k',
+            'a-no-d',
+        ]);
+        expect(attrsOf('\x19F@.00214x')).toEqual(['a-d']);
+        expect(attrsOf('\x19*%.05~03x')).toEqual(['a-k', 'a-d']);
+        expect(stripColors('a\x1a\x05b\x1b\x05c\x1a\x06d\x1b\x06e')).toBe('abcde');
+        expect(parseRichText('a\x1a\x06b')[1].classes).toContain('a-d');
+    });
+
+    it('resets the attributes with a color, unless | keeps them', () => {
+        const parts = parseRichText('\x19F*05a\x19F03b\x19F*05c\x19F|03d');
+        expect(parts[1].classes).toContain('a-no-b');
+        expect(parts[3].classes).toContain('a-b');
+        expect(parts[3].classes[0]).toBe('cwf-red');
     });
 
     it('resets colors and attributes (\\x1c)', () => {

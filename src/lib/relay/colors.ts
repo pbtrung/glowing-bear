@@ -9,7 +9,7 @@
  *   cof-/cob-/coa-<option>   color option (foreground, background, attributes)
  *   cwf-/cwb-<name>          WeeChat basic color (foreground, background)
  *   cef-/ceb-<number>        extended color (foreground, background)
- *   a-<attr> / a-no-<attr>   attribute override (b, r, i, u)
+ *   a-<attr> / a-no-<attr>   attribute override (b, r, i, u, k: blink, d: dim)
  * See https://weechat.org/files/doc/devel/weechat_dev.en.html#color_codes_in_strings
  */
 
@@ -112,7 +112,7 @@ const defaultColor = (): Color => ({ type: 'weechat', name: 'default' });
 
 const defaultAttributes = (): Attributes => ({
     name: null,
-    override: { bold: false, reverse: false, italic: false, underline: false },
+    override: { b: false, r: false, i: false, u: false, k: false, d: false },
 });
 
 const cloneAttrs = (attrs: Attributes): Attributes => ({
@@ -126,11 +126,15 @@ const ATTR_CHARS: Record<string, string> = {
     '!': 'r',
     '/': 'i',
     _: 'u',
-    // some extension often used (IRC?)
+    '%': 'k',
+    '.': 'd',
+    // attribute codes, used after \x1a (set) and \x1b (remove)
     '\x01': 'b',
     '\x02': 'r',
     '\x03': 'i',
     '\x04': 'u',
+    '\x05': 'k',
+    '\x06': 'd',
 };
 
 /** Attributes from a string of attribute characters (null: keep current) */
@@ -187,7 +191,7 @@ const MATCHERS: Array<{ regex: RegExp; fn: (m: RegExpMatchArray) => Style }> = [
     },
     {
         // foreground color with F: "F" + (A)STD, "F" + (A)EXT
-        regex: /^F(?:([*!/_|]*)(\d{2})|@([\x01\x02\x03\x04*!/_|]*)(\d{5}))/,
+        regex: /^F(?:([*!/_%.|]*)(\d{2})|@([*!/_%.|]*)(\d{5}))/,
         fn: (m) =>
             m[2]
                 ? { fgColor: colorObj(m[2]), bgColor: null, attrs: attrsFromStr(m[1]) }
@@ -201,7 +205,7 @@ const MATCHERS: Array<{ regex: RegExp; fn: (m: RegExpMatchArray) => Style }> = [
     {
         // foreground, background (+ attributes): "*" + (A)STD|(A)EXT + "," + STD|EXT
         // WeeChat 2.6+ uses a tilde (~) instead of a comma (,): recognize both
-        regex: /^\*(?:([\x01\x02\x03\x04*!/_|]*)(\d{2})|@([\x01\x02\x03\x04*!/_|]*)(\d{5}))[,~](\d{2}|@\d{5})/,
+        regex: /^\*(?:([*!/_%.|]*)(\d{2})|@([*!/_%.|]*)(\d{5}))[,~](\d{2}|@\d{5})/,
         fn: (m) => ({
             fgColor: colorObj(m[2] ? m[2] : m[4]),
             bgColor: colorObj(m[5]),
@@ -210,7 +214,7 @@ const MATCHERS: Array<{ regex: RegExp; fn: (m: RegExpMatchArray) => Style }> = [
     },
     {
         // foreground color with * (+ attributes): "*" + (A)STD, "*" + (A)EXT
-        regex: /^\*([\x01\x02\x03\x04*!/_|]*)(\d{2}|@\d{5})/,
+        regex: /^\*([*!/_%.|]*)(\d{2}|@\d{5})/,
         fn: (m) => ({
             fgColor: colorObj(m[2]),
             bgColor: null,

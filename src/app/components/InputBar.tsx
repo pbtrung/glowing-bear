@@ -123,6 +123,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
             nicks,
             options['weechat.completion.nick_completer'] ?? ':',
             (options['weechat.completion.nick_add_space'] ?? 'on') === 'on',
+            buffer.nicklistCaseSensitive,
         );
         nickIteration.current = result.iterCandidate;
         if (result.text !== input) {

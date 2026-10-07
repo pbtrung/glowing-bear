@@ -52,6 +52,13 @@ describe('tokenize', () => {
             { type: 'text', text: ') now!' },
         ]);
         expect(tokenize('#c++')).toEqual([{ type: 'channel', text: '#c++' }]);
+        expect(tokenize('#café')).toEqual([{ type: 'channel', text: '#café' }]);
+    });
+
+    it('scans long texts in linear time', () => {
+        const start = performance.now();
+        tokenize('#-'.repeat(50000));
+        expect(performance.now() - start).toBeLessThan(500);
     });
 
     it('never links javascript: or data: URLs', () => {

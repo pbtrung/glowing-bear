@@ -40,6 +40,13 @@ const MONTHS = [
 
 const hour12 = (d: Date): number => d.getHours() % 12 || 12;
 
+const dayOfYear = (d: Date): number =>
+    Math.round(
+        (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
+            new Date(d.getFullYear(), 0, 1).getTime()) /
+            86400000,
+    ) + 1;
+
 /** Value of a conversion specifier, or null if unknown */
 function field(spec: string, d: Date): string | null {
     switch (spec) {
@@ -80,6 +87,29 @@ function field(spec: string, d: Date): string | null {
             return MONTHS[d.getMonth()];
         case 's':
             return String(Math.floor(d.getTime() / 1000));
+        case 'j':
+            return pad(dayOfYear(d), 3);
+        case 'u':
+            return String(d.getDay() || 7);
+        case 'w':
+            return String(d.getDay());
+        case 'C':
+            return pad(Math.floor(d.getFullYear() / 100));
+        case 'n':
+            return '\n';
+        case 't':
+            return '\t';
+        case 'z': {
+            const offset = -d.getTimezoneOffset();
+            const abs = Math.abs(offset);
+            return (offset < 0 ? '-' : '+') + pad(Math.floor(abs / 60)) + pad(abs % 60);
+        }
+        case 'Z':
+            return (
+                new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+                    .formatToParts(d)
+                    .find((p) => p.type === 'timeZoneName')?.value ?? ''
+            );
         default:
             return null;
     }
@@ -105,7 +135,12 @@ export function formatTime(
     date: Date,
     format: string = DEFAULT_TIME_FORMAT,
 ): TimePart[] {
-    let fmt = (format || DEFAULT_TIME_FORMAT).replace(/\$\{[^}]*\}/g, '');
+    let fmt = format || DEFAULT_TIME_FORMAT;
+    // Remove ${...} expressions, innermost first (they can be nested)
+    for (let prev = ''; prev !== fmt;) {
+        prev = fmt;
+        fmt = fmt.replace(/\$\{[^{}]*\}/g, '');
+    }
     // (matching "%%" too, so that "%%T" stays a literal "%T")
     fmt = fmt.replace(/%([%TRrDF])/g, (all, spec: string) => COMPOSITES[spec] ?? all);
 

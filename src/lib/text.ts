@@ -12,10 +12,9 @@ export type Token =
     | { type: 'color'; text: string; color: string }
     | { type: 'code'; text: string; fence: string };
 
-// Channels starting with # and with at least one letter: "#1" is more likely
-// "number 1" than a channel
-const CHANNEL =
-    /(^|[\s,.:;?!"'()+@~%-])(#+[^\x00\x07\r\n\s,:]*[a-z][^\x00\x07\r\n\s,:]*)/gi; // eslint-disable-line no-control-regex
+// Channels start with #; whole tokens are matched (linear time), the ones
+// without a letter are left out after: "#1" is more likely "number 1"
+const CHANNEL = /(^|[\s,.:;?!"'()+@~%-])(#+[^\x00\x07\r\n\s,:]*)/g; // eslint-disable-line no-control-regex
 
 // 6-digit hex colors (3 digits give too many false positives) and rgb()
 const COLOR =
@@ -48,7 +47,7 @@ function scanPlain(text: string): Match[] {
         const start = m.index + m[1].length;
         const end = start + name.length;
         if (
-            /[a-z]/i.test(name) &&
+            /\p{L}/u.test(name) &&
             !matches.some((x) => start < x.end && end > x.start)
         ) {
             matches.push({ start, end, token: { type: 'channel', text: name } });

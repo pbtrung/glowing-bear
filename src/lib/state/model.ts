@@ -75,6 +75,8 @@ export interface Buffer {
     serverSortKey: string;
     hideTime: boolean;
     hasNicklist: boolean;
+    /** Nicks are compared with their case (e.g. for completion) */
+    nicklistCaseSensitive: boolean;
     inputPrompt: RichText[];
     input: string;
     inputPosition: number;
@@ -141,6 +143,7 @@ export function bufferProperties(api: ApiBuffer): Partial<Buffer> {
         ).toLowerCase(),
         hideTime: type === 'relay' || api.time_displayed === false,
         hasNicklist: api.nicklist !== false,
+        nicklistCaseSensitive: api.nicklist_case_sensitive === true,
         inputPrompt: parseRichText(api.input_prompt),
         input: api.input ?? '',
         inputPosition: api.input_position ?? 0,

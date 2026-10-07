@@ -14,20 +14,34 @@ export interface NickCompletion {
     iterCandidate: string | null;
 }
 
-const NICK = '[a-zA-Z0-9_\\\\\\[\\]{}^`|-]+';
+// IRC nicks, and nicks of other networks (letters of any script, dots...)
+const NICK = '[\\p{L}\\p{M}\\p{N}_\\\\\\[\\]{}^`|.\\-]+';
+/** Text before a nick in the middle of the input (also on another line) */
+const BEFORE = '[\\s\\S]*\\s';
 
-/** First nick starting with candidate (case insensitive) */
-function completeSingleNick(candidate: string, nicks: string[]): string | null {
-    const lc = candidate.toLowerCase();
-    return nicks.find((nick) => nick.toLowerCase().startsWith(lc)) ?? null;
+const regex = (source: string) => new RegExp(source, 'u');
+
+/** First nick starting with candidate */
+function completeSingleNick(
+    candidate: string,
+    nicks: string[],
+    fold: (s: string) => string,
+): string | null {
+    const prefix = fold(candidate);
+    return nicks.find((nick) => fold(nick).startsWith(prefix)) ?? null;
 }
 
 /** Next nick starting with iterCandidate after currentNick, cycling */
-function nextNick(iterCandidate: string, currentNick: string, nicks: string[]): string {
-    const lcCandidate = iterCandidate.toLowerCase();
-    const lcCurrent = currentNick.toLowerCase();
-    const matching = nicks.filter((nick) => nick.toLowerCase().startsWith(lcCandidate));
-    const at = matching.findIndex((nick) => nick.toLowerCase() === lcCurrent);
+function nextNick(
+    iterCandidate: string,
+    currentNick: string,
+    nicks: string[],
+    fold: (s: string) => string,
+): string {
+    const prefix = fold(iterCandidate);
+    const current = fold(currentNick);
+    const matching = nicks.filter((nick) => fold(nick).startsWith(prefix));
+    const at = matching.findIndex((nick) => fold(nick) === current);
     if (at === -1) {
         return currentNick;
     }
@@ -35,7 +49,8 @@ function nextNick(iterCandidate: string, currentNick: string, nicks: string[]): 
 }
 
 /**
- * Complete the nick before the caret.
+ * Complete the nick before the caret (the rest of the word after the caret
+ * is replaced).
  *
  * @param text input text
  * @param caretPos caret position (0 means before the first character)
@@ -45,6 +60,8 @@ function nextNick(iterCandidate: string, currentNick: string, nicks: string[]): 
  *               (weechat.completion.nick_completer)
  * @param addSpace whether to add a space after a nick in the middle of the
  *                 input (weechat.completion.nick_add_space)
+ * @param caseSensitive compare nicks with their case (buffer property
+ *                      nicklist_case_sensitive)
  */
 export function completeNick(
     text: string,
@@ -53,7 +70,9 @@ export function completeNick(
     nicks: string[],
     suffix = ':',
     addSpace = true,
+    caseSensitive = false,
 ): NickCompletion {
+    const fold = caseSensitive ? (s: string) => s : (s: string) => s.toLowerCase();
     const doIterate = iterCandidate !== null;
     const addSpaceChar = addSpace ? ' ' : '';
     const nickSuffix = suffix.endsWith(' ') ? suffix : suffix + ' ';
@@ -72,12 +91,12 @@ export function completeNick(
     const escapedSuffix = suffix.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
 
     // iterating nicks at the beginning?
-    let m = beforeCaret.match(new RegExp('^(' + NICK + ')' + escapedSuffix + ' ?$'));
+    let m = beforeCaret.match(regex('^(' + NICK + ')' + escapedSuffix + ' ?$'));
     if (m && (beforeCaret.endsWith(' ') || suffix.endsWith(' '))) {
         if (!doIterate) {
             return unchanged;
         }
-        const newNick = nextNick(iterCandidate, m[1], nicks);
+        const newNick = nextNick(iterCandidate, m[1], nicks, fold);
         beforeCaret = newNick + nickSuffix;
         return {
             text: beforeCaret + afterCaret,
@@ -87,13 +106,17 @@ export function completeNick(
         };
     }
 
+    // The rest of the word after the caret is replaced by the nick
+    const restOfWord = afterCaret.match(regex('^' + NICK))?.[0] ?? '';
+
     // nick completion at the beginning?
-    m = beforeCaret.match(new RegExp('^(' + NICK + ')$'));
+    m = beforeCaret.match(regex('^(' + NICK + ')$'));
     if (m) {
-        const newNick = completeSingleNick(m[1], nicks);
+        const newNick = completeSingleNick(m[1], nicks, fold);
         if (newNick === null) {
             return unchanged;
         }
+        afterCaret = afterCaret.substring(restOfWord.length);
         beforeCaret = newNick + nickSuffix;
         if (afterCaret.startsWith(' ')) {
             // swallow first space after caret if any
@@ -108,9 +131,9 @@ export function completeNick(
     }
 
     // iterating nicks in the middle?
-    m = beforeCaret.match(new RegExp('^(.* )(' + NICK + ') ?$'));
+    m = beforeCaret.match(regex('^(' + BEFORE + ')(' + NICK + ') ?$'));
     if (m && doIterate && (beforeCaret.endsWith(' ') || !addSpace)) {
-        const newNick = nextNick(iterCandidate, m[2], nicks);
+        const newNick = nextNick(iterCandidate, m[2], nicks, fold);
         beforeCaret = m[1] + newNick + addSpaceChar;
         return {
             text: beforeCaret + afterCaret,
@@ -121,12 +144,13 @@ export function completeNick(
     }
 
     // nick completion elsewhere in the middle?
-    m = beforeCaret.match(new RegExp('^(.* )(' + NICK + ')$'));
+    m = beforeCaret.match(regex('^(' + BEFORE + ')(' + NICK + ')$'));
     if (m) {
-        const newNick = completeSingleNick(m[2], nicks);
+        const newNick = completeSingleNick(m[2], nicks, fold);
         if (newNick === null) {
             return unchanged;
         }
+        afterCaret = afterCaret.substring(restOfWord.length);
         beforeCaret = m[1] + newNick + addSpaceChar;
         if (afterCaret.startsWith(' ')) {
             afterCaret = afterCaret.substring(1);

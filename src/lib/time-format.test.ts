@@ -55,6 +55,18 @@ describe('formatTime', () => {
         );
     });
 
+    it('removes nested ${...} expressions', () => {
+        expect(formatTimeText(date, '${color:${x}}%H${if:${y}?a:b}:%M')).toBe('07:08');
+    });
+
+    it('formats day numbers, the century, the time zone', () => {
+        expect(formatTimeText(date, '%j %u %w %C')).toBe('065 2 2 20');
+        expect(formatTimeText(new Date(2024, 2, 3), '%u %w')).toBe('7 0');
+        expect(formatTimeText(date, '%z')).toMatch(/^[+-]\d{4}$/);
+        expect(formatTimeText(date, '%Z')).not.toBe('%Z');
+        expect(formatTimeText(date, '%H%t%M%n')).toBe('07\t08\n');
+    });
+
     it('keeps %% and unknown specifiers', () => {
         expect(formatTimeText(date, '100%% %Q')).toBe('100% %Q');
     });

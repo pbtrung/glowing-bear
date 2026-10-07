@@ -50,7 +50,14 @@ const LineRow = memo(function LineRow({
     };
     const openChannel = (channel: string) => session.openQuery(bufferId, channel);
     return (
-        <tr className={`bufferline${line.highlight ? ' line-highlight' : ''}`}>
+        <tr
+            className={
+                'bufferline' +
+                (line.highlight ? ' line-highlight' : '') +
+                (line.self ? ' line-self' : '') +
+                (line.smartFiltered ? ' line-smart-filtered' : '')
+            }
+        >
             <td className="time">
                 <span className={`date${repeatedTime ? ' repeated-time' : ''}`}>
                     <Time date={line.date} format={timeFormat} />
@@ -58,7 +65,7 @@ const LineRow = memo(function LineRow({
             </td>
             <td className="prefix">
                 <span className={repeatedPrefix ? 'repeated-prefix' : undefined}>
-                    <a onClick={mention}>
+                    <a onClick={mention} title={line.host ?? undefined}>
                         {line.isMessage && <span className="hidden-bracket">&lt;</span>}
                         <RichText parts={line.prefix} links={false} maxLength={25} />
                         {line.isMessage && <span className="hidden-bracket">&gt;</span>}
@@ -95,28 +102,40 @@ function Lines({ buffer }: { buffer: Buffer }) {
         (s) => s.options['weechat.look.buffer_time_format'] ?? '%H:%M:%S',
     );
     const math = useSettings((s) => s.enableMathjax);
+    const hideSmartFiltered = useSettings((s) => s.hideSmartFiltered);
+    const lines = hideSmartFiltered
+        ? buffer.lines.filter((l) => !l.smartFiltered)
+        : buffer.lines;
+    // The read marker goes after the last line shown before it
+    let marker = buffer.lastReadKey;
+    if (hideSmartFiltered && marker !== null && marker !== READ_MARKER_TOP) {
+        const at = buffer.lines.findIndex((l) => l.key === marker);
+        if (at >= 0) {
+            marker =
+                buffer.lines.slice(0, at + 1).findLast((l) => !l.smartFiltered)?.key ??
+                READ_MARKER_TOP;
+        }
+    }
     const rows = [];
-    if (buffer.lastReadKey === READ_MARKER_TOP && buffer.lines.length > 0) {
+    if (marker === READ_MARKER_TOP && lines.length > 0) {
         rows.push(
             <tbody key={READ_MARKER_TOP}>
                 <ReadMarker />
             </tbody>,
         );
     }
-    for (let i = 0; i < buffer.lines.length; i++) {
-        const line = buffer.lines[i];
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         rows.push(
             <tbody key={line.key}>
                 <LineRow
                     line={line}
-                    previous={buffer.lines[i - 1]}
+                    previous={lines[i - 1]}
                     bufferId={buffer.id}
                     timeFormat={timeFormat}
                     math={math}
                 />
-                {buffer.lastReadKey === line.key && i < buffer.lines.length - 1 && (
-                    <ReadMarker />
-                )}
+                {marker === line.key && i < lines.length - 1 && <ReadMarker />}
             </tbody>,
         );
     }

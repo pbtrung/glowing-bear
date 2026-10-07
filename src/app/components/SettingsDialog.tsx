@@ -296,6 +296,11 @@ function Chat() {
                     help="Pinned buffers and the core buffer stay visible."
                 />
                 <SwitchRow
+                    setting="showBufferNumbers"
+                    title="Buffer numbers"
+                    help="Show WeeChat's numbers (merged buffers share theirs)."
+                />
+                <SwitchRow
                     setting="enableQuickKeys"
                     title="Quick buffer switching"
                     className="desktop"
@@ -332,6 +337,16 @@ function Chat() {
                     setting="hotlistsync"
                     title="Mark messages as read in WeeChat"
                     help="Clear the hotlist and move the read marker when you view a buffer."
+                />
+                <SwitchRow
+                    setting="syncInput"
+                    title="Share the input with WeeChat"
+                    help="What you type appears in WeeChat and its other clients, and the other way around."
+                />
+                <SwitchRow
+                    setting="hideSmartFiltered"
+                    title="Hide joins, parts and quits of inactive users"
+                    help="The ones WeeChat's smart filter marks (otherwise they are dimmed)."
                 />
                 <SwitchRow
                     setting="readlineBindings"

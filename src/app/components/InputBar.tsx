@@ -3,7 +3,8 @@ import { AtSign, SendHorizontal } from 'lucide-react';
 import { emojifyWord, loadShortcodes } from '../../lib/emoji';
 import { completeNick } from '../../lib/irc/completion';
 import type { Buffer } from '../../lib/state/model';
-import { session, setUi, uiStore, useUi } from '../chat';
+import { flushInput, session, setUi, uiStore, useUi } from '../chat';
+import { handleBufferKey } from '../bufferkeys';
 import { promptNick } from '../nicks';
 import { getSettings } from '../settings';
 import { Icon } from './Icon';
@@ -80,6 +81,8 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
             return;
         }
         setUi({ input: '' });
+        // (WeeChat's input too, now)
+        flushInput('');
         commandCompletion.current = null;
         void session
             .send(buffer.id, text, () =>
@@ -125,7 +128,8 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
         );
         const after = text.substring(completion.position);
         const word = completion.list[completion.index];
-        const suffix = completion.addSpace ? ' ' : '';
+        // (no second space before a space after the caret)
+        const suffix = completion.addSpace && !after.startsWith(' ') ? ' ' : '';
         const next = before + word + suffix + after;
         const caret = before.length + word.length + suffix.length;
         setInput(next, caret);
@@ -140,7 +144,11 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
         }
     };
 
-    const doCompleteCommand = (direction: 1 | -1) => {
+    /**
+     * Complete with WeeChat (commands, nicks, anything it knows), cycling
+     * through its list; nicks are completed here if WeeChat finds nothing.
+     */
+    const doCompleteWeeChat = (direction: 1 | -1) => {
         const el = ref.current!;
         const key = input + buffer.id;
         if (commandCompletion.current?.key === key) {
@@ -149,6 +157,11 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
         }
         const caret = el.selectionStart;
         const request = ++commandRequest.current;
+        const fallback = () => {
+            if (!input.startsWith('/') && direction === 1) {
+                doCompleteNick();
+            }
+        };
         void session
             .completion(buffer.id, input, caret)
             .then((completion) => {
@@ -157,6 +170,10 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                     request !== commandRequest.current ||
                     uiStore.getState().input + buffer.id !== key
                 ) {
+                    return;
+                }
+                if (completion.list.length === 0) {
+                    fallback();
                     return;
                 }
                 commandCompletion.current = {
@@ -169,14 +186,19 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                 };
                 cycleCommand(direction);
             })
-            .catch(() => undefined);
+            .catch(() => {
+                if (request === commandRequest.current) {
+                    fallback();
+                }
+            });
     };
 
     const complete = (direction: 1 | -1) => {
-        if (input.startsWith('/')) {
-            doCompleteCommand(direction);
-        } else if (direction === 1) {
+        if (nickIteration.current !== null) {
+            // iterating local completions
             doCompleteNick();
+        } else {
+            doCompleteWeeChat(direction);
         }
     };
 
@@ -205,6 +227,11 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+        // Keys of free buffers (/fset...) first, like in WeeChat
+        if (!event.nativeEvent.isComposing && handleBufferKey(event, buffer)) {
+            event.preventDefault();
+            return;
+        }
         const el = event.currentTarget;
         const caret = el.selectionStart;
         const noModifier = !event.altKey && !event.ctrlKey && !event.metaKey;

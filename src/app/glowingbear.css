@@ -383,6 +383,45 @@ pre {
     font-variant-numeric: tabular-nums;
 }
 
+/* WeeChat's number of a buffer, and the mark of merged buffers */
+.buffer .buffer-number {
+    min-width: 1.5em;
+    font-size: 0.75em;
+    color: var(--gb-muted);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+
+.buffer .buffer-merged {
+    flex: none;
+    color: var(--gb-muted);
+    width: 0.85em;
+    height: 0.85em;
+}
+
+#topbar .buffer-away {
+    align-self: center;
+    background: var(--gb-hover-bg);
+    color: var(--gb-muted);
+    font-weight: 500;
+}
+
+/* Local variables in the topic dialog */
+.local-variables > div {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.local-variables dt {
+    min-width: 8rem;
+    font-weight: 500;
+}
+
+.local-variables dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
 #topbar .latency {
     font-size: 0.75rem;
     color: var(--gb-muted);
@@ -804,6 +843,11 @@ pre {
     margin-top: 0.5rem;
 }
 
+/* Subgroups are indented */
+.nick-section {
+    padding-inline-start: calc(var(--nick-depth, 0) * 0.75rem);
+}
+
 .nick-section-title {
     display: flex;
     align-items: center;
@@ -1011,6 +1055,25 @@ td.message a {
 
 .a-no-u {
     text-decoration: none;
+}
+
+/* Lines: ours, and joins/parts/quits WeeChat's smart filter may hide */
+#bufferlines .line-self td.prefix {
+    opacity: 0.8;
+}
+
+#bufferlines .line-smart-filtered td.message,
+#bufferlines .line-smart-filtered td.prefix {
+    opacity: 0.55;
+}
+
+/* Reverse video: the default colors swapped (colors.ts swaps the others) */
+.a-r-fg {
+    color: var(--gb-bg);
+}
+
+.a-r-bg {
+    background-color: var(--gb-fg);
 }
 
 .a-d {

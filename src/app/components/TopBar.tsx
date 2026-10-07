@@ -62,6 +62,11 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                         {buffer.modes && (
                             <span className="buffer-modes">{buffer.modes}</span>
                         )}
+                        {buffer.away !== null && (
+                            <span className="buffer-away badge" title={buffer.away}>
+                                Away
+                            </span>
+                        )}
                         <span className="buffer-title desktop">
                             <RichText parts={buffer.title} />
                         </span>

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyBuffers, initialState } from '../lib/state/reducers';
 import type { ApiBuffer } from '../lib/relay/types';
-import { listBuffers, session, setUi, uiStore } from './chat';
+import type { Buffer } from '../lib/state/model';
+import { activityOrder, listBuffers, session, setUi, uiStore } from './chat';
 
 const apiBuffer = (
     id: number,
@@ -233,5 +234,31 @@ describe('input drafts', () => {
         // (same id again only to check that the draft is gone)
         session.store.setState({ buffers: state.buffers, activeBufferId: 1 });
         expect(uiStore.getState().input).toBe('');
+    });
+});
+
+describe('next buffer with activity', () => {
+    it('takes highlights first, then the most recent activity', () => {
+        const b = (id: number, unread: number, notification: number, at: number) =>
+            ({
+                ...buffers[1],
+                id,
+                unread,
+                notification,
+                activityAt: at,
+                hidden: false,
+            }) as Buffer;
+        const order = activityOrder(
+            [
+                b(1, 3, 0, 100),
+                b(2, 1, 0, 300),
+                b(3, 0, 1, 50),
+                b(4, 0, 0, 999),
+                b(5, 2, 1, 10),
+            ],
+            null,
+        ).map((x) => x.id);
+        expect(order).toEqual([3, 5, 2, 1]);
+        expect(activityOrder([b(1, 1, 0, 1)], 1)).toEqual([]);
     });
 });

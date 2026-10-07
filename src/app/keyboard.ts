@@ -11,6 +11,8 @@ import {
     toggleNicklistPanel,
     uiStore,
 } from './chat';
+import { activeBuffer } from '../lib/state/reducers';
+import { handleBufferKey } from './bufferkeys';
 import { getSettings } from './settings';
 
 let lastEscape = 0;
@@ -80,7 +82,16 @@ function onKeyDown(event: KeyboardEvent): void {
         return;
     }
     // AltGr is used to type characters: never a shortcut
-    if (event.getModifierState?.('AltGraph')) {
+    if (event.getModifierState?.('AltGraph') || event.defaultPrevented) {
+        // (or already used, e.g. by the input bar)
+        return;
+    }
+    // Keys of free buffers (/fset...), here when not typing in a field
+    if (
+        !isEditable(event.target) &&
+        handleBufferKey(event, activeBuffer(session.state))
+    ) {
+        event.preventDefault();
         return;
     }
     const ui = uiStore.getState();

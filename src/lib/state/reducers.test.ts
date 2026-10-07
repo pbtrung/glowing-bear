@@ -839,3 +839,55 @@ describe('lines kept', () => {
         expect(state.buffers[3].lastReadKey).toBe(READ_MARKER_TOP);
     });
 });
+
+describe('line tags and buffer details', () => {
+    it('reads our messages, smart filtered lines and hosts from tags', () => {
+        const state = applyLines(
+            setup(),
+            2,
+            [
+                apiLine(1, 'mine', { tags: ['irc_privmsg', 'self_msg', 'nick_me'] }),
+                apiLine(2, 'joined', {
+                    tags: [
+                        'irc_join',
+                        'irc_smart_filter',
+                        'nick_bob',
+                        'host_bob@example.org',
+                    ],
+                }),
+            ],
+            100,
+        );
+        const [mine, joined] = state.buffers[2].lines.filter((l) => !l.isDateChange);
+        expect([mine.self, mine.smartFiltered, mine.host]).toEqual([true, false, null]);
+        expect([joined.self, joined.smartFiltered, joined.host]).toEqual([
+            false,
+            true,
+            'bob@example.org',
+        ]);
+    });
+
+    it('knows when the user is away, and the time of activity', () => {
+        let state = applyBuffers(setup(), [
+            apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat', {
+                local_variables: { plugin: 'irc', type: 'channel', away: 'lunch' },
+            }),
+            apiBuffer(3, 3, 'irc.libera.#test', '#test'),
+        ]);
+        expect(state.buffers[2].away).toBe('lunch');
+        expect(state.buffers[3].away).toBeNull();
+        state = applyHotlist(state, [
+            {
+                priority: 1,
+                date: '2024-03-17T16:38:51Z',
+                buffer_id: 3,
+                count: [0, 1, 0, 0],
+            },
+        ]);
+        expect(state.buffers[3].activityAt).toBe(Date.parse('2024-03-17T16:38:51Z'));
+        state = send(state, 'buffer_line_added', 2, apiLine(9, 'hi')).state;
+        expect(state.buffers[2].activityAt).toBe(
+            Date.parse('2024-01-07T08:54:00.179Z'),
+        );
+    });
+});

@@ -34,6 +34,12 @@ export interface Settings {
     readlineBindings: boolean;
     enableMathjax: boolean;
     enableQuickKeys: boolean;
+    /** Share the input bar with WeeChat and its other clients */
+    syncInput: boolean;
+    /** Show WeeChat's buffer numbers in the buffer list */
+    showBufferNumbers: boolean;
+    /** Hide joins/parts/quits WeeChat's smart filter marks (irc_smart_filter) */
+    hideSmartFiltered: boolean;
     customCSS: string;
     /** Buffer to show after connecting, per relay ("host:port/path" -> full name) */
     currentlyViewedBuffers: Record<string, string>;
@@ -65,6 +71,9 @@ export const DEFAULT_SETTINGS: Settings = {
     readlineBindings: false,
     enableMathjax: false,
     enableQuickKeys: true,
+    syncInput: true,
+    showBufferNumbers: false,
+    hideSmartFiltered: false,
     customCSS: '',
     currentlyViewedBuffers: {},
     collapsedServers: [],

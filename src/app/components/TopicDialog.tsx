@@ -42,9 +42,31 @@ export function TopicDialog() {
                             Modes: {buffer.modes}
                         </p>
                     )}
+                    {buffer.away !== null && (
+                        <p className="small mb-0 text-break">
+                            Away: {buffer.away || 'yes'}
+                        </p>
+                    )}
                     <p className="small text-body-secondary mb-0 text-break">
-                        {buffer.fullName}
+                        {buffer.fullName} · buffer {buffer.number}
                     </p>
+                    {Object.keys(buffer.localVariables).length > 0 && (
+                        <details className="small mt-2">
+                            <summary className="text-body-secondary">
+                                Local variables
+                            </summary>
+                            <dl className="local-variables mb-0">
+                                {Object.entries(buffer.localVariables)
+                                    .sort(([a], [b]) => a.localeCompare(b))
+                                    .map(([name, value]) => (
+                                        <div key={name}>
+                                            <dt>{name}</dt>
+                                            <dd>{value}</dd>
+                                        </div>
+                                    ))}
+                            </dl>
+                        </details>
+                    )}
                 </div>
             )}
             <div className="modal-footer">

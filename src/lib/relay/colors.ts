@@ -360,14 +360,35 @@ const BG_PREFIX: Record<ColorType, string> = {
     ext: 'ceb-',
 };
 
+const isDefault = (color: Color) =>
+    color.type === 'weechat' && color.name === 'default';
+
+/**
+ * Classes of the foreground and background colors. Reverse video swaps them
+ * (a-r-fg / a-r-bg: the default background / foreground colors); colors of
+ * options can't be swapped (they have a class per side).
+ */
+function colorClasses(fg: Color, bg: Color, reverse: boolean): string[] {
+    if (reverse && fg.type !== 'option' && bg.type !== 'option') {
+        return [
+            isDefault(bg) ? 'a-r-fg' : FG_PREFIX[bg.type] + bg.name,
+            isDefault(fg) ? 'a-r-bg' : BG_PREFIX[fg.type] + fg.name,
+        ];
+    }
+    return [FG_PREFIX[fg.type] + fg.name, BG_PREFIX[bg.type] + bg.name];
+}
+
 /** Parse a string with WeeChat color codes into text parts with CSS classes */
 export function parseRichText(text: string | null | undefined): RichText[] {
     if (!text) {
         return [{ text: '', classes: [] }];
     }
     const parts = rawText2Rich(text).map((el) => {
-        const classes = [FG_PREFIX[el.fgColor.type] + el.fgColor.name];
-        classes.push(BG_PREFIX[el.bgColor.type] + el.bgColor.name);
+        const classes = colorClasses(
+            el.fgColor,
+            el.bgColor,
+            el.attrs.override.r === true,
+        );
         if (el.attrs.name !== null) {
             classes.push('coa-' + el.attrs.name);
         }

@@ -27,11 +27,18 @@ export interface NickSection {
     id: number;
     title: string;
     nicks: Nick[];
+    /** Depth of the group (0 under the root) */
+    depth: number;
+    /** The group name is shown (visible group) */
+    visible: boolean;
+    /** Classes of the color of the group name */
+    classes: string[];
 }
 
 /**
- * Visible nicks by group (in WeeChat's group order), sorted by name, keeping
- * nicks matching the filter (case insensitive).
+ * Visible nicks by group, in WeeChat's order: groups sorted by name, each
+ * followed by its subgroups, the nicks of the root group last. Nicks are
+ * sorted by name, and kept if they match the filter (case insensitive).
  */
 export function nickSections(buffer: Buffer, filter = ''): NickSection[] {
     const needle = filter.trim().toLowerCase();
@@ -40,24 +47,59 @@ export function nickSections(buffer: Buffer, filter = ''): NickSection[] {
         if (!nick.visible || (needle && !nick.name.toLowerCase().includes(needle))) {
             continue;
         }
-        const list = byGroup.get(nick.groupId) ?? [];
-        list.push(nick);
-        byGroup.set(nick.groupId, list);
+        byGroup.set(nick.groupId, [...(byGroup.get(nick.groupId) ?? []), nick]);
     }
-    const groupName = (id: number) => buffer.nickGroups[id]?.name ?? '';
-    return [...byGroup.entries()]
-        .sort(([a], [b]) => groupName(a).localeCompare(groupName(b)))
-        .map(([id, nicks]) => ({
-            id,
-            // Nicks in the root group are plain users
-            title:
-                id === 0 || groupName(id) === 'root'
-                    ? 'Users'
-                    : groupTitle(groupName(id)),
-            nicks: nicks.sort((a, b) =>
-                a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
-            ),
-        }));
+    const groups = Object.values(buffer.nickGroups);
+    const isRoot = (id: number) =>
+        id === 0 || buffer.nickGroups[id]?.name === 'root' || !buffer.nickGroups[id];
+    const children = (parentId: number) =>
+        groups
+            .filter((g) => g.parentId === parentId && !isRoot(g.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    const sortNicks = (nicks: Nick[]) =>
+        nicks.sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+        );
+
+    const sections: NickSection[] = [];
+    const visit = (parentId: number, depth: number, seen: Set<number>) => {
+        for (const group of children(parentId)) {
+            if (seen.has(group.id)) {
+                continue;
+            }
+            seen.add(group.id);
+            const nicks = byGroup.get(group.id);
+            if (nicks) {
+                sections.push({
+                    id: group.id,
+                    title: groupTitle(group.name),
+                    nicks: sortNicks(nicks),
+                    depth,
+                    visible: group.visible,
+                    classes: group.colorClasses,
+                });
+            }
+            visit(group.id, depth + 1, seen);
+        }
+    };
+    const rootId = groups.find((g) => isRoot(g.id))?.id ?? 0;
+    visit(rootId, 0, new Set());
+    // Nicks of the root group, and of groups not found (nicks are kept)
+    const placed = new Set(sections.map((s) => s.id));
+    const others = [...byGroup.entries()]
+        .filter(([id]) => !placed.has(id))
+        .flatMap(([, nicks]) => nicks);
+    if (others.length > 0) {
+        sections.push({
+            id: rootId,
+            title: 'Users',
+            nicks: sortNicks(others),
+            depth: 0,
+            visible: true,
+            classes: [],
+        });
+    }
+    return sections;
 }
 
 /**

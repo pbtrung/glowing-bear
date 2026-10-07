@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Buffer } from '../../lib/state/model';
 import { session } from '../chat';
 import { nickSections, showGroupTitles } from '../nicks';
@@ -27,9 +27,19 @@ export function NickList({ buffer }: { buffer: Buffer }) {
             </div>
             <div className="nicklist-body">
                 {sections.map((section) => (
-                    <section key={section.id} className="nick-section">
-                        {titled && (
-                            <h3 className="nick-section-title">
+                    <section
+                        key={section.id}
+                        className="nick-section"
+                        style={
+                            section.depth > 0
+                                ? ({ '--nick-depth': section.depth } as CSSProperties)
+                                : undefined
+                        }
+                    >
+                        {titled && section.visible && (
+                            <h3
+                                className={`nick-section-title ${section.classes.join(' ')}`}
+                            >
                                 {section.title}
                                 <span className="nick-section-count">
                                     {section.nicks.length}

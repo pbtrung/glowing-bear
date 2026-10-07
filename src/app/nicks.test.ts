@@ -159,3 +159,43 @@ describe('nicklist display', () => {
         expect(promptNick([])).toEqual([]);
     });
 });
+
+describe('nested nick groups', () => {
+    it('lists subgroups after their group, with their depth and visibility', () => {
+        const state = applyBuffers(initialState, [
+            {
+                id: 1,
+                name: 'matrix.room',
+                short_name: 'room',
+                number: 1,
+                type: 'formatted',
+                nicklist_display_groups: true,
+                local_variables: { type: 'channel' },
+            } as unknown as ApiBuffer,
+        ]);
+        const sub = {
+            ...group(11, 'admins', [nick(12, 11, 'ann')]),
+            parent_group_id: 10,
+        };
+        const buffer = applyNicklist(state, 1, {
+            ...group(0, 'root', []),
+            parent_group_id: -1,
+            groups: [
+                { ...group(10, 'staff', [nick(13, 10, 'bob')]), groups: [sub] },
+                { ...group(20, 'guests', [nick(21, 20, 'carl')]), visible: false },
+            ],
+        }).buffers[1];
+        expect(
+            nickSections(buffer).map((s) => [
+                s.title,
+                s.depth,
+                s.visible,
+                s.nicks[0].name,
+            ]),
+        ).toEqual([
+            ['guests', 0, false, 'carl'],
+            ['staff', 0, true, 'bob'],
+            ['admins', 1, true, 'ann'],
+        ]);
+    });
+});

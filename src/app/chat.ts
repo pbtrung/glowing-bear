@@ -125,6 +125,8 @@ session.store.subscribe((state, previous) => {
     const text = uiStore.getState().input;
     const left = previous.activeBufferId;
     if (left !== null && state.buffers[left]) {
+        // what was typed last in the buffer left
+        flushInput(text, left);
         if (text) {
             drafts.set(left, text);
         } else {
@@ -140,6 +142,83 @@ session.store.subscribe((state, previous) => {
     if (state.activeBufferId !== null) {
         setUi({ input: drafts.get(state.activeBufferId) ?? '' });
         drafts.delete(state.activeBufferId);
+    }
+});
+
+/*
+ * The input bar is shared with WeeChat (setting syncInput): what is typed
+ * here is set in WeeChat's input of the buffer (after a pause), and what is
+ * typed in WeeChat or its other clients comes here.
+ */
+
+/** Text we set in WeeChat's input, by buffer: its echo is ignored */
+const pushed = new Map<number, { text: string; at: number }>();
+/** The input bar is being set from WeeChat (not to push it back) */
+let applyingRemote = false;
+let pushTimer: ReturnType<typeof setTimeout> | undefined;
+const PUSH_DELAY = 400;
+/** An echo not received after this (ms) is not waited for anymore */
+const ECHO_TIMEOUT = 3000;
+
+function pushInput(bufferId: number, text: string): void {
+    pushed.set(bufferId, { text, at: Date.now() });
+    session.setRemoteInput(bufferId, text);
+}
+
+/**
+ * Set WeeChat's input of a buffer (the one shown by default) to the text of
+ * the input bar, now
+ */
+export function flushInput(
+    text = uiStore.getState().input,
+    bufferId = session.state.activeBufferId,
+): void {
+    clearTimeout(pushTimer);
+    const buffer = bufferId !== null ? session.state.buffers[bufferId] : undefined;
+    if (buffer && getSettings().syncInput && buffer.input !== text) {
+        pushInput(buffer.id, text);
+    }
+}
+
+uiStore.subscribe((state, previous) => {
+    if (state.input !== previous.input && !applyingRemote && getSettings().syncInput) {
+        clearTimeout(pushTimer);
+        const bufferId = session.state.activeBufferId;
+        pushTimer = setTimeout(() => flushInput(state.input, bufferId), PUSH_DELAY);
+    }
+});
+
+session.store.subscribe((state, previous) => {
+    if (!getSettings().syncInput || state.buffers === previous.buffers) {
+        return;
+    }
+    for (const buffer of Object.values(state.buffers)) {
+        const before = previous.buffers[buffer.id];
+        if (before?.input === buffer.input) {
+            continue;
+        }
+        const echo = pushed.get(buffer.id);
+        if (echo && Date.now() - echo.at < ECHO_TIMEOUT) {
+            if (echo.text === buffer.input) {
+                pushed.delete(buffer.id);
+            }
+            continue;
+        }
+        pushed.delete(buffer.id);
+        if (before === undefined && buffer.input === '') {
+            continue;
+        }
+        if (buffer.id === state.activeBufferId) {
+            if (uiStore.getState().input !== buffer.input) {
+                applyingRemote = true;
+                setUi({ input: buffer.input });
+                applyingRemote = false;
+            }
+        } else if (buffer.input) {
+            drafts.set(buffer.id, buffer.input);
+        } else {
+            drafts.delete(buffer.id);
+        }
     }
 });
 
@@ -168,6 +247,8 @@ export interface ListedBuffer {
     /** Unread messages and highlights in the collapsed buffers */
     hiddenUnread: number;
     hiddenNotification: number;
+    /** Short names of the buffers merged with it (same number in WeeChat) */
+    mergedWith: string[];
 }
 
 /** Key of the server of a buffer ("irc.libera") */
@@ -268,6 +349,15 @@ export function listBuffers(
         quickOrder.slice(0, 10).map((b, i) => [b.id, String((i + 1) % 10)]),
     );
 
+    // Merged buffers share their number
+    const sameNumber = new Map<number, Buffer[]>();
+    for (const buffer of all) {
+        sameNumber.set(buffer.number, [
+            ...(sameNumber.get(buffer.number) ?? []),
+            buffer,
+        ]);
+    }
+
     return visible.map((buffer) => {
         const key = serverKeyOf(buffer);
         const group = grouped && buffer.type === 'server' && children.has(key);
@@ -279,6 +369,9 @@ export function listBuffers(
             collapsed: group && collapsed.has(key),
             hiddenUnread: group ? (hidden.get(key)?.unread ?? 0) : 0,
             hiddenNotification: group ? (hidden.get(key)?.notification ?? 0) : 0,
+            mergedWith: (sameNumber.get(buffer.number) ?? [])
+                .filter((b) => b.id !== buffer.id)
+                .map((b) => b.shortName || b.fullName),
         };
     });
 }
@@ -338,15 +431,25 @@ export function switchToAdjacentBuffer(direction: 1 | -1): void {
 
 /** Next buffer with a highlight, else with unread messages */
 export function switchToActivityBuffer(): void {
-    const sorted = Object.values(session.state.buffers).sort(
-        (a, b) => a.number - b.number,
-    );
-    const target =
-        sorted.find((b) => b.notification > 0) ??
-        sorted.find((b) => b.unread > 0 && !b.hidden);
+    const target = activityOrder(
+        Object.values(session.state.buffers),
+        session.state.activeBufferId,
+    )[0];
     if (target) {
         activateBuffer(target.id);
     }
+}
+
+/**
+ * Buffers with activity in the order of WeeChat's hotlist: highlights and
+ * private messages first, then messages; the most recent first.
+ */
+export function activityOrder(buffers: Buffer[], activeId: number | null): Buffer[] {
+    const priority = (b: Buffer) =>
+        b.notification > 0 ? 2 : b.unread > 0 && !b.hidden ? 1 : 0;
+    return buffers
+        .filter((b) => b.id !== activeId && priority(b) > 0)
+        .sort((a, b) => priority(b) - priority(a) || b.activityAt - a.activityAt);
 }
 
 export function toggleNicklistPanel(): void {

@@ -116,6 +116,24 @@ describe('WeeChat color codes', () => {
         expect(parts[3].classes[0]).toBe('cwf-red');
     });
 
+    it('swaps the colors in reverse video', () => {
+        // default colors
+        expect(classesOf('\x1a\x02x')[0][1].slice(0, 2)).toEqual(['a-r-fg', 'a-r-bg']);
+        // red on blue -> blue on red
+        expect(classesOf('\x19*!03~09x')[0][1].slice(0, 2)).toEqual([
+            'cwf-blue',
+            'cwb-red',
+        ]);
+        // extended
+        expect(classesOf('\x19F@!00214x')[0][1].slice(0, 2)).toEqual([
+            'a-r-fg',
+            'ceb-214',
+        ]);
+        // back to normal
+        const parts = parseRichText('\x1a\x02a\x1b\x02b');
+        expect(parts[1].classes.slice(0, 2)).toEqual(['cwf-default', 'cwb-default']);
+    });
+
     it('resets colors and attributes (\\x1c)', () => {
         const parts = parseRichText('\x19F03red\x1cnormal');
         expect(parts[0].classes[0]).toBe('cwf-red');

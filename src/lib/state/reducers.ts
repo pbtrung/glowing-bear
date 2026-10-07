@@ -129,6 +129,9 @@ export function dateChangeLine(previous: Date, date: Date, key: string): Line {
         displayed: true,
         isMessage: false,
         isDateChange: true,
+        self: false,
+        smartFiltered: false,
+        host: null,
     };
 }
 
@@ -251,6 +254,9 @@ function addNewLine(
     }
     const isPrivate = line.notifyLevel === 2;
     const isHighlight = line.highlight || line.notifyLevel === 3;
+    if (isHighlight || isPrivate || line.notifyLevel === 1) {
+        buffer.activityAt = line.date.getTime();
+    }
     if (isHighlight || isPrivate) {
         buffer.notification++;
         effects.push({ type: 'highlight', bufferId: buffer.id, line });
@@ -393,6 +399,7 @@ export function applyHotlist(state: ChatState, hotlist: ApiHotlist[]): ChatState
                 continue;
             }
             // count: low, message, private, highlight
+            buffer.activityAt = Date.parse(entry.date) || 0;
             buffer.unread = entry.count[1];
             buffer.notification = entry.count[2] + entry.count[3];
         }

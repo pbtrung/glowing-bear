@@ -631,7 +631,7 @@ describe('events', () => {
         await c.weechat('/input delete_line', bufferId);
     });
 
-    it('sends no input events with input: false (as the session syncs)', async () => {
+    it('sends no input events with input: false', async () => {
         const quiet = await connect();
         try {
             await quiet.api.sync({ sync: true, nicks: true, input: false });
@@ -881,6 +881,52 @@ describe('session', () => {
             expect((await c.api.buffer(gbtest().id)).last_read_line_id).toBe(last.id);
         } finally {
             c.client.close();
+        }
+    });
+
+    it('shares the input with WeeChat (escapes, several lines)', async () => {
+        const c = await connect();
+        try {
+            await c.api.sync({ sync: true, input: true });
+            c.mark();
+            const text = 'one \\ two\nthree';
+            session.setRemoteInput(gbtest().id, text);
+            await c.waitEvent(
+                'input_text_changed',
+                (e) => (e.body as ApiBuffer).input === text,
+            );
+            await until(() => gbtest().input === text);
+            session.setRemoteInput(gbtest().id, '');
+            await until(() => gbtest().input === '');
+        } finally {
+            c.client.close();
+        }
+    });
+
+    it('runs the key bindings of free buffers', async () => {
+        await session.input('/fset weechat.look.a');
+        await until(() =>
+            Object.values(session.state.buffers).some(
+                (b) => b.fullName === 'fset.fset',
+            ),
+        );
+        const fset = Object.values(session.state.buffers).find(
+            (b) => b.fullName === 'fset.fset',
+        )!;
+        expect(fset.free).toBe(true);
+        const down = fset.keys.find((k) => k.key === 'down');
+        expect(down?.command).toBe('/fset -down');
+        const c = await connect();
+        try {
+            const before = await c.api.lines(fset.id, undefined, 'weechat');
+            session.runKeyCommands(fset.id, [down!.command]);
+            await until(async () => {
+                const after = await c.api.lines(fset.id, undefined, 'weechat');
+                return JSON.stringify(after) !== JSON.stringify(before);
+            });
+        } finally {
+            c.client.close();
+            await session.input('/buffer close fset.fset');
         }
     });
 

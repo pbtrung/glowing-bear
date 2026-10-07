@@ -101,7 +101,7 @@ describe('connection', () => {
             expect.objectContaining({ request: 'GET /api/hotlist' }),
             expect.objectContaining({
                 request: 'POST /api/sync',
-                body: { sync: true, nicks: true, input: false, colors: 'weechat' },
+                body: { sync: true, nicks: true, input: true, colors: 'weechat' },
             }),
         ]);
         expect(session.state.status).toBe('connected');
@@ -423,6 +423,36 @@ describe('multi-line input', () => {
         ws.reply(204);
         await commands;
         expect(ws.sent.length).toBe(count + 3);
+    });
+});
+
+describe('WeeChat input', () => {
+    it('sets the input of a buffer in one frame, with escapes', async () => {
+        const { session, ws } = await connected();
+        const frames = ws.frames.length;
+        session.setRemoteInput(2, 'a\\b\nc');
+        expect(ws.frames[frames]).toEqual([
+            expect.objectContaining({
+                body: { buffer_id: 2, command: '/input delete_input' },
+            }),
+            expect.objectContaining({
+                body: { buffer_id: 2, command: '/input insert a\\\\b\\nc' },
+            }),
+        ]);
+        session.setRemoteInput(2, '');
+        expect(ws.frames[frames + 1]).toMatchObject({
+            body: { buffer_id: 2, command: '/input delete_input' },
+        });
+    });
+
+    it('runs the commands of key bindings', async () => {
+        const { session, ws } = await connected();
+        const count = ws.sent.length;
+        session.runKeyCommands(5, ['/fset -mark', '/fset -down']);
+        expect(ws.sent.slice(count).map((r) => r.body)).toEqual([
+            { buffer_id: 5, command: '/fset -mark' },
+            { buffer_id: 5, command: '/fset -down' },
+        ]);
     });
 });
 

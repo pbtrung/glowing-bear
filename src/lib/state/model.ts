@@ -27,6 +27,12 @@ export interface Line {
     displayed: boolean;
     /** Message of a user (add invisible <> around the nick for copy/paste) */
     isMessage: boolean;
+    /** Sent by us (tag self_msg) */
+    self: boolean;
+    /** A join/part/quit WeeChat's smart filter may hide (tag irc_smart_filter) */
+    smartFiltered: boolean;
+    /** user@host of the nick (tag host_...), null if unknown */
+    host: string | null;
     /** Date change line added by Glowing Bear */
     isDateChange?: boolean;
 }
@@ -47,7 +53,10 @@ export interface NickGroup {
     id: number;
     parentId: number;
     name: string;
+    /** Its name is shown (its nicks are, whatever this is) */
     visible: boolean;
+    /** Classes of the color of its name */
+    colorClasses: string[];
 }
 
 export interface Buffer {
@@ -104,6 +113,10 @@ export interface Buffer {
 
     unread: number;
     notification: number;
+    /** Time of the last activity counted (ms), 0 if none */
+    activityAt: number;
+    /** Away message (local variable "away" of IRC buffers), null if not away */
+    away: string | null;
 
     nicklistLoaded: boolean;
     nickGroups: Record<number, NickGroup>;
@@ -138,6 +151,7 @@ export function bufferProperties(api: ApiBuffer): Partial<Buffer> {
         plugin,
         server,
         pinned: localVariables.pinned === 'true',
+        away: localVariables.away || null,
         // "irc.server.libera" must sort before "irc.libera.#chan"
         serverSortKey: (
             plugin +
@@ -173,6 +187,7 @@ export function createBuffer(api: ApiBuffer): Buffer {
         lastReadLineId: -1,
         unread: 0,
         notification: 0,
+        activityAt: 0,
         nicklistLoaded: false,
         nickGroups: {},
         nicks: {},
@@ -207,6 +222,9 @@ export function createLine(api: ApiLine, free = false): Line {
         notifyLevel: api.notify_level ?? 0,
         displayed: api.displayed !== false,
         isMessage: tags.includes('irc_privmsg') && !tags.includes('irc_action'),
+        self: tags.includes('self_msg'),
+        smartFiltered: tags.includes('irc_smart_filter'),
+        host: tags.find((t) => t.startsWith('host_'))?.substring(5) || null,
     };
 }
 
@@ -259,5 +277,6 @@ export function createNickGroup(api: ApiNickGroup): NickGroup {
         parentId: api.parent_group_id,
         name: api.name,
         visible: api.visible !== false,
+        colorClasses: nickColorClasses(api.color_name),
     };
 }

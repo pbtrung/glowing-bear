@@ -248,7 +248,8 @@ export class Session {
                         api.sync({
                             sync: true,
                             nicks: true,
-                            input: false,
+                            // the input of buffers, shared with other clients
+                            input: true,
                             colors: 'weechat',
                         }),
                     ] as const,
@@ -560,6 +561,34 @@ export class Session {
         }
         if (this.options.hotlistSync()) {
             this.clearHotlist(bufferId);
+        }
+    }
+
+    /**
+     * Set the text of WeeChat's input of a buffer (shared with WeeChat and
+     * its other clients): sent in one frame, so nothing happens in between.
+     */
+    setRemoteInput(bufferId: number, text: string): void {
+        const client = this.client;
+        const api = this.api;
+        if (!client || !api) {
+            return;
+        }
+        // "/input insert" reads escapes like /print
+        const escaped = text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n');
+        const requests = client.batch(() => [
+            api.input('/input delete_input', bufferId),
+            ...(text ? [api.input('/input insert ' + escaped, bufferId)] : []),
+        ]);
+        for (const request of requests) {
+            request.catch(() => undefined);
+        }
+    }
+
+    /** Run the commands of a key binding of a buffer (e.g. /fset -down) */
+    runKeyCommands(bufferId: number, commands: string[]): void {
+        for (const command of commands) {
+            void this.input(command, bufferId).catch(() => undefined);
         }
     }
 

@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react';
 import {
     ChevronDown,
+    Merge,
     MessagesSquare,
     Pin,
     Server,
@@ -89,6 +90,7 @@ function BufferRow({
     active: boolean;
     highlighted: boolean;
 }) {
+    const showNumber = useSettings((s) => s.showBufferNumbers);
     const { buffer, quickKey, jumpKey } = item;
     const classes = ['buffer', `type-${buffer.type}`];
     if (active) classes.push('active');
@@ -102,12 +104,17 @@ function BufferRow({
     const unread = buffer.unread + item.hiddenUnread;
     const count = notification || unread;
     const label = buffer.trimmedName || buffer.fullName;
+    const merged = item.mergedWith.length > 0;
+    if (merged) classes.push('merged');
 
     return (
         <li className={classes.join(' ')}>
             <a
                 href="#"
-                title={buffer.fullName}
+                title={
+                    buffer.fullName +
+                    (merged ? ` (merged with ${item.mergedWith.join(', ')})` : '')
+                }
                 aria-current={active ? 'page' : undefined}
                 onClick={(e) => {
                     e.preventDefault();
@@ -118,7 +125,9 @@ function BufferRow({
                 <span className="buffer-jump-key">
                     {jumpKey !== null ? String(jumpKey).padStart(2, '0') : ''}
                 </span>
+                {showNumber && <span className="buffer-number">{buffer.number}</span>}
                 <BufferIcon buffer={buffer} />
+                {merged && <Icon icon={Merge} className="buffer-merged" />}
                 <span className={`buffername ${buffer.nameClasses.join(' ')}`}>
                     {label}
                 </span>

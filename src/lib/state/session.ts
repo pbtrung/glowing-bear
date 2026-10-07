@@ -14,6 +14,7 @@ import {
 import type { ApiEvent, ApiCompletion } from '../relay/types';
 import type { Line } from './model';
 import {
+    activeBuffer,
     applyBuffers,
     applyEvent,
     applyHotlist,
@@ -217,10 +218,7 @@ export class Session {
         api: RelayApi,
         current: () => void,
     ): Promise<void> {
-        const previous =
-            this.state.activeBufferId !== null
-                ? this.state.buffers[this.state.activeBufferId]?.fullName
-                : undefined;
+        const previous = activeBuffer(this.state)?.fullName;
         // Alone first: older relays may not answer the batch
         const version = await api.version();
         current();

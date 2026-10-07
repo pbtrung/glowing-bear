@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import {
     BellRing,
     EllipsisVertical,
@@ -13,6 +13,11 @@ import {
 } from 'lucide-react';
 import { closeModal, useChat, useUi } from '../chat';
 import { DEFAULT_FONT, updateSettings, useSettings, type Settings } from '../settings';
+import {
+    notificationPermission,
+    requestNotificationPermission,
+    type NotificationPermissionState,
+} from '../notifications';
 import { THEMES } from '../theme';
 import { Icon } from './Icon';
 import { Modal } from './Modal';
@@ -369,11 +374,36 @@ function Notifications() {
                     help="Also shown on the app icon when installed."
                 />
             </div>
-            <p className="settings-note">
-                <Icon icon={Info} /> Desktop notifications for highlights and private
-                messages use your browser's permission for this site.
-            </p>
+            <NotificationPermissionRow />
         </>
+    );
+}
+
+const PERMISSION_TEXT: Record<NotificationPermissionState, string> = {
+    granted: 'Allowed.',
+    denied: "Blocked: allow them in your browser's site settings.",
+    default: 'Not allowed yet.',
+    unsupported: "This browser doesn't support them.",
+};
+
+function NotificationPermissionRow() {
+    const [permission, setPermission] = useState(notificationPermission);
+    return (
+        <p className="settings-note">
+            <Icon icon={Info} /> Desktop notifications for highlights and private
+            messages: {PERMISSION_TEXT[permission]}{' '}
+            {permission === 'default' && (
+                <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() =>
+                        void requestNotificationPermission().then(setPermission)
+                    }
+                >
+                    Allow notifications
+                </button>
+            )}
+        </p>
     );
 }
 
@@ -540,6 +570,25 @@ export function SettingsDialog() {
     const [tab, setTab] = useState<Tab>('appearance');
     const Pane = PANES[tab];
     const current = TABS.find((t) => t.id === tab)!;
+    // Arrow keys, Home and End move between the tabs
+    const onTabKey = (event: KeyboardEvent<HTMLElement>) => {
+        const index = TABS.findIndex((t) => t.id === tab);
+        const moves: Record<string, number> = {
+            ArrowDown: index + 1,
+            ArrowRight: index + 1,
+            ArrowUp: index - 1,
+            ArrowLeft: index - 1,
+            Home: 0,
+            End: TABS.length - 1,
+        };
+        if (!(event.key in moves)) {
+            return;
+        }
+        event.preventDefault();
+        const next = TABS[(moves[event.key] + TABS.length) % TABS.length];
+        setTab(next.id);
+        document.getElementById(`settings-tab-${next.id}`)?.focus();
+    };
     return (
         <Modal
             id="settingsModal"
@@ -571,13 +620,18 @@ export function SettingsDialog() {
                     className="settings-nav"
                     role="tablist"
                     aria-label="Settings sections"
+                    aria-orientation="vertical"
+                    onKeyDown={onTabKey}
                 >
                     {TABS.map((t) => (
                         <button
                             key={t.id}
+                            id={`settings-tab-${t.id}`}
                             type="button"
                             role="tab"
                             aria-selected={tab === t.id}
+                            aria-controls="settings-pane"
+                            tabIndex={tab === t.id ? 0 : -1}
                             className={`settings-nav-item${tab === t.id ? ' active' : ''}`}
                             onClick={() => setTab(t.id)}
                         >
@@ -586,7 +640,12 @@ export function SettingsDialog() {
                         </button>
                     ))}
                 </nav>
-                <div className="settings-panes modal-body" role="tabpanel">
+                <div
+                    id="settings-pane"
+                    className="settings-panes modal-body"
+                    role="tabpanel"
+                    aria-labelledby={`settings-tab-${tab}`}
+                >
                     <Pane />
                 </div>
             </div>

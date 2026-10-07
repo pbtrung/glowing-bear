@@ -7,6 +7,7 @@ import {
     uiStore,
     useActiveBuffer,
     useChat,
+    useMobileUi,
     useUi,
     useUnreadTotals,
 } from './chat';
@@ -96,7 +97,7 @@ function Chat() {
     const nicklistOpen = useUi((s) => s.nicklistOpen);
     const nonicklist = useSettings((s) => s.nonicklist);
     const alwaysnicklist = useSettings((s) => s.alwaysnicklist);
-    const mobile = isMobileUi();
+    const mobile = useMobileUi();
     const showNicklist =
         buffer !== undefined &&
         buffer.hasNicklist &&

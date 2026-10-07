@@ -1,39 +1,30 @@
-import { useState, type CSSProperties } from 'react';
-import { Search } from 'lucide-react';
+import { useState } from 'react';
 import type { Buffer } from '../../lib/state/model';
 import { session } from '../chat';
-import { initial, nameHue, nickSections } from '../nicks';
+import { nickSections } from '../nicks';
 import { useSwipe } from '../swipe';
-import { Icon } from './Icon';
+import { Avatar } from './Avatar';
+import { SearchBox } from './SearchBox';
 
 export function NickList({ buffer }: { buffer: Buffer }) {
     const swipe = useSwipe();
     const [filter, setFilter] = useState('');
-    const total = Object.values(buffer.nicks).filter((n) => n.visible).length;
+    const visible = Object.values(buffer.nicks).filter((n) => n.visible);
+    const total = visible.length;
     const sections = nickSections(buffer, filter);
     // Titles only help with several groups
-    const titled = nickSections(buffer).length > 1;
+    const titled = new Set(visible.map((n) => n.groupId)).size > 1;
 
     return (
         <aside id="nicklist" aria-label="Nicklist" {...swipe}>
             <div className="nicklist-header">
-                <div className="search-box">
-                    <Icon icon={Search} className="search-box-icon" />
-                    <input
-                        type="search"
-                        className="form-control form-control-sm"
-                        placeholder={`Filter ${total} ${total === 1 ? 'user' : 'users'}`}
-                        aria-label="Filter users"
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Escape' && filter) {
-                                e.stopPropagation();
-                                setFilter('');
-                            }
-                        }}
-                    />
-                </div>
+                <SearchBox
+                    value={filter}
+                    onChange={setFilter}
+                    onClear={() => setFilter('')}
+                    placeholder={`Filter ${total} ${total === 1 ? 'user' : 'users'}`}
+                    label="Filter users"
+                />
             </div>
             <div className="nicklist-body">
                 {sections.map((section) => (
@@ -57,17 +48,10 @@ export function NickList({ buffer }: { buffer: Buffer }) {
                                             session.openQuery(buffer.id, nick.name);
                                         }}
                                     >
-                                        <span
-                                            className="nick-avatar avatar"
-                                            style={
-                                                {
-                                                    '--avatar-hue': nameHue(nick.name),
-                                                } as CSSProperties
-                                            }
-                                            aria-hidden="true"
-                                        >
-                                            {initial(nick.name)}
-                                        </span>
+                                        <Avatar
+                                            name={nick.name}
+                                            className="nick-avatar"
+                                        />
                                         <span className="nick-name">
                                             {nick.prefix.trim() && (
                                                 <span

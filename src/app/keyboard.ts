@@ -24,6 +24,39 @@ const focusInput = () => {
     }
 };
 
+const isEditable = (target: EventTarget | null): boolean =>
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA');
+
+/**
+ * Key of a shortcut, lowercase. With Option, macOS gives the character typed
+ * (Option+N: "˜"): the letter then comes from the physical key.
+ */
+export function shortcutKey(event: Pick<KeyboardEvent, 'key' | 'code'>): string {
+    if (event.key.length !== 1 || /^[a-z]$/i.test(event.key)) {
+        return event.key.toLowerCase();
+    }
+    return /^Key([A-Z])$/.exec(event.code)?.[1].toLowerCase() ?? event.key;
+}
+
+/**
+ * Alt (Option on macOS) types an ASCII character in a text field (e.g. "@"
+ * with Option+L, "[" with Option+5 on German Mac layouts): not a shortcut.
+ * Alt+< and Alt+` are shortcuts.
+ */
+export function typesCharacter(event: Pick<KeyboardEvent, 'key' | 'target'>): boolean {
+    const ch = event.key;
+    return (
+        ch.length === 1 &&
+        ch.charCodeAt(0) > 32 &&
+        ch.charCodeAt(0) < 127 &&
+        !/[a-z0-9<`]/i.test(ch) &&
+        isEditable(event.target)
+    );
+}
+
 /** Digit of a key event (layout independent), or null */
 function digitOf(event: KeyboardEvent): number | null {
     const m = /^Digit(\d)$/.exec(event.code) ?? /^Numpad(\d)$/.exec(event.code);
@@ -53,7 +86,7 @@ function onKeyDown(event: KeyboardEvent): void {
     const ui = uiStore.getState();
     const settings = getSettings();
     const alt = event.altKey && !event.ctrlKey && !event.metaKey;
-    const key = event.key.toLowerCase();
+    const key = shortcutKey(event);
     const digit = digitOf(event);
 
     if (ui.showQuickKeys) {
@@ -88,7 +121,7 @@ function onKeyDown(event: KeyboardEvent): void {
         return;
     }
 
-    if (!alt) {
+    if (!alt || typesCharacter(event)) {
         return;
     }
 

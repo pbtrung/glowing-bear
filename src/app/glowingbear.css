@@ -2,7 +2,7 @@
  * Glowing Bear base styles, on top of Bootstrap 5.
  *
  * Mobile first: the base rules are for small screens, the desktop layout is
- * in the "min-width: 968px" media query (the same cutoff as isMobileUi in chat.ts).
+ * in the "min-width: 968px" media query (the same query as isMobileUi in chat.ts).
  *
  * Colors are CSS variables (--gb-*); themes (css/themes/*.css) override them
  * and style the WeeChat color classes (cof-*, cwf-*, cef-*, ...).
@@ -393,6 +393,12 @@ pre {
     overflow: hidden;
     white-space: nowrap;
     cursor: pointer;
+    /* a button */
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: start;
 }
 
 #topbar .buffer-name {

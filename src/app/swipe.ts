@@ -3,6 +3,7 @@
  * nicklist), swipe left to show the nicklist (or hide the buffer list).
  */
 import { useRef, type TouchEvent } from 'react';
+import { activeBuffer } from '../lib/state/reducers';
 import { isMobileUi, session, setUi, uiStore } from './chat';
 
 const MIN_DISTANCE = 60;
@@ -23,9 +24,7 @@ function swipeLeft(): void {
         setUi({ sidebarOpen: false });
         return;
     }
-    const state = session.state;
-    const buffer =
-        state.activeBufferId !== null ? state.buffers[state.activeBufferId] : undefined;
+    const buffer = activeBuffer(session.state);
     if (buffer?.hasNicklist && Object.keys(buffer.nicks).length > 0) {
         setUi({ nicklistOpen: true });
     }

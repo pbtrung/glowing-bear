@@ -395,6 +395,10 @@ export function applyNicklist(
     });
 }
 
+/** The buffer shown */
+export const activeBuffer = (state: ChatState): Buffer | undefined =>
+    state.activeBufferId !== null ? state.buffers[state.activeBufferId] : undefined;
+
 /**
  * Switch to a buffer. The previous one remembers its last line as read.
  */

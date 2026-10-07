@@ -8,10 +8,19 @@ import { getSettings } from './settings';
 let serviceWorker: ServiceWorkerRegistration | null = null;
 const shown: Notification[] = [];
 
-/** Ask for the permission to show notifications, register the service worker */
-export function requestNotificationPermission(): void {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-        void Notification.requestPermission();
+export type NotificationPermissionState = NotificationPermission | 'unsupported';
+
+export const notificationPermission = (): NotificationPermissionState =>
+    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
+
+/**
+ * Ask for the permission to show notifications (browsers only ask from a
+ * click), register the service worker. Resolves with the permission.
+ */
+export async function requestNotificationPermission(): Promise<NotificationPermissionState> {
+    let permission = notificationPermission();
+    if (permission === 'default') {
+        permission = await Notification.requestPermission().catch(() => permission);
     }
     if ('serviceWorker' in navigator && serviceWorker === null) {
         navigator.serviceWorker.register('serviceworker.js').then(
@@ -21,6 +30,7 @@ export function requestNotificationPermission(): void {
             () => undefined,
         );
     }
+    return permission;
 }
 
 /** Click handlers of the notifications shown by the service worker, by tag */
@@ -139,6 +149,8 @@ export function updateTitle(notifications: number, buffer: Buffer | undefined): 
 
 let originalFavicon: string | null = null;
 let faviconImage: HTMLImageElement | null = null;
+/** Counts to draw once the favicon is loaded (only the latest ones) */
+let faviconCounts: [number, number] = [0, 0];
 
 /** Draw a badge with a count on the favicon */
 export function updateFavicon(notifications: number, unread: number): void {
@@ -149,12 +161,17 @@ export function updateFavicon(notifications: number, unread: number): void {
         return;
     }
     originalFavicon ??= link.href;
+    faviconCounts = [notifications, unread];
     const count = notifications > 0 ? notifications : unread;
     if (count === 0 || !getSettings().useFavico) {
         link.href = originalFavicon;
         return;
     }
     const draw = (image: HTMLImageElement) => {
+        if (faviconCounts[0] !== notifications || faviconCounts[1] !== unread) {
+            // changed while the image was loading: drawn by a later call
+            return;
+        }
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 32;
         const ctx = canvas.getContext('2d');
@@ -173,12 +190,16 @@ export function updateFavicon(notifications: number, unread: number): void {
         ctx.fillText(count > 99 ? '99' : String(count), 22, 23);
         link.href = canvas.toDataURL('image/png');
     };
-    if (faviconImage?.complete) {
-        draw(faviconImage);
-    } else {
+    if (faviconImage === null) {
         faviconImage = new Image();
-        faviconImage.onload = () => draw(faviconImage!);
         faviconImage.src = originalFavicon;
+    }
+    const image = faviconImage;
+    if (image.complete && image.naturalWidth > 0) {
+        draw(image);
+    } else {
+        // one handler: the latest counts are drawn
+        image.onload = () => draw(image);
     }
 }
 

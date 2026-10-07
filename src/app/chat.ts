@@ -1,9 +1,11 @@
 /*
  * The session with WeeChat and the UI state, with hooks for components.
  */
+import { useSyncExternalStore } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
+import { activeBuffer } from '../lib/state/reducers';
 import { Session, type SessionState } from '../lib/state/session';
 import type { Buffer } from '../lib/state/model';
 import { getSettings, updateSettings, type Settings } from './settings';
@@ -13,8 +15,24 @@ import { notifyHighlight } from './notifications';
 export const relayKey = (s: Settings = getSettings()): string =>
     `${s.host}:${s.port}/${s.path}`;
 
-export const isMobileUi = (): boolean =>
-    typeof document !== 'undefined' && document.body.clientWidth < 968;
+/** The media query of the mobile layout in glowingbear.css */
+const MOBILE_QUERY = '(max-width: 967.98px)';
+
+const mobileQuery = (): MediaQueryList | null =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        ? window.matchMedia(MOBILE_QUERY)
+        : null;
+
+export const isMobileUi = (): boolean => mobileQuery()?.matches ?? false;
+
+/** isMobileUi(), updated when the window is resized or rotated */
+export function useMobileUi(): boolean {
+    return useSyncExternalStore((onChange) => {
+        const query = mobileQuery();
+        query?.addEventListener('change', onChange);
+        return () => query?.removeEventListener('change', onChange);
+    }, isMobileUi);
+}
 
 export const windowFocused = (): boolean =>
     typeof document === 'undefined' || document.visibilityState !== 'hidden';
@@ -55,10 +73,7 @@ export const useUnreadTotals = (): { unread: number; notifications: number } =>
         return { unread, notifications };
     });
 
-export const useActiveBuffer = (): Buffer | undefined =>
-    useChat((s) =>
-        s.activeBufferId !== null ? s.buffers[s.activeBufferId] : undefined,
-    );
+export const useActiveBuffer = (): Buffer | undefined => useChat(activeBuffer);
 
 /*
  * UI state
@@ -322,10 +337,7 @@ export function addMention(nick: string): void {
         const trimmed = value.trim();
         if (trimmed.endsWith(':')) {
             const lastWord = trimmed.slice(trimmed.lastIndexOf(' ') + 1, -1);
-            const buffer =
-                session.state.activeBufferId !== null
-                    ? session.state.buffers[session.state.activeBufferId]
-                    : undefined;
+            const buffer = activeBuffer(session.state);
             if (
                 buffer &&
                 Object.values(buffer.nicks).some((n) => n.name === lastWord)

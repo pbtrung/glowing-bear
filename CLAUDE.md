@@ -50,7 +50,7 @@ Single tests: `npx vitest run src/lib/state` or `npx vitest run -t "name"`.
 - **`chat.ts`** — the `Session` instance, the UI store (panels, dialogs, search, jump/quick keys, input text), `listBuffers` (buffer list filtering and keys) and actions. Components read state with `useChat`/`useUi`/`useSettings`.
 - **`App.tsx`** — layout (login or chat), banners, title/favicon/badge updates. **`nicks.ts`** — nicklist sections, avatar hue and initial, the nick shown in the input prompt.
 - **`keyboard.ts`** (global shortcuts), **`swipe.ts`** (mobile gestures), **`notifications.ts`** (desktop notifications — through `public/serviceworker.js` where pages can't create them (Android) — sound, title, favicon and app badges), **`theme.ts`** (themes, fonts, custom CSS), **`connect.ts`** (URL parameters, autoconnect).
-- **`components/`** — `RichText` (message text as React elements), `BufferLines`, `BufferList`, `NickList`, `TopBar`, `InputBar`, `SettingsDialog`, `TopicDialog`, `Login`, `Modal`, `Icon` (lucide-react).
+- **`components/`** — `RichText` (message text as React elements), `BufferLines`, `BufferList`, `NickList`, `TopBar`, `InputBar`, `SettingsDialog`, `TopicDialog`, `Login`, `Modal` (focus taken, trapped and restored; `inert` when hidden), `SearchBox`, `Avatar`, `Icon` (lucide-react). `isMobileUi`/`useMobileUi` (chat.ts) use the same media query as the CSS.
 
 ## Conventions
 

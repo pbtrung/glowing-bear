@@ -1,9 +1,8 @@
-import type { KeyboardEvent, CSSProperties } from 'react';
+import type { KeyboardEvent } from 'react';
 import {
     ChevronDown,
     MessagesSquare,
     Pin,
-    Search,
     Server,
     SquareTerminal,
     type LucideIcon,
@@ -20,10 +19,11 @@ import {
     useUi,
     type ListedBuffer,
 } from '../chat';
-import { initial, nameHue } from '../nicks';
 import { useSettings } from '../settings';
 import { useSwipe } from '../swipe';
+import { Avatar } from './Avatar';
 import { Icon } from './Icon';
+import { SearchBox } from './SearchBox';
 
 function onSearchKey(
     event: KeyboardEvent<HTMLInputElement>,
@@ -32,12 +32,6 @@ function onSearchKey(
 ): void {
     const ui = uiStore.getState();
     switch (event.key) {
-        case 'Escape':
-            event.preventDefault();
-            // not counted for the double Escape that disconnects
-            event.stopPropagation();
-            setUi({ search: '', searchIndex: 0 });
-            break;
         case 'Enter':
             event.preventDefault();
             if (count > 0) {
@@ -48,8 +42,15 @@ function onSearchKey(
             event.preventDefault();
             setUi({ searchIndex: Math.max(0, ui.searchIndex - 1) });
             break;
-        case 'ArrowDown':
         case 'Tab':
+            // moves in the results while searching, else leaves the field
+            if (ui.search === '' || event.shiftKey) {
+                break;
+            }
+            event.preventDefault();
+            setUi({ searchIndex: Math.min(count - 1, ui.searchIndex + 1) });
+            break;
+        case 'ArrowDown':
             event.preventDefault();
             setUi({
                 searchIndex: Math.max(0, Math.min(count - 1, ui.searchIndex + 1)),
@@ -62,13 +63,10 @@ function onSearchKey(
 function BufferIcon({ buffer }: { buffer: Buffer }) {
     if (buffer.type === 'private') {
         return (
-            <span
-                className="buffer-avatar avatar"
-                style={{ '--avatar-hue': nameHue(buffer.shortName) } as CSSProperties}
-                aria-hidden="true"
-            >
-                {initial(buffer.shortName || buffer.fullName)}
-            </span>
+            <Avatar
+                name={buffer.shortName || buffer.fullName}
+                className="buffer-avatar"
+            />
         );
     }
     let icon: LucideIcon | null = null;
@@ -188,28 +186,21 @@ export function BufferList() {
                 className="bufferfilter"
                 onSubmit={(e) => e.preventDefault()}
             >
-                <div className={`search-box${ui.jumpMode ? ' showjumpkeys' : ''}`}>
-                    {ui.jumpMode ? (
-                        <span className="search-box-jump">Jump</span>
-                    ) : (
-                        <Icon icon={Search} className="search-box-icon" />
-                    )}
-                    <input
-                        className="form-control form-control-sm"
-                        type="search"
-                        id="bufferFilter"
-                        value={
-                            ui.jumpMode ? (ui.jumpDigit ?? '').toString() : ui.search
-                        }
-                        onChange={(e) =>
-                            setUi({ search: e.target.value, searchIndex: 0 })
-                        }
-                        onKeyDown={(e) => onSearchKey(e, list.length, ids)}
-                        placeholder={ui.jumpMode ? 'Number' : 'Search buffers'}
-                        autoComplete="off"
-                        aria-label="Search buffers"
-                    />
-                </div>
+                <SearchBox
+                    id="bufferFilter"
+                    className={ui.jumpMode ? 'showjumpkeys' : ''}
+                    prefix={
+                        ui.jumpMode ? (
+                            <span className="search-box-jump">Jump</span>
+                        ) : undefined
+                    }
+                    value={ui.jumpMode ? (ui.jumpDigit ?? '').toString() : ui.search}
+                    onChange={(search) => setUi({ search, searchIndex: 0 })}
+                    onClear={() => setUi({ search: '', searchIndex: 0 })}
+                    onKeyDown={(e) => onSearchKey(e, list.length, ids)}
+                    placeholder={ui.jumpMode ? 'Number' : 'Search buffers'}
+                    label="Search buffers"
+                />
             </form>
             <ul className={listClasses.join(' ')}>
                 {list.map((item, index) => (

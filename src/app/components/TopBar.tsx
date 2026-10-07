@@ -40,10 +40,14 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                 <img alt="" src="assets/img/favicon.png" className="desktop" />
             </button>
 
-            <div
+            <button
+                type="button"
                 className="title"
                 onClick={() => setUi({ modal: 'topic' })}
                 title={buffer?.titleText}
+                aria-label={
+                    buffer ? `Topic of ${buffer.shortName || buffer.fullName}` : 'Topic'
+                }
             >
                 {buffer && (
                     <>
@@ -58,13 +62,12 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                         </span>
                     </>
                 )}
-            </div>
+            </button>
 
             <div className="actions">
                 {(unread > 0 || notifications > 0) && (
                     <div
                         className="totals"
-                        role="status"
                         aria-label={`${unread} unread, ${notifications} highlights`}
                     >
                         {unread > 0 && (

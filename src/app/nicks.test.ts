@@ -85,6 +85,8 @@ describe('nicklist display', () => {
         expect(initial('alice')).toBe('A');
         expect(initial('_[xavier]')).toBe('X');
         expect(initial('élodie')).toBe('É');
+        expect(initial('')).toBe('?');
+        expect(initial('___')).toBe('_');
         expect(nameHue('alice')).toBe(nameHue('ALICE'));
         expect(nameHue('alice')).toBeGreaterThanOrEqual(0);
         expect(nameHue('alice')).toBeLessThan(360);

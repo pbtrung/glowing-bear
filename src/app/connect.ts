@@ -18,7 +18,9 @@ export async function connectWithSettings(password: string): Promise<void> {
     if (!parsed) {
         return;
     }
-    requestNotificationPermission();
+    // (from the Connect button: autoconnecting can't show the prompt, see the
+    // notification settings)
+    void requestNotificationPermission();
     try {
         await session.connect({
             host: parsed.host,

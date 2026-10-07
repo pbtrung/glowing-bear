@@ -72,7 +72,7 @@ export function nameHue(name: string): number {
 /** First letter of a name for its avatar (skipping symbols like "_" or "[") */
 export function initial(name: string): string {
     const letter = [...name].find((ch) => /[\p{L}\p{N}]/u.test(ch));
-    return (letter ?? name.charAt(0) ?? '?').toUpperCase();
+    return (letter ?? (name.charAt(0) || '?')).toUpperCase();
 }
 
 /** Prompt without the IRC prefixes (~ & @ % + !) in front of the nick */

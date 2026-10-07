@@ -104,6 +104,73 @@ weechat.controller('WeechatCtrl', [
             'base16-solarized-light',
         ];
 
+        // Colors of the theme cards in the settings: background, panels,
+        // text and accent (keep in sync with css/themes/)
+        $scope.themePreviews = {
+            dark: ['#181818', '#232323', '#dddddd', '#4f8fd6'],
+            light: ['#fdfdfd', '#f1f2f4', '#181818', '#2f6fb5'],
+            black: ['#000000', '#080808', '#dddddd', '#4f8fd6'],
+            'dark-spacious': ['#181818', '#232323', '#dddddd', '#4f8fd6'],
+            blue: ['#1d222c', '#283244', '#dfdfcf', '#0f99d9'],
+            'base16-default': ['#181818', '#282828', '#d8d8d8', '#7cafc2'],
+            'base16-light': ['#f8f8f8', '#e8e8e8', '#383838', '#3e7184'],
+            'base16-mocha': ['#3b3228', '#534636', '#d0c8c6', '#8ab3b5'],
+            'base16-ocean-dark': ['#2b303b', '#343d46', '#c0c5ce', '#8fa1b3'],
+            'base16-solarized-dark': ['#002b36', '#073642', '#839496', '#268bd2'],
+            'base16-solarized-light': ['#fdf6e3', '#eee8d5', '#657b83', '#268bd2'],
+        };
+
+        // Settings dialog
+        $scope.settingsTabs = [
+            { id: 'appearance', label: 'Appearance', icon: 'palette' },
+            { id: 'chat', label: 'Chat', icon: 'messages-square' },
+            { id: 'notifications', label: 'Notifications', icon: 'bell-ring' },
+            { id: 'shortcuts', label: 'Shortcuts', icon: 'keyboard', desktop: true },
+            { id: 'about', label: 'About', icon: 'info' },
+        ];
+        $scope.settingsTab = 'appearance';
+        $scope.selectSettingsTab = function (tab, $event) {
+            $scope.settingsTab = tab.id;
+            // On phones the tabs scroll horizontally: show the selected one
+            $event.currentTarget.scrollIntoView({
+                block: 'nearest',
+                inline: 'nearest',
+            });
+        };
+
+        // Names of the themes in the settings
+        $scope.themeLabels = {
+            dark: 'Dark',
+            light: 'Light',
+            black: 'Black',
+            'dark-spacious': 'Dark spacious',
+            blue: 'Blue',
+            'base16-default': 'Base16',
+            'base16-light': 'Base16 light',
+            'base16-mocha': 'Mocha',
+            'base16-ocean-dark': 'Ocean dark',
+            'base16-solarized-dark': 'Solarized dark',
+            'base16-solarized-light': 'Solarized light',
+        };
+
+        $scope.fontPresets = [
+            { label: 'Inter', value: DEFAULT_FONT },
+            { label: 'System', value: 'system-ui, -apple-system, sans-serif' },
+            {
+                label: 'Monospace',
+                value: "ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace",
+            },
+        ];
+
+        // Font size slider, the setting itself is a CSS size ("14px")
+        $scope.fontSizePx = function (value) {
+            if (arguments.length && isFinite(value) && value > 0) {
+                settings.fontsize = value + 'px';
+            }
+            var size = parseInt(settings.fontsize, 10);
+            return isNaN(size) ? 14 : size;
+        };
+
         // Current swipe status. Values:
         // +1: bufferlist open, nicklist closed
         //  0: bufferlist closed, nicklist closed
@@ -609,6 +676,9 @@ weechat.controller('WeechatCtrl', [
         });
         // Update font size when changed
         settings.addCallback('fontsize', function (fontsize) {
+            if (fontsize === null || fontsize === undefined || fontsize === '') {
+                return;
+            }
             if (typeof fontsize === 'number') {
                 // settings module recognizes a fontsize without unit it as a number
                 // and converts, we need to convert back

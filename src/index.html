@@ -224,9 +224,10 @@ chown -R <strong>username</strong>:<strong>username</strong> ~<strong>username</
 
       <nav id="sidebar" data-state="visible" ng-swipe-left="swipeLeft()" ng-swipe-disable-mouse aria-label="Buffers">
         <form role="search" class="bufferfilter" ng-submit="$event.preventDefault()">
-          <div class="input-group input-group-sm" ng-class="{'showjumpkeys': showJumpKeys}">
-            <span class="input-group-text" id="jump-addon"><gb-icon name="search" ng-hide="showJumpKeys"></gb-icon><span ng-show="showJumpKeys">Jump</span></span>
-            <input class="form-control" type="search" id="bufferFilter" ng-model="search" ng-keydown="handleSearchBoxKey($event)" placeholder="{{ search_placeholder || 'Search' }}" autocomplete="off" aria-describedby="jump-addon">
+          <div class="search-box" ng-class="{'showjumpkeys': showJumpKeys}">
+            <gb-icon name="search" class="search-box-icon" ng-hide="showJumpKeys"></gb-icon>
+            <span class="search-box-jump" ng-show="showJumpKeys">Jump</span>
+            <input class="form-control form-control-sm" type="search" id="bufferFilter" ng-model="search" ng-keydown="handleSearchBoxKey($event)" placeholder="{{ search_placeholder || 'Search buffers' }}" autocomplete="off" aria-label="Search buffers">
           </div>
         </form>
         <ul class="buffer-list" ng-class="{'indented': (predicate === 'serverSortKey'), 'showquickkeys': showQuickKeys, 'showjumpkeys': showJumpKeys}">
@@ -311,107 +312,175 @@ chown -R <strong>username</strong>:<strong>username</strong> ~<strong>username</
     </div>
 
     <!-- Settings -->
-    <div id="settingsModal" class="gb-modal modal" data-state="hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div id="settingsModal" class="gb-modal modal settings-modal" data-state="hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <div class="backdrop" ng-click="closeModal($event)"></div>
       <div class="modal-dialog modal-dialog-scrollable modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
           <div class="modal-header">
-            <div>
-              <h2 class="modal-title h5 d-flex align-items-center gap-2" id="settingsTitle"><gb-icon name="sliders-horizontal"></gb-icon> Settings</h2>
-              <p class="small text-body-secondary mb-0">Settings are stored in this browser.</p>
-            </div>
+            <h2 class="modal-title h5 d-flex align-items-center gap-2" id="settingsTitle"><gb-icon name="sliders-horizontal"></gb-icon> Settings</h2>
             <button type="button" class="btn-close" ng-click="closeModal($event)" aria-label="Close"></button>
           </div>
-          <div class="modal-body">
-            <section class="settings-section">
-              <h3 class="h6 d-flex align-items-center gap-2"><gb-icon name="palette"></gb-icon> Appearance</h3>
-              <div class="row g-2">
-                <div class="col-12 col-sm-6">
-                  <label for="theme" class="form-label">Theme</label>
-                  <select id="theme" class="form-select" ng-model="settings.theme" ng-options="theme for theme in themes"></select>
-                </div>
-                <div class="col-8 col-sm-4">
-                  <label for="font" class="form-label">Chat font</label>
-                  <input type="text" ng-model="settings.fontfamily" class="form-control" id="font">
-                </div>
-                <div class="col-4 col-sm-2">
-                  <label for="size" class="form-label">Size</label>
-                  <input type="text" ng-model="settings.fontsize" class="form-control" id="size">
-                </div>
-                <div class="col-12">
-                  <label for="custom-css" class="form-label">Custom CSS</label>
-                  <textarea id="custom-css" class="form-control font-monospace" rows="2" ng-model="settings.customCSS"></textarea>
-                </div>
-              </div>
-            </section>
+          <div class="settings-layout">
+            <nav class="settings-nav" role="tablist" aria-label="Settings sections">
+              <button type="button" class="settings-nav-item" role="tab" ng-repeat="tab in settingsTabs" ng-class="{'active': settingsTab === tab.id, 'desktop': tab.desktop}" ng-attr-aria-selected="{{ settingsTab === tab.id }}" ng-click="selectSettingsTab(tab, $event)">
+                <gb-icon name="{{ tab.icon }}"></gb-icon><span>{{ tab.label }}</span>
+              </button>
+            </nav>
 
-            <section class="settings-section">
-              <h3 class="h6 d-flex align-items-center gap-2"><gb-icon name="messages-square"></gb-icon> Behavior</h3>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="onlyUnread" ng-model="settings.onlyUnread">
-                <label class="form-check-label" for="onlyUnread">Only show buffers with unread messages</label>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="orderbyserver" ng-model="settings.orderbyserver">
-                <label class="form-check-label" for="orderbyserver">Hierarchical buffer view (order by server)</label>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="hotlistsync" ng-model="settings.hotlistsync">
-                <label class="form-check-label" for="hotlistsync">Mark messages as read in WeeChat</label>
-              </div>
-              <div class="form-check form-switch mobile">
-                <input class="form-check-input" type="checkbox" role="switch" id="alwaysnicklist" ng-model="settings.alwaysnicklist">
-                <label class="form-check-label" for="alwaysnicklist">Always show nicklist</label>
-              </div>
-              <div class="form-check form-switch desktop">
-                <input class="form-check-input" type="checkbox" role="switch" id="nonicklist" ng-model="settings.nonicklist">
-                <label class="form-check-label" for="nonicklist">Hide nicklist</label>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="readlineBindings" ng-model="settings.readlineBindings">
-                <label class="form-check-label" for="readlineBindings">Enable common readline keybindings in the input bar</label>
-              </div>
-              <div class="form-check form-switch desktop">
-                <input class="form-check-input" type="checkbox" role="switch" id="enableQuickKeys" ng-model="settings.enableQuickKeys">
-                <label class="form-check-label" for="enableQuickKeys">Use <kbd>Alt</kbd>+<kbd>0</kbd>–<kbd>9</kbd> to switch buffers</label>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="enableMathjax" ng-model="settings.enableMathjax">
-                <label class="form-check-label" for="enableMathjax">Enable LaTeX math rendering</label>
-              </div>
-            </section>
+            <div class="settings-panes modal-body">
+              <!-- Appearance -->
+              <section class="settings-pane" role="tabpanel" ng-show="settingsTab === 'appearance'">
+                <h3 class="settings-heading">Theme</h3>
+                <div class="theme-grid" role="radiogroup" aria-label="Theme">
+                  <button type="button" class="theme-card" role="radio" ng-repeat="theme in themes" ng-class="{'active': settings.theme === theme}" ng-attr-aria-checked="{{ settings.theme === theme }}" ng-click="settings.theme = theme" title="{{ themeLabels[theme] || theme }}">
+                    <span class="theme-preview" ng-style="{'background': themePreviews[theme][0]}">
+                      <span class="theme-preview-side" ng-style="{'background': themePreviews[theme][1]}"></span>
+                      <span class="theme-preview-lines">
+                        <span ng-style="{'background': themePreviews[theme][2]}"></span>
+                        <span ng-style="{'background': themePreviews[theme][3]}"></span>
+                        <span ng-style="{'background': themePreviews[theme][2]}"></span>
+                      </span>
+                    </span>
+                    <span class="theme-name">{{ themeLabels[theme] || theme }}</span>
+                  </button>
+                </div>
 
-            <section class="settings-section">
-              <h3 class="h6 d-flex align-items-center gap-2"><gb-icon name="bell-ring"></gb-icon> Notifications</h3>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="useFavico" ng-model="settings.useFavico">
-                <label class="form-check-label" for="useFavico">Display unread count in favicon</label>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="soundnotification" ng-model="settings.soundnotification">
-                <label class="form-check-label" for="soundnotification">Play sound on notification</label>
-              </div>
-            </section>
+                <h3 class="settings-heading">Chat text</h3>
+                <div class="settings-group">
+                  <div class="settings-row settings-row-stacked">
+                    <div class="settings-row-text">
+                      <label class="settings-row-title" for="font">Font</label>
+                      <div class="settings-row-help">Used for messages and the input bar.</div>
+                    </div>
+                    <div class="btn-group btn-group-sm font-presets" role="group" aria-label="Font presets">
+                      <button type="button" class="btn btn-outline-secondary" ng-repeat="preset in fontPresets" ng-class="{'active': settings.fontfamily === preset.value}" ng-click="settings.fontfamily = preset.value" ng-style="{'font-family': preset.value}">{{ preset.label }}</button>
+                    </div>
+                    <input type="text" ng-model="settings.fontfamily" class="form-control form-control-sm font-monospace" id="font" spellcheck="false" aria-label="Font family">
+                  </div>
+                  <div class="settings-row settings-row-stacked">
+                    <div class="settings-row-text">
+                      <label class="settings-row-title" for="size">Size</label>
+                      <div class="settings-row-help">{{ settings.fontsize }}</div>
+                    </div>
+                    <input type="range" class="form-range" id="size" min="11" max="22" step="1" ng-model="fontSizePx" ng-model-options="{ getterSetter: true }">
+                    <p class="font-sample favorite-font mb-0"><span class="font-sample-nick">alice</span> The quick brown fox jumps over the lazy dog.</p>
+                  </div>
+                </div>
 
+                <details class="settings-advanced">
+                  <summary>Custom CSS</summary>
+                  <textarea id="custom-css" class="form-control font-monospace mt-2" rows="4" ng-model="settings.customCSS" spellcheck="false" aria-label="Custom CSS" placeholder="#bufferlines { letter-spacing: 0.01em; }"></textarea>
+                </details>
+              </section>
 
-            <section class="settings-section mb-0">
-              <h3 class="h6 d-flex align-items-center gap-2"><gb-icon name="server"></gb-icon> About</h3>
-              <dl class="row small mb-2">
-                <dt class="col-5 col-sm-4">Glowing Bear</dt><dd class="col-7 col-sm-8">0.10.0</dd>
-                <dt class="col-5 col-sm-4">WeeChat</dt><dd class="col-7 col-sm-8">{{ models.versionInfo.weechat_version || '–' }}</dd>
-                <dt class="col-5 col-sm-4">Relay API</dt><dd class="col-7 col-sm-8">{{ models.versionInfo.relay_api_version || '–' }}</dd>
-                <dt class="col-5 col-sm-4">Relay</dt><dd class="col-7 col-sm-8 text-break">{{ settings.host }}:{{ settings.port }}/{{ settings.path }} <gb-icon name="{{ settings.tls ? 'lock' : 'lock-open' }}"></gb-icon></dd>
-              </dl>
-              <details ng-if="models.scripts.length">
-                <summary class="small">Loaded scripts ({{ models.scripts.length }})</summary>
-                <ul class="list-unstyled small scripts-list mt-2 mb-0">
-                  <li ng-repeat="script in models.scripts | orderBy:'name'"><strong>{{ script.name }}</strong> {{ script.version }} <span class="text-body-secondary">— {{ script.description }}</span></li>
-                </ul>
-              </details>
-            </section>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-primary" ng-click="closeModal($event)">Close</button>
+              <!-- Chat -->
+              <section class="settings-pane" role="tabpanel" ng-show="settingsTab === 'chat'">
+                <h3 class="settings-heading">Buffer list</h3>
+                <div class="settings-group">
+                  <label class="settings-row" for="orderbyserver">
+                    <span class="settings-row-text"><span class="settings-row-title">Group by server</span><span class="settings-row-help">Show channels and queries under their server.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="orderbyserver" ng-model="settings.orderbyserver"></span>
+                  </label>
+                  <label class="settings-row" for="onlyUnread">
+                    <span class="settings-row-text"><span class="settings-row-title">Only buffers with unread messages</span><span class="settings-row-help">Pinned buffers and the core buffer stay visible.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="onlyUnread" ng-model="settings.onlyUnread"></span>
+                  </label>
+                  <label class="settings-row desktop" for="enableQuickKeys">
+                    <span class="settings-row-text"><span class="settings-row-title">Quick buffer switching</span><span class="settings-row-help">Use <kbd>Alt</kbd>+<kbd>0</kbd>–<kbd>9</kbd> to switch buffers.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="enableQuickKeys" ng-model="settings.enableQuickKeys"></span>
+                  </label>
+                </div>
+
+                <h3 class="settings-heading">Nicklist</h3>
+                <div class="settings-group">
+                  <label class="settings-row desktop" for="nonicklist">
+                    <span class="settings-row-text"><span class="settings-row-title">Hide nicklist</span><span class="settings-row-help">Toggle it anytime with <kbd>Alt</kbd>+<kbd>n</kbd>.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="nonicklist" ng-model="settings.nonicklist"></span>
+                  </label>
+                  <label class="settings-row mobile" for="alwaysnicklist">
+                    <span class="settings-row-text"><span class="settings-row-title">Always show nicklist</span><span class="settings-row-help">Otherwise open it from the top bar.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="alwaysnicklist" ng-model="settings.alwaysnicklist"></span>
+                  </label>
+                </div>
+
+                <h3 class="settings-heading">Messages</h3>
+                <div class="settings-group">
+                  <label class="settings-row" for="hotlistsync">
+                    <span class="settings-row-text"><span class="settings-row-title">Mark messages as read in WeeChat</span><span class="settings-row-help">Clear the hotlist and move the read marker when you view a buffer.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="hotlistsync" ng-model="settings.hotlistsync"></span>
+                  </label>
+                  <label class="settings-row" for="readlineBindings">
+                    <span class="settings-row-text"><span class="settings-row-title">Readline keybindings</span><span class="settings-row-help"><kbd>Ctrl</kbd>+<kbd>a</kbd>/<kbd>e</kbd>/<kbd>u</kbd>/<kbd>k</kbd>/<kbd>w</kbd> in the input bar.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="readlineBindings" ng-model="settings.readlineBindings"></span>
+                  </label>
+                  <label class="settings-row" for="enableMathjax">
+                    <span class="settings-row-text"><span class="settings-row-title">LaTeX math</span><span class="settings-row-help">Render math between <code>$$</code> delimiters with KaTeX (loaded from cdnjs).</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="enableMathjax" ng-model="settings.enableMathjax"></span>
+                  </label>
+                </div>
+              </section>
+
+              <!-- Notifications -->
+              <section class="settings-pane" role="tabpanel" ng-show="settingsTab === 'notifications'">
+                <h3 class="settings-heading">Notifications</h3>
+                <div class="settings-group">
+                  <label class="settings-row" for="soundnotification">
+                    <span class="settings-row-text"><span class="settings-row-title">Sound</span><span class="settings-row-help">Play a sound on highlights and private messages.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="soundnotification" ng-model="settings.soundnotification"></span>
+                  </label>
+                  <label class="settings-row" for="useFavico">
+                    <span class="settings-row-text"><span class="settings-row-title">Unread count in the tab icon</span><span class="settings-row-help">Also shown on the app icon when installed.</span></span>
+                    <span class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="useFavico" ng-model="settings.useFavico"></span>
+                  </label>
+                </div>
+                <p class="settings-note"><gb-icon name="info"></gb-icon> Desktop notifications for highlights and private messages use your browser's permission for this site.</p>
+              </section>
+
+              <!-- Shortcuts -->
+              <section class="settings-pane" role="tabpanel" ng-show="settingsTab === 'shortcuts'">
+                <h3 class="settings-heading">Keyboard shortcuts</h3>
+                <dl class="shortcut-table">
+                  <dt><kbd>Alt</kbd> <kbd>0</kbd>–<kbd>9</kbd></dt><dd>Switch to buffer number N</dd>
+                  <dt><kbd>Alt</kbd> <kbd>j</kbd> <kbd>NN</kbd></dt><dd>Switch to buffer number NN</dd>
+                  <dt><kbd>Alt</kbd> <kbd>↑</kbd> / <kbd>↓</kbd></dt><dd>Previous / next buffer</dd>
+                  <dt><kbd>Alt</kbd> <kbd>a</kbd></dt><dd>Next buffer with activity</dd>
+                  <dt><kbd>Alt</kbd> <kbd>&lt;</kbd></dt><dd>Previously active buffer</dd>
+                  <dt><kbd>Alt</kbd> <kbd>g</kbd></dt><dd>Search buffers</dd>
+                  <dt><kbd>Alt</kbd> <kbd>n</kbd></dt><dd>Toggle nicklist</dd>
+                  <dt><kbd>Alt</kbd> <kbd>l</kbd></dt><dd>Focus the input bar</dd>
+                  <dt><kbd>Alt</kbd> <kbd>h</kbd></dt><dd>Clear all unread counters</dd>
+                  <dt><kbd>Tab</kbd></dt><dd>Complete nick or command</dd>
+                  <dt><kbd>↑</kbd> / <kbd>↓</kbd></dt><dd>Input history</dd>
+                  <dt><kbd>Esc</kbd> <kbd>Esc</kbd></dt><dd>Disconnect</dd>
+                </dl>
+              </section>
+
+              <!-- About -->
+              <section class="settings-pane" role="tabpanel" ng-show="settingsTab === 'about'">
+                <div class="about-header">
+                  <img alt="" src="assets/img/glowing-bear.svg">
+                  <div>
+                    <div class="fw-semibold">Glowing Bear 0.10.0</div>
+                    <div class="small text-body-secondary">WeeChat web frontend</div>
+                  </div>
+                </div>
+                <h3 class="settings-heading">Connection</h3>
+                <div class="settings-group">
+                  <div class="settings-row"><span class="settings-row-title">WeeChat</span><span class="settings-row-value">{{ models.versionInfo.weechat_version || '–' }}</span></div>
+                  <div class="settings-row"><span class="settings-row-title">Relay API</span><span class="settings-row-value">{{ models.versionInfo.relay_api_version || '–' }}</span></div>
+                  <div class="settings-row"><span class="settings-row-title">Relay</span><span class="settings-row-value text-break">{{ settings.host }}:{{ settings.port }}/{{ settings.path }}</span></div>
+                  <div class="settings-row"><span class="settings-row-title">Encryption</span><span class="settings-row-value"><gb-icon name="{{ settings.tls ? 'lock' : 'lock-open' }}"></gb-icon> {{ settings.tls ? 'TLS' : 'None' }}</span></div>
+                </div>
+                <h3 class="settings-heading" ng-if="models.scripts.length">Scripts <span class="badge rounded-pill text-bg-secondary">{{ models.scripts.length }}</span></h3>
+                <div class="settings-group scripts-list" ng-if="models.scripts.length">
+                  <div class="settings-row" ng-repeat="script in models.scripts | orderBy:'name'">
+                    <span class="settings-row-text"><span class="settings-row-title">{{ script.name }}</span><span class="settings-row-help">{{ script.description }}</span></span>
+                    <span class="settings-row-value">{{ script.version }}</span>
+                  </div>
+                </div>
+                <p class="settings-note"><gb-icon name="info"></gb-icon> Settings are stored in this browser only.</p>
+              </section>
+            </div>
           </div>
         </div>
       </div>

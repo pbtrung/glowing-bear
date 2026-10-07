@@ -5,6 +5,9 @@
 import { parseRichText, plainText, type RichText } from '../relay/colors';
 import type { ApiBuffer, ApiLine, ApiNick, ApiNickGroup } from '../relay/types';
 
+/** lastReadKey when all the lines loaded are unread */
+export const READ_MARKER_TOP = '^';
+
 export interface Line {
     /** Unique key in the buffer */
     key: string;
@@ -82,8 +85,13 @@ export interface Buffer {
     requestedLines: number;
     /** Lines were fetched (else only the lines received since are held) */
     linesFetched: boolean;
+    /** Lines are being fetched */
+    loadingLines: boolean;
     allLinesFetched: boolean;
-    /** Key of the last line read: the read marker is shown after it */
+    /**
+     * Key of the last line read: the read marker is shown after it (before
+     * the first line with READ_MARKER_TOP)
+     */
     lastReadKey: string | null;
     /** Read marker of WeeChat, used when lines are loaded (-1: none) */
     lastReadLineId: number;
@@ -150,6 +158,7 @@ export function createBuffer(api: ApiBuffer): Buffer {
         lines: [],
         requestedLines: 0,
         linesFetched: false,
+        loadingLines: false,
         allLinesFetched: false,
         lastReadKey: null,
         lastReadLineId: -1,

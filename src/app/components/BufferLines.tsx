@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { History, LoaderCircle } from 'lucide-react';
-import type { Buffer, Line } from '../../lib/state/model';
+import { READ_MARKER_TOP, type Buffer, type Line } from '../../lib/state/model';
 import {
     activeBufferLineListeners,
     addMention,
@@ -80,12 +80,29 @@ function showToast(text: string): void {
     setTimeout(() => toast.remove(), 5000);
 }
 
+function ReadMarker() {
+    return (
+        <tr className="readmarker">
+            <td colSpan={3}>
+                <hr id="readmarker" />
+            </td>
+        </tr>
+    );
+}
+
 function Lines({ buffer }: { buffer: Buffer }) {
     const timeFormat = useChat(
         (s) => s.options['weechat.look.buffer_time_format'] ?? '%H:%M:%S',
     );
     const math = useSettings((s) => s.enableMathjax);
     const rows = [];
+    if (buffer.lastReadKey === READ_MARKER_TOP && buffer.lines.length > 0) {
+        rows.push(
+            <tbody key={READ_MARKER_TOP}>
+                <ReadMarker />
+            </tbody>,
+        );
+    }
     for (let i = 0; i < buffer.lines.length; i++) {
         const line = buffer.lines[i];
         rows.push(
@@ -98,11 +115,7 @@ function Lines({ buffer }: { buffer: Buffer }) {
                     math={math}
                 />
                 {buffer.lastReadKey === line.key && i < buffer.lines.length - 1 && (
-                    <tr className="readmarker">
-                        <td colSpan={3}>
-                            <hr id="readmarker" />
-                        </td>
-                    </tr>
+                    <ReadMarker />
                 )}
             </tbody>,
         );
@@ -113,7 +126,6 @@ function Lines({ buffer }: { buffer: Buffer }) {
 /** The lines of the active buffer */
 export function BufferLines() {
     const buffer = useActiveBuffer();
-    const loadingLines = useChat((s) => s.loadingLines);
     const ref = useRef<HTMLElement>(null);
     const atBottom = useRef(true);
     const scrollState = useRef({ bufferId: -1, firstKey: '', height: 0 });
@@ -172,8 +184,7 @@ export function BufferLines() {
     }, [scrollToBottom]);
 
     const fetchMore = useCallback(() => {
-        const state = session.state;
-        if (buffer && !state.loadingLines && !buffer.allLinesFetched) {
+        if (buffer && !buffer.loadingLines && !buffer.allLinesFetched) {
             void session.fetchLines(buffer.id);
         }
     }, [buffer]);
@@ -211,7 +222,7 @@ export function BufferLines() {
                     <tr className="bufferline fetch-more">
                         {!buffer.allLinesFetched && (
                             <td colSpan={3}>
-                                {loadingLines ? (
+                                {buffer.loadingLines ? (
                                     <span className="text-body-secondary">
                                         <Icon icon={LoaderCircle} spin /> Fetching more
                                         lines…

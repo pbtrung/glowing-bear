@@ -65,7 +65,9 @@ function Banners() {
                 >
                     <Icon icon={RefreshCw} spin />
                     <span>
-                        <strong>Connection to WeeChat lost.</strong>{' '}
+                        <strong>
+                            {quitting ? 'WeeChat quit.' : 'Connection to WeeChat lost.'}
+                        </strong>{' '}
                         {upgrading && 'WeeChat is upgrading. '}
                         Reconnecting…
                     </span>

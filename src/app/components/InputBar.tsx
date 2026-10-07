@@ -213,7 +213,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
             return;
         }
         if (direction === -1 && lines.scrollTop === 0) {
-            if (!session.state.loadingLines && !buffer.allLinesFetched) {
+            if (!buffer.loadingLines && !buffer.allLinesFetched) {
                 void session.fetchLines(buffer.id);
             }
             return;

@@ -23,6 +23,7 @@ import {
     createLine,
     createNick,
     createNickGroup,
+    READ_MARKER_TOP,
     type Buffer,
     type Line,
 } from './model';
@@ -44,7 +45,7 @@ export interface ChatState {
     /** WeeChat is quitting */
     quitting: boolean;
     /** Names of buffers we asked WeeChat to open (/query, /join): switch to them */
-    outgoingQueries: string[];
+    outgoingQueries: OutgoingQuery[];
 }
 
 export const initialState: ChatState = {
@@ -59,6 +60,14 @@ export const initialState: ChatState = {
     quitting: false,
     outgoingQueries: [],
 };
+
+/** A buffer we asked WeeChat to open: switch to it when it opens */
+export interface OutgoingQuery {
+    /** Short name of the buffer */
+    name: string;
+    /** Date.now() after which it's forgotten (e.g. the /join failed) */
+    expires: number;
+}
 
 export type Effect =
     /** A highlight or private message to notify */
@@ -138,15 +147,17 @@ function addDateChange(buffer: Draft<Buffer>, line: Line): void {
 
 /** Remember when a nick spoke, to complete the most recent speakers first */
 function updateNickSpeak(buffer: Draft<Buffer>, line: Line, now: number): void {
-    if (!buffer.nicklistLoaded || line.prefix.length === 0) {
+    if (!buffer.nicklistLoaded || line.notifyLevel < 1) {
+        // not a message (joins, quits, nick changes...)
         return;
     }
-    let nick = line.prefix[line.prefix.length - 1].text;
-    if (nick === ' *') {
-        // action: the nick is the first word of the message
-        nick = line.text.match(/^(\S+)\s/)?.[1] ?? '';
+    // The nick_xxx tag, else the prefix (which may have a suffix, or be the
+    // action prefix)
+    let nick = line.tags.find((t) => t.startsWith('nick_'))?.substring(5);
+    if (nick === undefined) {
+        nick = line.prefix[line.prefix.length - 1]?.text.trim();
     }
-    if (!nick || nick === '=!=') {
+    if (!nick) {
         return;
     }
     for (const n of Object.values(buffer.nicks)) {
@@ -218,7 +229,7 @@ function guessLastRead(lines: Line[], unread: number): string | null {
     for (let remaining = unread; remaining > 0;) {
         if (i === 0) {
             // everything loaded is unread
-            return null;
+            return lines.length > 0 ? READ_MARKER_TOP : null;
         }
         i--;
         const line = lines[i];
@@ -226,7 +237,7 @@ function guessLastRead(lines: Line[], unread: number): string | null {
             remaining--;
         }
     }
-    return lines.slice(0, i).findLast((l) => !l.isDateChange)?.key ?? null;
+    return lines.slice(0, i).findLast((l) => !l.isDateChange)?.key ?? READ_MARKER_TOP;
 }
 
 /**
@@ -267,12 +278,18 @@ export function applyLines(
         // Read marker, if none yet: WeeChat's one, else guess from the number
         // of unread lines (WeeChat's marker comes again with each buffer
         // event, and must not replace the local one)
-        if (buffer.lastReadKey === null && buffer.lastReadLineId >= 0) {
+        const noMarker =
+            buffer.lastReadKey === null || buffer.lastReadKey === READ_MARKER_TOP;
+        if (noMarker && buffer.lastReadLineId >= 0) {
             const key = 'l' + buffer.lastReadLineId;
+            const first = buffer.lines.find((l) => !l.isDateChange);
             if (buffer.lines.some((l) => l.key === key)) {
                 buffer.lastReadKey = key;
+            } else if (first && first.id > buffer.lastReadLineId) {
+                // read before the lines loaded (line ids grow with time)
+                buffer.lastReadKey = READ_MARKER_TOP;
             }
-        } else if (buffer.lastReadKey === null && unreadHint > 0) {
+        } else if (noMarker && unreadHint > 0) {
             buffer.lastReadKey = guessLastRead(buffer.lines, unreadHint);
         }
         buffer.linesFetched = true;
@@ -400,6 +417,20 @@ export function setActiveBuffer(state: ChatState, bufferId: number): ChatState {
     });
 }
 
+/** Lines of a buffer are being fetched, or no more */
+export function setLoadingLines(
+    state: ChatState,
+    bufferId: number,
+    loading: boolean,
+): ChatState {
+    return produce(state, (draft) => {
+        const buffer = draft.buffers[bufferId];
+        if (buffer) {
+            buffer.loadingLines = loading;
+        }
+    });
+}
+
 /** Clear the unread counters of a buffer (e.g. when the window gets focus) */
 export function markRead(state: ChatState, bufferId: number): ChatState {
     return produce(state, (draft) => {
@@ -453,8 +484,10 @@ function checkOutgoingQuery(
     buffer: Draft<Buffer>,
     effects: Effect[],
 ): void {
+    const now = Date.now();
+    draft.outgoingQueries = draft.outgoingQueries.filter((q) => q.expires > now);
     const name = buffer.shortName.toLowerCase();
-    const index = draft.outgoingQueries.findIndex((q) => q.toLowerCase() === name);
+    const index = draft.outgoingQueries.findIndex((q) => q.name.toLowerCase() === name);
     if (name && index >= 0) {
         draft.outgoingQueries.splice(index, 1);
         effects.push({ type: 'activate', bufferId: buffer.id });

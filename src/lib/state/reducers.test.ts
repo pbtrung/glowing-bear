@@ -13,7 +13,7 @@ import {
     type ChatState,
 } from './reducers';
 import { apiBuffer, apiLine, apiNick } from './fixtures.test-helper';
-import { nickColorClasses } from './model';
+import { nickColorClasses, READ_MARKER_TOP } from './model';
 
 const root: ApiNickGroup = {
     id: 0,
@@ -160,8 +160,58 @@ describe('lines', () => {
     it('guesses the read marker from the unread count', () => {
         const lines = [apiLine(1, 'a'), apiLine(2, 'b'), apiLine(3, 'c')];
         expect(applyLines(setup(), 2, lines, 100, 2).buffers[2].lastReadKey).toBe('l1');
-        // Everything is unread
-        expect(applyLines(setup(), 2, lines, 100, 5).buffers[2].lastReadKey).toBeNull();
+        // Everything is unread: the marker is above the first line
+        expect(applyLines(setup(), 2, lines, 100, 5).buffers[2].lastReadKey).toBe(
+            READ_MARKER_TOP,
+        );
+        expect(applyLines(setup(), 2, lines, 100, 3).buffers[2].lastReadKey).toBe(
+            READ_MARKER_TOP,
+        );
+    });
+
+    it('places the read marker on top when WeeChat one is older than the lines', () => {
+        let state = applyBuffers(setup(), [
+            apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat', {
+                last_read_line_id: 5,
+            }),
+        ]);
+        state = applyLines(state, 2, [apiLine(8, 'a'), apiLine(9, 'b')], 2);
+        expect(state.buffers[2].lastReadKey).toBe(READ_MARKER_TOP);
+        // Loading older lines finds it
+        state = applyLines(
+            state,
+            2,
+            [5, 6, 7, 8, 9].map((id) => apiLine(id, 'x')),
+            4,
+        );
+        expect(state.buffers[2].lastReadKey).toBe('l5');
+    });
+
+    it('remembers who spoke last from the nick tag of messages', () => {
+        let state = applyNicklist(setup(), 2, root);
+        state = send(
+            state,
+            'buffer_line_added',
+            2,
+            apiLine(1, 'waves', {
+                prefix: ' *',
+                tags: ['irc_privmsg', 'irc_action', 'nick_alice'],
+            }),
+        ).state;
+        expect(state.buffers[2].nicks[101].spokeAt).toBeGreaterThan(0);
+        // Not for joins
+        state = applyNicklist(setup(), 2, root);
+        state = send(
+            state,
+            'buffer_line_added',
+            2,
+            apiLine(2, 'alice has joined', {
+                prefix: '-->',
+                notify_level: 0,
+                tags: ['irc_join', 'nick_alice'],
+            }),
+        ).state;
+        expect(state.buffers[2].nicks[101].spokeAt).toBe(0);
     });
 
     it('counts only the lines that notify to guess the read marker', () => {
@@ -397,7 +447,23 @@ describe('events', () => {
     });
 
     it('switches to queries we opened', () => {
-        const state = { ...setup(), outgoingQueries: ['bob'] };
+        const state = {
+            ...setup(),
+            outgoingQueries: [{ name: 'Bob', expires: Date.now() + 60000 }],
+        };
+        // Expired ones are forgotten
+        const expired = {
+            ...setup(),
+            outgoingQueries: [{ name: 'bob', expires: Date.now() - 1 }],
+        };
+        const e = send(
+            expired,
+            'buffer_opened',
+            4,
+            apiBuffer(4, 4, 'irc.libera.bob', 'bob'),
+        );
+        expect(e.effects).toEqual([]);
+        expect(e.state.outgoingQueries).toEqual([]);
         let r = send(state, 'buffer_opened', 4, apiBuffer(4, 4, 'irc.libera.bob', ''));
         expect(r.effects).toEqual([]);
         r = send(

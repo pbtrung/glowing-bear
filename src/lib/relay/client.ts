@@ -94,12 +94,19 @@ export interface RelayClientOptions {
     pingTimeout?: number;
     /** Page protocol, to detect mixed content (defaults to location.protocol) */
     pageProtocol?: string;
+    /** Requests not answered after this (ms) are rejected (0: never) */
+    requestTimeout?: number;
 }
 
 interface Pending {
     resolve: (response: ApiResponse) => void;
     reject: (error: Error) => void;
+    timer?: ReturnType<typeof setTimeout>;
 }
+
+/** Hosts browsers trust without TLS (no mixed content blocking) */
+const isLoopback = (host: string): boolean =>
+    /^(localhost|127(\.\d+){3}|\[?::1\]?)$/i.test(host);
 
 export class RelayClient {
     private ws: WebSocket | null = null;
@@ -129,7 +136,7 @@ export class RelayClient {
         const pageProtocol =
             this.options.pageProtocol ??
             (typeof location !== 'undefined' ? location.protocol : 'http:');
-        if (pageProtocol === 'https:' && !options.tls) {
+        if (pageProtocol === 'https:' && !options.tls && !isLoopback(options.host)) {
             throw new ConnectError(
                 'insecure',
                 'Unencrypted relays are blocked on pages loaded over https',
@@ -149,14 +156,32 @@ export class RelayClient {
                     "can't send it on a WebSocket",
             );
         }
-        if (!handshake.password_hash_algo) {
-            throw new ConnectError('hash', 'No common password hash algorithm');
+        const algo = handshake.password_hash_algo;
+        if (!algo) {
+            throw new ConnectError(
+                'hash',
+                supportedHashAlgos().length === 1
+                    ? 'WeeChat refuses the "plain" password hash algorithm, the only ' +
+                          'one available on pages not loaded over https:// or from localhost'
+                    : 'No common password hash algorithm',
+            );
         }
-        const credentials = await buildCredentials(
-            options.password,
-            handshake.password_hash_algo,
-            handshake.password_hash_iterations,
-        );
+        if (algo.startsWith('pbkdf2') && !(handshake.password_hash_iterations > 0)) {
+            throw new ConnectError(
+                'hash',
+                'WeeChat did not send the number of PBKDF2 iterations',
+            );
+        }
+        let credentials: string;
+        try {
+            credentials = await buildCredentials(
+                options.password,
+                algo,
+                handshake.password_hash_iterations,
+            );
+        } catch (e) {
+            throw new ConnectError('hash', 'Hashing the password failed: ' + String(e));
+        }
 
         try {
             await this.open(urls.ws, credentials);
@@ -236,6 +261,7 @@ export class RelayClient {
         const pending = [...this.pending.values()];
         this.pending.clear();
         for (const p of pending) {
+            clearTimeout(p.timer);
             p.reject(new Error('Connection closed'));
         }
         this.options.onClose?.(info);
@@ -281,6 +307,7 @@ export class RelayClient {
             return;
         }
         this.pending.delete(response.request_id);
+        clearTimeout(pending.timer);
         if (response.code >= 400) {
             pending.reject(new RequestError(response));
         } else {
@@ -313,10 +340,18 @@ export class RelayClient {
             request.body = body;
         }
         return new Promise<ApiResponse<T>>((resolve, reject) => {
-            this.pending.set(id, {
+            const pending: Pending = {
                 resolve: resolve as (response: ApiResponse) => void,
                 reject,
-            });
+            };
+            const timeout = this.options.requestTimeout ?? 60000;
+            if (timeout > 0) {
+                pending.timer = setTimeout(() => {
+                    this.pending.delete(id);
+                    reject(new Error(`No answer to ${method} ${path}`));
+                }, timeout);
+            }
+            this.pending.set(id, pending);
             if (this.batched !== null) {
                 this.batched.push(request);
             } else {

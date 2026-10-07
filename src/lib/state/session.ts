@@ -23,6 +23,7 @@ import {
     markAllRead,
     markRead,
     setActiveBuffer,
+    setLoadingLines,
     type ChatState,
     type Effect,
 } from './reducers';
@@ -36,6 +37,12 @@ export const WEECHAT_OPTIONS: Record<string, string> = {
     'weechat.completion.nick_completer': ':',
     'weechat.completion.nick_add_space': 'on',
 };
+
+/** Time to wait for a buffer we asked to open (ms) */
+const OUTGOING_QUERY_TIMEOUT = 60000;
+
+/** Lines kept in the input history of a buffer */
+const HISTORY_SIZE = 1000;
 
 /** Commands opening a buffer: switch to it once WeeChat opened it */
 const OPEN_COMMANDS = ['/query', '/join', '/j', '/q'];
@@ -72,8 +79,6 @@ class Cancelled extends Error {
 export interface SessionState extends ChatState {
     /** Error of the last connection attempt */
     error: ConnectError | null;
-    /** Lines are being fetched for the active buffer */
-    loadingLines: boolean;
 }
 
 export interface SessionOptions {
@@ -114,7 +119,6 @@ export class Session {
         this.store = createStore<SessionState>(() => ({
             ...initialState,
             error: null,
-            loadingLines: false,
         }));
     }
 
@@ -140,6 +144,8 @@ export class Session {
             return;
         }
         clearTimeout(this.reconnectTimer);
+        // (the history is kept when reconnecting: buffer ids don't change)
+        this.history.clear();
         this.connectOptions = options;
         this.set({ status: 'connecting', error: null, quitting: false });
         try {
@@ -244,7 +250,6 @@ export class Session {
         );
         current();
 
-        this.history.clear();
         const loaded: ChatState = {
             ...initialState,
             status: 'connected',
@@ -362,6 +367,9 @@ export class Session {
      */
 
     private onEvent(event: ApiEvent): void {
+        if (event.event_name === 'buffer_closed') {
+            this.history.delete(event.buffer_id);
+        }
         const result = applyEvent(this.state, event, {
             windowFocused: this.options.windowFocused?.() ?? true,
         });
@@ -451,7 +459,7 @@ export class Session {
                   buffer.linesFetched ? buffer.requestedLines * 2 : 0,
                   1,
               );
-        this.set({ loadingLines: true });
+        this.update((s) => setLoadingLines(s, bufferId, true));
         try {
             const lines = await this.api.lines(
                 bufferId,
@@ -462,7 +470,7 @@ export class Session {
         } catch {
             // connection lost (the reconnection reloads them), or buffer closed
         } finally {
-            this.set({ loadingLines: false });
+            this.update((s) => setLoadingLines(s, bufferId, false));
         }
     }
 
@@ -582,7 +590,12 @@ export class Session {
 
     /** Switch to the buffer with this short name once WeeChat opens it */
     private expectBuffer(name: string): void {
-        this.set({ outgoingQueries: [...this.state.outgoingQueries, name] });
+        this.set({
+            outgoingQueries: [
+                ...this.state.outgoingQueries,
+                { name, expires: Date.now() + OUTGOING_QUERY_TIMEOUT },
+            ],
+        });
     }
 
     /*
@@ -605,6 +618,9 @@ export class Session {
             history.lines.pop();
         }
         history.lines.push(text);
+        if (history.lines.length > HISTORY_SIZE) {
+            history.lines.shift();
+        }
         history.pos = history.lines.length;
     }
 

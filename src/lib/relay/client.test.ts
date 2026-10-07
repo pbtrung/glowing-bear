@@ -104,10 +104,49 @@ describe('connecting', () => {
 
     it('refuses unencrypted relays on secure pages', async () => {
         const client = new RelayClient({ pageProtocol: 'https:' });
-        await expect(client.connect(OPTIONS)).rejects.toMatchObject({
-            kind: 'insecure',
-        });
+        await expect(
+            client.connect({ ...OPTIONS, host: 'example.com' }),
+        ).rejects.toMatchObject({ kind: 'insecure' });
         expect(http.requests).toHaveLength(0);
+    });
+
+    it('allows unencrypted relays on the same machine from secure pages', async () => {
+        for (const host of ['localhost', '127.0.0.1', '[::1]']) {
+            const client = new RelayClient({ pageProtocol: 'https:', pingInterval: 0 });
+            const connecting = client.connect({ ...OPTIONS, host });
+            (await nextSocket()).open();
+            await connecting;
+            client.close();
+        }
+    });
+
+    it('reports a missing number of PBKDF2 iterations', async () => {
+        http.handshake = {
+            password_hash_algo: 'pbkdf2+sha256',
+            password_hash_iterations: 0,
+            totp: false,
+        };
+        await expect(
+            new RelayClient({ pageProtocol: 'http:' }).connect(OPTIONS),
+        ).rejects.toMatchObject({
+            kind: 'hash',
+            message: expect.stringContaining('PBKDF2'),
+        });
+    });
+
+    it('explains that only "plain" works without WebCrypto', async () => {
+        vi.stubGlobal('crypto', {});
+        http.handshake = {
+            password_hash_algo: null,
+            password_hash_iterations: 0,
+            totp: false,
+        };
+        await expect(
+            new RelayClient({ pageProtocol: 'http:' }).connect(OPTIONS),
+        ).rejects.toMatchObject({
+            kind: 'hash',
+            message: expect.stringContaining('https://'),
+        });
     });
 
     it('reports network errors', async () => {
@@ -269,6 +308,13 @@ describe('requests', () => {
         ]);
         expect((await pending).body).toEqual([]);
         expect(errors).toHaveBeenCalledOnce();
+    });
+
+    it('rejects requests not answered in time', async () => {
+        const { client } = await connected({ requestTimeout: 50 });
+        await expect(client.request('GET', '/api/hotlist')).rejects.toThrow(
+            'No answer to GET /api/hotlist',
+        );
     });
 
     it('ignores responses to unknown requests', async () => {

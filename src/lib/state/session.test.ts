@@ -259,6 +259,18 @@ describe('connection', () => {
         expect(session.state.buffers[2].lines.map((l) => l.id)).toEqual([2]);
     });
 
+    it('keeps reconnecting after WeeChat quit, which shows it', async () => {
+        const { session, ws } = await connected({ reconnectDelay: 1 });
+        ws.receive({ code: 0, message: 'OK', event_name: 'quit', buffer_id: -1 });
+        ws.refuse(1000);
+        expect(session.state.status).toBe('reconnecting');
+        expect(session.state.quitting).toBe(true);
+        await acceptConnection();
+        await flush();
+        expect(session.state.status).toBe('connected');
+        expect(session.state.quitting).toBe(false);
+    });
+
     it('reconnects after a WeeChat upgrade', async () => {
         const { session, ws } = await connected({ reconnectDelay: 1 });
         ws.receive({ code: 0, message: 'OK', event_name: 'upgrade', buffer_id: -1 });
@@ -338,7 +350,9 @@ describe('buffers', () => {
             request: 'POST /api/input',
             body: { buffer_id: 1, command: '/query -noswitch bob' },
         });
-        expect(session.state.outgoingQueries).toEqual(['bob']);
+        expect(session.state.outgoingQueries).toEqual([
+            { name: 'bob', expires: expect.any(Number) },
+        ]);
     });
 
     it('sends each line of a text, skipping empty ones', async () => {
@@ -353,6 +367,20 @@ describe('buffers', () => {
         expect(
             ws.sent.slice(count).map((r) => (r.body as { command: string }).command),
         ).toEqual(['one', 'two']);
+    });
+});
+
+describe('lines', () => {
+    it('tracks the loading of lines per buffer', async () => {
+        const { session, ws } = await connected();
+        // The first buffer is loading since connected
+        expect(session.state.buffers[1].loadingLines).toBe(true);
+        void session.fetchLines(2);
+        expect(session.state.buffers[2].loadingLines).toBe(true);
+        ws.replyTo('GET /api/buffers/1/lines', 200, [], 'line');
+        await flush();
+        expect(session.state.buffers[1].loadingLines).toBe(false);
+        expect(session.state.buffers[2].loadingLines).toBe(true);
     });
 });
 
@@ -390,6 +418,38 @@ describe('input history', () => {
         expect(session.historyUp(1, 'text')).toBe('text');
         expect(session.historyDown(1, 'text')).toBe('');
         expect(session.historyUp(1, '')).toBe('text');
+    });
+
+    it('keeps a limited number of lines', () => {
+        const session = newSession();
+        for (let i = 0; i < 1005; i++) {
+            session.addToHistory(1, 'line ' + i);
+        }
+        let first = '';
+        for (let i = 0; i < 1100; i++) {
+            first = session.historyUp(1, first);
+        }
+        expect(first).toBe('line 5');
+    });
+
+    it('is kept when reconnecting, forgotten when the buffer closes', async () => {
+        const { session, ws } = await connected({ reconnectDelay: 60000 });
+        session.addToHistory(2, 'hello');
+        ws.refuse(1006);
+        const reconnecting = session.reconnect();
+        const current = await acceptConnection();
+        await reconnecting;
+        expect(session.historyUp(2, '')).toBe('hello');
+        session.historyDown(2, 'hello');
+        current.receive({
+            code: 0,
+            message: 'OK',
+            event_name: 'buffer_closed',
+            buffer_id: 2,
+            body_type: null,
+            body: null,
+        });
+        expect(session.historyUp(2, '')).toBe('');
     });
 
     it('is per buffer', () => {

@@ -7,16 +7,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
     {
-        ignores: [
-            'build',
-            'node_modules',
-            'src/js',
-            'src/**/*.js',
-            'test/unit',
-            'test/e2e',
-            'test/*.js',
-            'webpack.config.js',
-        ],
+        ignores: ['build', 'node_modules', 'public'],
     },
     {
         files: ['**/*.{ts,tsx,mts}'],

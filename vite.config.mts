@@ -13,8 +13,11 @@ export default defineConfig({
     define: {
         __APP_VERSION__: JSON.stringify(version),
     },
+    server: {
+        port: 8000,
+    },
     build: {
-        outDir: 'dist',
+        outDir: 'build',
         sourcemap: true,
     },
     test: {

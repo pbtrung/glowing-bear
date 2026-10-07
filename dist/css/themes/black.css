@@ -1,0 +1,11 @@
+/* Glowing Bear theme: black (dark theme on a pure black background) */
+@import 'dark.css';
+
+:root {
+    --gb-bg: #000000;
+    --gb-chrome-bg: #080808;
+    --gb-input-bg: #0e0e0e;
+    --gb-border: #1e1e1e;
+    --gb-line-hover: #0d0d0d;
+    --gb-repeated-time: #2a2a2a;
+}

@@ -3,7 +3,5 @@ node_modules/
 package-lock.json
 test_out/
 .claude/
-# Angular templates rely on exact whitespace between inline elements
-*.html
 # Vendored/minified assets
-src/assets/
+public/assets/

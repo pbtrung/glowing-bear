@@ -15,8 +15,7 @@ git clone https://github.com/pbtrung/glowing-bear.git
 cd glowing-bear
 npm install
 npm start        # development server on http://localhost:8000
-npm run build    # production bundle in build/
-npm run dev      # new React app: development server on http://localhost:5173
+npm run build    # production build in build/
 ```
 
 To host it yourself, serve the `build/` directory with any static web server (Caddy,
@@ -53,11 +52,13 @@ screen" option.
 
 ## Development
 
+Glowing Bear is written in TypeScript with React, built with Vite.
+
 ```bash
 npm run format      # Prettier
-npm run lint        # jshint + ESLint
+npm run lint        # ESLint
 npm run typecheck   # TypeScript
-npm test            # Vitest + Karma unit tests
+npm test            # unit tests (Vitest)
 npm run test:relay  # protocol tests against a real WeeChat (needs Docker)
-./run_tests.sh      # format check + lint + typecheck + unit tests
+./run_tests.sh      # format check + lint + typecheck + tests + build
 ```

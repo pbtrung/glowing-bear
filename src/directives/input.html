@@ -1,8 +1,0 @@
-<form id="inputform" ng-submit="sendMessage()">
-  <div class="input-group">
-    <span class="input-group-text input-prompt d-none d-md-flex" ng-if="activeBuffer().inputPrompt[0].text" title="WeeChat input prompt"><span ng-repeat="part in activeBuffer().inputPrompt" ng-class="part.classes" ng-bind="part.text"></span></span>
-    <textarea id="{{inputId}}" class="form-control favorite-font" ng-trim="false" rows="1" ng-change="inputChanged()" autocomplete="on" autocapitalize="sentences" enterkeyhint="send" aria-label="Message" placeholder="Message {{ activeBuffer().shortName || activeBuffer().fullName }}" ng-model="command" ng-focus="hideSidebar()"></textarea>
-    <button type="button" class="btn btn-input btn-complete-nick unselectable mobile" title="Complete nick" aria-label="Complete nick" ng-click="handleCompleteNickButton($event)"><gb-icon name="at-sign"></gb-icon></button>
-    <button type="submit" class="btn btn-input btn-send unselectable" title="Send" aria-label="Send"><gb-icon name="send-horizontal"></gb-icon></button>
-  </div>
-</form>

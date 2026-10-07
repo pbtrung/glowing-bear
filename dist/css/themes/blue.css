@@ -1,0 +1,29 @@
+/* Glowing Bear theme: blue (dark theme with a blue palette) */
+@import 'dark.css';
+
+:root {
+    --gb-bg: #1d222c;
+    --gb-fg: #dfdfcf;
+    --gb-muted: #8a94a6;
+    --gb-chrome-bg: #283244;
+    --gb-chrome-fg: #dddddd;
+    --gb-border: #3a4657;
+    --gb-hover-bg: rgba(54, 57, 67, 0.6);
+    --gb-active-bg: rgba(27, 97, 161, 0.4);
+    --gb-active-fg: #ffffff;
+    --gb-accent: #0f99d9;
+    --gb-accent-fg: #ffffff;
+    --gb-input-bg: #141922;
+    --gb-line-hover: #1b2737;
+    --gb-readmarker: #1d5e98;
+    --gb-repeated-time: #3a4657;
+    --gb-link: #0787c1;
+}
+
+td.prefix {
+    border-right-color: #464f5e;
+}
+
+.buffer.active a {
+    box-shadow: inset 0 0 0 1px #1b61a1;
+}

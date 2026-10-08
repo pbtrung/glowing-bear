@@ -52,7 +52,7 @@ const SHORTCUTS: [ReactNode, string][] = [
         <>
             <kbd>Alt</kbd> <kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd>
         </>,
-        'Switch to the Nth buffer of the list (10th with 0)',
+        'Switch to the Nth buffer of the list (10th with 0), when quick buffer switching is on',
     ],
     [
         <>

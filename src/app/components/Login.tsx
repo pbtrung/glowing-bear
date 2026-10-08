@@ -321,7 +321,9 @@ function HelpItem({ title, children }: { title: string; children: ReactNode }) {
 
 function Help() {
     const host = useSettings((s) => s.host || 'your.domain.com');
-    const port = useSettings((s) => String(s.port || 443));
+    const port = useSettings((s) => Number(s.port) || 443);
+    // WeeChat can't listen on privileged ports (e.g. 443, behind a proxy)
+    const relayPort = port < 1024 ? 9001 : port;
     return (
         <div className="accordion login-help">
             <HelpItem title="Getting started">
@@ -338,7 +340,7 @@ function Help() {
                     password if you choose to save it, stay in this browser.
                 </p>
                 <h3 className="h6">Quick start (unencrypted, for local testing)</h3>
-                <pre>{`/set relay.network.password y0ur_StRonG-pa$sw0rd:of*choice\n/relay add api ${port}`}</pre>
+                <pre>{`/set relay.network.password y0ur_StRonG-pa$sw0rd:of*choice\n/relay add api ${relayPort}`}</pre>
                 <h3 className="h6">Use TLS encryption</h3>
                 <p>
                     With encryption, all communication between your browser and WeeChat
@@ -348,22 +350,31 @@ function Help() {
                     <a href="https://letsencrypt.org/">Let's Encrypt</a>: follow the
                     instructions at{' '}
                     <a href="https://certbot.eff.org/">certbot.eff.org</a> (or proxy the
-                    relay through your web server, see{' '}
-                    <a href="https://github.com/glowing-bear/glowing-bear/wiki/Proxying-WeeChat-relay-with-a-web-server">
-                        our wiki
-                    </a>
-                    ), with <code>certbot certonly --standalone -d {host}</code>. Then
-                    copy it where WeeChat expects it, replacing{' '}
-                    <strong>username</strong> with your user:
+                    relay through your web server, see below), with{' '}
+                    <code>certbot certonly --standalone -d {host}</code>. Then copy it
+                    where WeeChat expects it, replacing <strong>username</strong> with
+                    your user:
                 </p>
                 <pre>{`mkdir -p ~username/.config/weechat/tls\ncat /etc/letsencrypt/live/${host}/{fullchain,privkey}.pem > ~username/.config/weechat/tls/relay.pem\nchown -R username:username ~username/.config/weechat/tls/`}</pre>
                 <p>Then set up an encrypted relay:</p>
-                <pre>{`/set relay.network.password y0ur_StRonG-pa$sw0rd:of*choice\n/relay tlscertkey\n/relay add tls.api ${port}`}</pre>
+                <pre>{`/set relay.network.password y0ur_StRonG-pa$sw0rd:of*choice\n/relay tlscertkey\n/relay add tls.api ${relayPort}`}</pre>
                 <p>
                     Certificates must be renewed every few months (
                     <code>certbot renew</code>). After renewing, copy the certificate
                     again and run <code>/relay tlscertkey</code> in WeeChat.
                 </p>
+                <h3 className="h6">Behind a reverse proxy (port 443)</h3>
+                <p>
+                    WeeChat can't listen on port 443 as a normal user: a web server
+                    (Caddy, nginx…) can serve Glowing Bear and forward <code>/api</code>
+                    , including the WebSocket, to an unencrypted relay on localhost.
+                    Connect to port 443 with TLS on. See the{' '}
+                    <a href="https://github.com/pbtrung/glowing-bear#reverse-proxy">
+                        README
+                    </a>{' '}
+                    for Caddy and nginx examples.
+                </p>
+                <pre>{`/set relay.network.bind_address "127.0.0.1"\n/relay add api 9001`}</pre>
                 <h3 className="h6">TOTP (Time-based One-Time Password)</h3>
                 <p className="mb-0">
                     WeeChat expects the TOTP in an HTTP header that browsers can't send
@@ -389,8 +400,9 @@ function Help() {
                         #host=weechat.example.com&amp;port=8000&amp;autoconnect=true
                     </code>
                     . Available parameters: <code>host</code>, <code>port</code>,{' '}
-                    <code>path</code>, <code>password</code>, <code>autoconnect</code>.
-                    Passing the password this way is not recommended.
+                    <code>path</code>, <code>password</code>, <code>autoconnect</code>,{' '}
+                    <code>buffer</code> (full name of the buffer to show). Passing the
+                    password this way is not recommended.
                 </p>
                 <h3 className="h6">Pinning buffers</h3>
                 <p className="mb-0">

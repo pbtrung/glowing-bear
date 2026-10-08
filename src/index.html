@@ -13,7 +13,7 @@
             content="black-translucent"
         />
         <meta name="apple-mobile-web-app-title" content="Glowing Bear" />
-        <meta name="theme-color" content="#232323" />
+        <meta name="theme-color" content="#1e2030" />
         <meta http-equiv="x-dns-prefetch-control" content="off" />
         <title>Glowing Bear</title>
         <link rel="manifest" href="webapp.manifest.json" />
@@ -27,7 +27,9 @@
         <script>
             // Fetch the theme stylesheet right away (theme.ts applies it)
             try {
-                const theme = JSON.parse(localStorage.getItem('theme') || '"dark"');
+                const theme = JSON.parse(
+                    localStorage.getItem('theme') || '"catppuccin-macchiato"',
+                );
                 if (/^[\w-]+$/.test(theme)) {
                     const link = document.createElement('link');
                     link.rel = 'preload';

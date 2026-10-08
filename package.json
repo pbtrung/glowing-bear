@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.999.1",
   "description": "A web client for WeeChat",
-  "repository": "https://github.com/glowing-bear/glowing-bear",
-  "license": "GPLv3",
+  "repository": "https://github.com/pbtrung/glowing-bear",
+  "license": "GPL-3.0-only",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@testing-library/react": "^16.3.3",

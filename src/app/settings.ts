@@ -60,16 +60,16 @@ export function pageHost(
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-    theme: 'dark',
+    theme: 'catppuccin-macchiato',
     hostField: pageHost(),
     host: pageHost(),
-    port: 9001,
+    port: 443,
     path: 'api',
     tls: isSecurePage,
     savepassword: false,
     password: '',
     autoconnect: false,
-    nonicklist: false,
+    nonicklist: true,
     alwaysnicklist: false,
     onlyUnread: false,
     hotlistsync: true,
@@ -83,7 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableQuickKeys: true,
     syncInput: true,
     showBufferNumbers: false,
-    hideSmartFiltered: false,
+    hideSmartFiltered: true,
     customCSS: '',
     currentlyViewedBuffers: {},
     collapsedServers: [],

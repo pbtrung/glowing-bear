@@ -170,7 +170,7 @@ function ConnectForm() {
                                     onChange={(e) =>
                                         updateSettings({ port: e.target.value })
                                     }
-                                    placeholder="9001"
+                                    placeholder="443"
                                 />
                             </div>
                             <div className="col-12">
@@ -321,7 +321,7 @@ function HelpItem({ title, children }: { title: string; children: ReactNode }) {
 
 function Help() {
     const host = useSettings((s) => s.host || 'your.domain.com');
-    const port = useSettings((s) => String(s.port || 9001));
+    const port = useSettings((s) => String(s.port || 443));
     return (
         <div className="accordion login-help">
             <HelpItem title="Getting started">

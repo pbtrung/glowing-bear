@@ -63,7 +63,7 @@ function onSearchKey(
 }
 
 /** Icon of a buffer: server, channel, avatar of a private chat... */
-function BufferIcon({ buffer }: { buffer: Buffer }) {
+export function BufferIcon({ buffer }: { buffer: Buffer }) {
     if (buffer.type === 'private') {
         return (
             <Avatar

@@ -399,6 +399,19 @@ pre {
     font-weight: 500;
 }
 
+/* Topic dialog */
+#topicModal .modal-title .buffer-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 967.98px) {
+    #topicModal .topic {
+        font-size: 0.875rem;
+    }
+}
+
 /* Local variables in the topic dialog */
 .local-variables > div {
     display: flex;
@@ -1231,6 +1244,23 @@ span.colourbox {
     box-shadow: var(--gb-shadow);
 }
 
+/* Dialog headers: same height as the top bar */
+.gb-modal .modal-header {
+    flex-shrink: 0;
+    height: var(--gb-topbar-height);
+    padding: 0 0.5rem 0 1rem;
+}
+
+.gb-modal .modal-title {
+    font-size: 1.1rem;
+    min-width: 0;
+}
+
+.gb-modal .modal-header .btn-close {
+    margin: 0 0 0 auto;
+    padding: 0.6rem;
+}
+
 /* Settings dialog: category list on the side, tabs on top on phones */
 .settings-modal .modal-dialog {
     max-width: 52rem;
@@ -1245,22 +1275,6 @@ span.colourbox {
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
-}
-
-/* Same height as the top bar */
-.settings-modal .modal-header {
-    flex-shrink: 0;
-    height: var(--gb-topbar-height);
-    padding: 0 0.5rem 0 1rem;
-}
-
-.settings-modal .modal-title {
-    font-size: 1.1rem;
-}
-
-.settings-modal .modal-header .btn-close {
-    margin: 0;
-    padding: 0.6rem;
 }
 
 /* Phones: sections in the ⋮ menu of the header; larger: list on the side */

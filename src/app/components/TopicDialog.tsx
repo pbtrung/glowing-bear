@@ -1,6 +1,5 @@
-import { Hash } from 'lucide-react';
 import { closeModal, session, useActiveBuffer, useUi } from '../chat';
-import { Icon } from './Icon';
+import { BufferIcon } from './BufferList';
 import { Modal } from './Modal';
 import { RichText } from './RichText';
 
@@ -11,10 +10,13 @@ export function TopicDialog() {
         <Modal id="topicModal" open={open} labelledBy="topicTitle">
             <div className="modal-header">
                 <h2
-                    className="modal-title h5 d-flex align-items-center gap-2 text-break"
+                    className="modal-title d-flex align-items-center gap-2"
                     id="topicTitle"
                 >
-                    <Icon icon={Hash} /> {buffer?.shortName || buffer?.fullName}
+                    {buffer && <BufferIcon buffer={buffer} />}
+                    <span className="buffer-name">
+                        {buffer?.shortName || buffer?.fullName}
+                    </span>
                 </h2>
                 <button
                     type="button"

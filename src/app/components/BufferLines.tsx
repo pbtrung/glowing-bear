@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { ArrowDown, ArrowUp, History, LoaderCircle, X } from 'lucide-react';
 import { READ_MARKER_TOP, type Buffer, type Line } from '../../lib/state/model';
-import { canFetchMore, linesAfter } from '../../lib/state/reducers';
+import { canFetchMore, linesAfter, MAX_FETCHED_LINES } from '../../lib/state/reducers';
 import { formatTimeText } from '../../lib/time-format';
 import {
     activeBufferLineListeners,
@@ -25,6 +25,26 @@ import { RichText, Time } from './RichText';
 import { useSwipe } from '../swipe';
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+/** Number of lines below the view of the lines (binary search of the rows) */
+function linesBelow(el: HTMLElement): number {
+    const rows = el.querySelectorAll<HTMLElement>('tbody[data-line]');
+    const viewBottom = el.getBoundingClientRect().bottom;
+    // The last row starting in or above the view
+    let low = 0;
+    let high = rows.length - 1;
+    let last = -1;
+    while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (rows[mid].getBoundingClientRect().top < viewBottom) {
+            last = mid;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    return rows.length - 1 - last;
+}
 
 /** Same minute (the time of a line is hidden when it repeats) */
 const sameMinute = (a: Date, b: Date) =>
@@ -164,7 +184,8 @@ function useShownLines(buffer: Buffer | undefined): {
     }, [all, lastReadKey, hideSmartFiltered]);
 }
 
-function Lines({
+/** (memo: not rendered again when only the scroll indicators change) */
+const Lines = memo(function Lines({
     buffer,
     lines,
     marker,
@@ -178,6 +199,8 @@ function Lines({
     );
     const math = useSettings((s) => s.enableMathjax);
     const rows = [];
+    /** Index of the line among the lines (date changes aside) */
+    let index = 0;
     if (marker === READ_MARKER_TOP && lines.length > 0) {
         rows.push(
             <tbody key={READ_MARKER_TOP}>
@@ -188,7 +211,7 @@ function Lines({
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         rows.push(
-            <tbody key={line.key}>
+            <tbody key={line.key} data-line={line.isDateChange ? undefined : index++}>
                 <LineRow
                     line={line}
                     previous={lines[i - 1]}
@@ -202,7 +225,7 @@ function Lines({
         );
     }
     return <>{rows}</>;
-}
+});
 
 /**
  * The lines of the active buffer
@@ -229,6 +252,8 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
         newFrom: null as string | null,
         farFromBottom: false,
         markerAbove: false,
+        /** Lines below the view (like tmux's scroll position), when scrolled up */
+        below: null as number | null,
     });
     /** Read marker ("buffer:key") whose button was closed */
     const [dismissed, setDismissed] = useState<string | null>(null);
@@ -273,6 +298,7 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
             row !== null &&
             row.getBoundingClientRect().bottom <= el.getBoundingClientRect().top;
         const lastKey = lines.findLast((l) => !l.isDateChange)?.key ?? null;
+        const below = bottom ? null : linesBelow(el);
         setIndicators((prev) => {
             const previousFrom = prev.bufferId === buffer.id ? prev.newFrom : null;
             const next = {
@@ -280,11 +306,13 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
                 newFrom: bottom ? null : (previousFrom ?? lastKey),
                 farFromBottom: fromBottom > el.clientHeight,
                 markerAbove,
+                below,
             };
             return next.bufferId === prev.bufferId &&
                 next.newFrom === prev.newFrom &&
                 next.farFromBottom === prev.farFromBottom &&
-                next.markerAbove === prev.markerAbove
+                next.markerAbove === prev.markerAbove &&
+                next.below === prev.below
                 ? prev
                 : next;
         });
@@ -421,6 +449,21 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
             inert={inert}
             {...swipe}
         >
+            {current && indicators.below !== null && (
+                <div className="scroll-position-anchor">
+                    <span
+                        className="scroll-position"
+                        title={
+                            canFetchMore(buffer) || buffer.allLinesFetched
+                                ? 'Lines below the view / lines loaded'
+                                : `Lines below the view / lines loaded (at most ${MAX_FETCHED_LINES})`
+                        }
+                    >
+                        [{indicators.below}/
+                        {lines.filter((l) => !l.isDateChange).length}]
+                    </span>
+                </div>
+            )}
             {unread?.first && (
                 <div className="jump-top">
                     <div className="jump-pill" role="group" aria-label="Unread lines">

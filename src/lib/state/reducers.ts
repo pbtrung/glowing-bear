@@ -187,14 +187,14 @@ function setFreeLine(buffer: Draft<Buffer>, line: Line): void {
 export const MAX_LINES = 500;
 
 /** Most lines fetched for a buffer (the history shown when scrolling up) */
-export const MAX_FETCHED_LINES = 8 * MAX_LINES;
+export const MAX_FETCHED_LINES = 3 * MAX_LINES;
 
 /**
  * Lines of the buffer shown above which it's trimmed (to 2 * MAX_LINES).
  * More than MAX_FETCHED_LINES, so that a new line doesn't trim the history
  * just fetched (whose reading would fetch it again, and so on).
  */
-export const MAX_ACTIVE_LINES = 10 * MAX_LINES;
+export const MAX_ACTIVE_LINES = 4 * MAX_LINES;
 
 /** Whether two versions of a line show the same thing */
 function sameLine(a: Line, b: Line): boolean {

@@ -8,6 +8,7 @@ import { BufferLines } from './BufferLines';
 /** Scroll geometry of #bufferlines (jsdom has no layout) */
 const geometry = { scrollTop: 0, scrollHeight: 1000, clientHeight: 200 };
 let markerAbove = false;
+let rowsLaidOut = false;
 
 const lines = (count: number) =>
     Array.from({ length: count }, (_, i) => apiLine(i + 1, 'line ' + (i + 1)));
@@ -29,6 +30,7 @@ function scrollTo(scrollTop: number): void {
 beforeEach(() => {
     geometry.scrollTop = 800;
     markerAbove = false;
+    rowsLaidOut = false;
     const isLines = (el: Element) => el.id === 'bufferlines';
     for (const key of ['scrollHeight', 'clientHeight'] as const) {
         vi.spyOn(Element.prototype, key, 'get').mockImplementation(function (
@@ -56,6 +58,12 @@ beforeEach(() => {
         // #bufferlines at 0, the read marker above it or in it
         if (isLines(this)) {
             return { top: 0, bottom: 200 } as DOMRect;
+        }
+        // Lines 10px high from the top of the view
+        const line = this.getAttribute('data-line');
+        if (rowsLaidOut && line !== null) {
+            const top = Number(line) * 10 - geometry.scrollTop;
+            return { top, bottom: top + 10 } as DOMRect;
         }
         const above = markerAbove && this.classList.contains('readmarker');
         return { top: above ? -20 : 50, bottom: above ? -10 : 60 } as DOMRect;
@@ -114,5 +122,22 @@ describe('unread lines button', () => {
         expect(container.querySelector('.jump-top')).not.toBeNull();
         scrollTo(800);
         expect(container.querySelector('.jump-top')).toBeNull();
+    });
+});
+
+describe('scroll position', () => {
+    it('shows the lines below the view while scrolled up, like tmux', () => {
+        show(100);
+        geometry.scrollHeight = 1000;
+        rowsLaidOut = true;
+        const { container } = render(<BufferLines />);
+        expect(container.querySelector('.scroll-position')).toBeNull();
+        // Rows 0 to 69 start above the bottom of the view (500 + 200)
+        scrollTo(500);
+        expect(container.querySelector('.scroll-position')?.textContent).toBe(
+            '[30/100]',
+        );
+        scrollTo(800);
+        expect(container.querySelector('.scroll-position')).toBeNull();
     });
 });

@@ -12,7 +12,13 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { closeModal, useChat, useUi } from '../chat';
-import { DEFAULT_FONT, updateSettings, useSettings, type Settings } from '../settings';
+import {
+    DEFAULT_FONT,
+    fontSizeInPx,
+    updateSettings,
+    useSettings,
+    type Settings,
+} from '../settings';
 import {
     notificationPermission,
     requestNotificationPermission,
@@ -163,7 +169,7 @@ function Appearance() {
     const fontfamily = useSettings((s) => s.fontfamily);
     const fontsize = useSettings((s) => s.fontsize);
     const customCSS = useSettings((s) => s.customCSS);
-    const size = parseInt(fontsize, 10) || 14;
+    const size = fontSizeInPx(fontsize);
     return (
         <>
             <h3 className="settings-heading">Theme</h3>

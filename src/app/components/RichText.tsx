@@ -150,6 +150,9 @@ function MathText({ text }: { text: string }) {
             displayMode: m[2] !== undefined,
             throwOnError: false,
             trust: false,
+            // Formulas of other users can't cover the buffer
+            maxSize: 10,
+            maxExpand: 100,
         });
         nodes.push(<span key={m.index} dangerouslySetInnerHTML={{ __html: html }} />);
         pos = m.index + m[0].length;

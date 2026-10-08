@@ -35,6 +35,12 @@ describe('WeeChat color codes', () => {
         ).toContain('cof-chat_status_enabled');
     });
 
+    it('parses extended foreground colors with attributes (\\x19*@ + attrs + EXT)', () => {
+        const [[text, classes]] = classesOf('\x19*@*00123hello');
+        expect(text).toBe('hello');
+        expect(classes).toContain('cef-123');
+    });
+
     it('ignores unknown color options', () => {
         expect(classesOf('\x1999x')).toEqual([['x', ['cwf-default', 'cwb-default']]]);
     });

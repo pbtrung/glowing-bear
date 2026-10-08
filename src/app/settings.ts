@@ -59,6 +59,19 @@ export function pageHost(
     return hostname || 'localhost';
 }
 
+/** A font size setting (any CSS size) in pixels, for the size slider */
+export function fontSizeInPx(size: string): number {
+    const m = /^\s*(\d+(?:\.\d+)?)\s*(px|pt|em|rem)?\s*$/i.exec(size);
+    if (!m) {
+        return 14;
+    }
+    const value = parseFloat(m[1]);
+    const factor = { px: 1, pt: 4 / 3, em: 16, rem: 16 }[
+        (m[2] ?? 'px').toLowerCase() as 'px' | 'pt' | 'em' | 'rem'
+    ];
+    return Math.round(value * factor) || 14;
+}
+
 export const DEFAULT_SETTINGS: Settings = {
     theme: 'catppuccin-macchiato',
     hostField: pageHost(),
@@ -236,6 +249,8 @@ export interface HashParams {
     path?: string;
     password?: string;
     autoconnect?: boolean;
+    /** Full name of the buffer to show once connected */
+    buffer?: string;
 }
 
 /** Parameters in the URL fragment: #host=...&port=...&password=...&autoconnect=true */
@@ -253,7 +268,13 @@ export function parseHashParams(hash: string): HashParams {
         } catch {
             value = part.substring(index + 1);
         }
-        if (key === 'host' || key === 'port' || key === 'path' || key === 'password') {
+        if (
+            key === 'host' ||
+            key === 'port' ||
+            key === 'path' ||
+            key === 'password' ||
+            key === 'buffer'
+        ) {
             params[key] = value;
         } else if (key === 'autoconnect') {
             params.autoconnect = value === 'true';

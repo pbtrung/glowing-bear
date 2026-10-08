@@ -9,7 +9,7 @@ import { activeBuffer } from '../lib/state/reducers';
 import { Session, type SessionState } from '../lib/state/session';
 import type { Buffer } from '../lib/state/model';
 import { getSettings, settingsStore, updateSettings, type Settings } from './settings';
-import { notifyHighlight } from './notifications';
+import { notifyHighlight, onOtherPageNotificationClick } from './notifications';
 
 /** Key of the relay in the settings (buffer to resume per relay) */
 export const relayKey = (s: Settings = getSettings()): string =>
@@ -51,6 +51,16 @@ export const session = new Session({
     },
     onActiveBufferLine: () => activeBufferLineListeners.forEach((l) => l()),
     resumeBuffer: () => getSettings().currentlyViewedBuffers[relayKey()],
+});
+
+// A notification of another tab clicked: show its buffer here
+onOtherPageNotificationClick((fullName) => {
+    const buffer = Object.values(session.state.buffers).find(
+        (b) => b.fullName === fullName,
+    );
+    if (buffer) {
+        activateBuffer(buffer.id);
+    }
 });
 
 // Start or stop refreshing the hotlist when the setting changes

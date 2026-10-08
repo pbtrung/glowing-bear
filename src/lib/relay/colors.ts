@@ -207,18 +207,18 @@ const MATCHERS: Array<{ regex: RegExp; fn: (m: RegExpMatchArray) => Style }> = [
         // WeeChat 2.6+ uses a tilde (~) instead of a comma (,): recognize both
         regex: /^\*(?:([*!/_%.|]*)(\d{2})|@([*!/_%.|]*)(\d{5}))[,~](\d{2}|@\d{5})/,
         fn: (m) => ({
-            fgColor: colorObj(m[2] ? m[2] : m[4]),
+            fgColor: colorObj(m[2] ? m[2] : '@' + m[4]),
             bgColor: colorObj(m[5]),
             attrs: attrsFromStr(m[2] ? m[1] : m[3]),
         }),
     },
     {
-        // foreground color with * (+ attributes): "*" + (A)STD, "*" + (A)EXT
-        regex: /^\*([*!/_%.|]*)(\d{2}|@\d{5})/,
+        // foreground color with * (+ attributes): "*" + (A)STD, "*@" + (A)EXT
+        regex: /^\*(?:([*!/_%.|]*)(\d{2})|@([*!/_%.|]*)(\d{5}))/,
         fn: (m) => ({
-            fgColor: colorObj(m[2]),
+            fgColor: colorObj(m[2] ? m[2] : '@' + m[4]),
             bgColor: null,
-            attrs: attrsFromStr(m[1]),
+            attrs: attrsFromStr(m[2] ? m[1] : m[3]),
         }),
     },
     {

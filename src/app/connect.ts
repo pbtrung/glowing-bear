@@ -1,7 +1,7 @@
 /*
  * Connecting with the settings of the connection form.
  */
-import { session } from './chat';
+import { relayKey, session } from './chat';
 import { cancelNotifications, requestNotificationPermission } from './notifications';
 import {
     getSettings,
@@ -44,7 +44,8 @@ export async function connectWithSettings(
 }
 
 /**
- * Apply the URL parameters (#host=...&port=...&path=...&password=...&autoconnect=true)
+ * Apply the URL parameters (#host=...&port=...&path=...&password=...&autoconnect=true
+ * &buffer=...)
  * and connect automatically if asked to.
  */
 export function initConnection(): void {
@@ -54,6 +55,15 @@ export function initConnection(): void {
         history.replaceState(null, '', location.pathname + location.search);
     }
     updateSettings(hashSettings(getSettings(), params).changes);
+    if (params.buffer) {
+        // e.g. a notification clicked with no page open
+        updateSettings({
+            currentlyViewedBuffers: {
+                ...getSettings().currentlyViewedBuffers,
+                [relayKey()]: params.buffer,
+            },
+        });
+    }
     const s = getSettings();
     const password = params.password ?? (s.savepassword ? s.password : '');
     // autoconnect in the URL applies to this page load only

@@ -32,11 +32,16 @@ function useUnreadIndicators(): void {
         (s) => s.status === 'connected' || s.status === 'reconnecting',
     );
     const useFavico = useSettings((s) => s.useFavico);
+    const shown = connected ? buffer : undefined;
     useEffect(() => {
-        updateTitle(notifications, connected ? buffer : undefined);
+        updateTitle(notifications, shown);
+        // (the buffer changes with each of its lines: only its title is used)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [notifications, shown?.id, shown?.shortName, shown?.fullName, shown?.titleText]);
+    useEffect(() => {
         updateFavicon(connected ? notifications : 0, connected ? unread : 0);
         updateAppBadge(connected ? notifications : 0, connected ? unread : 0);
-    }, [unread, notifications, buffer, connected, useFavico]);
+    }, [unread, notifications, connected, useFavico]);
 }
 
 /** Lines read while the window was hidden are read when it comes back */

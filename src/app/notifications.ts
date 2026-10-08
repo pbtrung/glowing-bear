@@ -41,11 +41,31 @@ export function registerServiceWorker(): void {
 /** Click handlers of the notifications shown by the service worker, by tag */
 const swClickHandlers = new Map<string, () => void>();
 
+/**
+ * Called for a click on a notification another page showed (several tabs):
+ * the full name of its buffer
+ */
+let otherPageClick: ((buffer: string) => void) | null = null;
+
+export function onOtherPageNotificationClick(handler: (buffer: string) => void): void {
+    otherPageClick = handler;
+}
+
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
-        const data = event.data as { type?: string; tag?: string } | null;
-        if (data?.type === 'notificationclick' && data.tag) {
-            swClickHandlers.get(data.tag)?.();
+        const data = event.data as {
+            type?: string;
+            tag?: string;
+            buffer?: string;
+        } | null;
+        if (data?.type !== 'notificationclick' || !data.tag) {
+            return;
+        }
+        const handler = swClickHandlers.get(data.tag);
+        if (handler) {
+            handler();
+        } else if (data.buffer) {
+            otherPageClick?.(data.buffer);
         }
     });
 }
@@ -59,6 +79,7 @@ function showNotification(
     tag: string,
     title: string,
     body: string,
+    buffer: string,
     onClick: () => void,
 ): void {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
@@ -81,6 +102,7 @@ function showNotification(
                     icon: 'assets/img/glowing_bear_128x128.png',
                     tag,
                     renotify: true,
+                    data: { buffer },
                 } as NotificationOptions)
                 .catch(() => undefined);
         }
@@ -122,7 +144,7 @@ export function notifyHighlight(buffer: Buffer, line: Line, onClick: () => void)
         body = `<${line.prefixText}> ${line.text}`;
     }
     title += buffer.shortName + (buffer.server ? ` (${buffer.server})` : '');
-    showNotification('gb-' + buffer.id, title, body, onClick);
+    showNotification('gb-' + buffer.id, title, body, buffer.fullName, onClick);
     if (getSettings().soundnotification) {
         playSound();
     }

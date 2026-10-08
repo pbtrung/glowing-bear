@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     DEFAULT_SETTINGS,
+    fontSizeInPx,
     loadSettings,
     hashSettings,
     pageHost,
@@ -74,6 +75,9 @@ describe('URL parameters', () => {
             password: 'p@ss',
             autoconnect: true,
         });
+        expect(parseHashParams('#buffer=irc.libera.%23weechat')).toEqual({
+            buffer: 'irc.libera.#weechat',
+        });
         expect(parseHashParams('')).toEqual({});
     });
 
@@ -134,6 +138,15 @@ describe('URL parameters', () => {
         const secure = hashSettings(tls, { host: 'https://example.com:9001' });
         expect(secure.relayChanged).toBe(false);
         expect(secure.changes.password).toBeUndefined();
+    });
+});
+
+describe('font size', () => {
+    it('is converted to pixels for the slider', () => {
+        expect(fontSizeInPx('15px')).toBe(15);
+        expect(fontSizeInPx('12pt')).toBe(16);
+        expect(fontSizeInPx('1.2em')).toBe(19);
+        expect(fontSizeInPx('large')).toBe(14);
     });
 });
 

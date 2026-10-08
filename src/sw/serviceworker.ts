@@ -23,18 +23,25 @@ sw.addEventListener('notificationclick', (event) => {
         sw.clients
             .matchAll({ type: 'window', includeUncontrolled: true })
             .then(async (windows) => {
-                // The page in front, else any; none: open Glowing Bear
+                // The page in front, else any; none: open Glowing Bear on
+                // the buffer (resumed once connected)
+                const data = event.notification.data as { buffer?: string } | null;
+                const buffer = data?.buffer ?? '';
                 const window =
                     windows.find((w) => w.focused) ??
                     windows.find((w) => w.visibilityState === 'visible') ??
                     windows[0];
                 if (!window) {
-                    await sw.clients.openWindow('./');
+                    await sw.clients.openWindow(
+                        buffer ? './#buffer=' + encodeURIComponent(buffer) : './',
+                    );
                     return;
                 }
+                // (it may not be the page that showed it: the buffer is sent)
                 window.postMessage({
                     type: 'notificationclick',
                     tag: event.notification.tag,
+                    buffer,
                 });
                 await window.focus();
             }),

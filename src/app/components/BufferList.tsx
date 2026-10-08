@@ -17,6 +17,7 @@ import {
     toggleServerCollapsed,
     uiStore,
     useChat,
+    useMobileUi,
     useUi,
     type ListedBuffer,
 } from '../chat';
@@ -196,6 +197,7 @@ export function BufferList() {
         })),
     );
     const swipe = useSwipe();
+    const mobile = useMobileUi();
     const list = listBuffers(buffers, activeId, settings, ui);
     const ids = list.map((l) => l.buffer.id);
 
@@ -210,6 +212,8 @@ export function BufferList() {
             id="sidebar"
             data-state={ui.sidebarOpen ? 'visible' : 'hidden'}
             aria-label="Buffers"
+            // (off-screen on mobile when closed: out of the tab order)
+            inert={mobile && !ui.sidebarOpen}
             {...swipe}
         >
             <form

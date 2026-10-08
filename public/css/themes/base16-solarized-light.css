@@ -17,4 +17,7 @@
     --base0D: #268bd2;
     --base0E: #6c71c4;
     --base0F: #d33682;
+    /* darker than base0D / base0A, for WCAG AA contrast on the light base */
+    --gb-link: #1b6aa5;
+    --gb-highlight-fg: #7f6200;
 }

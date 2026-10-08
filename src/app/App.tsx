@@ -111,6 +111,8 @@ function Chat() {
         buffer.nicklistLoaded &&
         Object.keys(buffer.nicks).length > 0 &&
         (mobile ? alwaysnicklist || nicklistOpen : !nonicklist);
+    // The chat behind the buffer list opened over it (mobile)
+    const behindPanel = mobile && sidebarOpen;
 
     // On mobile, start with the buffer list closed once a buffer is shown
     useEffect(() => {
@@ -137,9 +139,11 @@ function Chat() {
             />
             {showNicklist && buffer && <NickList key={buffer.id} buffer={buffer} />}
             <ErrorBoundary what="This buffer" resetKey={buffer?.id}>
-                <BufferLines />
+                <BufferLines inert={behindPanel} />
             </ErrorBoundary>
-            <footer className="footer">{buffer && <InputBar buffer={buffer} />}</footer>
+            <footer className="footer" inert={behindPanel}>
+                {buffer && <InputBar buffer={buffer} />}
+            </footer>
         </div>
     );
 }

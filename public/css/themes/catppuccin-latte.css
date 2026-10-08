@@ -18,12 +18,14 @@
     --base0D: #1e66f5;
     --base0E: #8839ef;
     --base0F: #dd7878;
-    --gb-muted: #6c6f85;
+    /* darker than Catppuccin's, for WCAG AA contrast on the light base */
+    --gb-muted: #5c5f77;
     --gb-chrome-bg: #e6e9ef;
     --gb-input-bg: #ffffff;
     --gb-accent: #8839ef;
     --gb-accent-fg: #ffffff;
-    --gb-link: #209fb5;
+    --gb-link: #1e5fd8;
+    --gb-highlight-fg: #8c5b00;
     --gb-active-bg: #ccd0da;
     --gb-active-fg: #4c4f69;
     --gb-repeated-time: #bcc0cc;

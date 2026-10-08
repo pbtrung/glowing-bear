@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import {
+    memo,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    type KeyboardEvent,
+} from 'react';
 import { History, LoaderCircle } from 'lucide-react';
 import { READ_MARKER_TOP, type Buffer, type Line } from '../../lib/state/model';
 import { canFetchMore } from '../../lib/state/reducers';
@@ -70,7 +78,21 @@ const LineRow = memo(function LineRow({
             <td className="prefix">
                 {/* repeated-prefix: no style, a hook for custom CSS */}
                 <span className={repeatedPrefix ? 'repeated-prefix' : undefined}>
-                    <a onClick={mention} title={line.host ?? undefined}>
+                    <a
+                        onClick={mention}
+                        title={line.host ?? undefined}
+                        {...(line.isMessage && {
+                            role: 'button',
+                            tabIndex: 0,
+                            'aria-label': `Mention ${line.prefixText}`,
+                            onKeyDown: (event: KeyboardEvent) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    mention();
+                                }
+                            },
+                        })}
+                    >
                         {line.isMessage && <span className="hidden-bracket">&lt;</span>}
                         <RichText parts={line.prefix} links={false} maxLength={25} />
                         {line.isMessage && <span className="hidden-bracket">&gt;</span>}
@@ -159,7 +181,12 @@ function Lines({ buffer }: { buffer: Buffer }) {
 }
 
 /** The lines of the active buffer */
-export function BufferLines() {
+/**
+ * The lines of the active buffer
+ *
+ * @param inert behind a panel (mobile)
+ */
+export function BufferLines({ inert = false }: { inert?: boolean }) {
     const buffer = useActiveBuffer();
     const ref = useRef<HTMLElement>(null);
     const atBottom = useRef(true);
@@ -258,7 +285,7 @@ export function BufferLines() {
     };
 
     if (!buffer) {
-        return <main id="bufferlines" className="favorite-font" />;
+        return <main id="bufferlines" className="favorite-font" inert={inert} />;
     }
 
     const classes = ['favorite-font'];
@@ -271,6 +298,7 @@ export function BufferLines() {
             className={classes.join(' ')}
             ref={ref}
             onScroll={onScroll}
+            inert={inert}
             {...swipe}
         >
             <table>

@@ -461,8 +461,8 @@ pre {
     color: var(--gb-fg);
     overflow: hidden;
     text-overflow: ellipsis;
-    /* whole unless it can't fit by itself (the topic gives way first), the
-       modes and badges stay whole */
+    /* whole unless it can't fit by itself (the topic, then the modes give
+       way first), the badges stay whole */
     flex: 0 1 auto;
     min-width: 0;
 }
@@ -470,7 +470,11 @@ pre {
 #topbar .buffer-modes {
     font-size: 0.8rem;
     color: var(--gb-muted);
-    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* shortened before the name (long modes with keys or limits) */
+    flex: 0 1000 auto;
+    min-width: 0;
 }
 
 #topbar .buffer-title {

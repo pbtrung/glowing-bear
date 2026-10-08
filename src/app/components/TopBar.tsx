@@ -60,7 +60,9 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                             {buffer.trimmedName || buffer.fullName}
                         </span>
                         {buffer.modes && (
-                            <span className="buffer-modes">{buffer.modes}</span>
+                            <span className="buffer-modes" title={buffer.modes}>
+                                {buffer.modes}
+                            </span>
                         )}
                         {buffer.away !== null && (
                             <span className="buffer-away badge" title={buffer.away}>

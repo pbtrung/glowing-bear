@@ -80,7 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
     fontfamily: DEFAULT_FONT,
     readlineBindings: false,
     enableMathjax: false,
-    enableQuickKeys: true,
+    enableQuickKeys: false,
     syncInput: true,
     showBufferNumbers: false,
     hideSmartFiltered: true,

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     FakeWebSocket,
+    type FakeHttp,
     flush,
     installFakes,
     nextSocket,
@@ -38,8 +39,10 @@ const BUFFERS = [
     apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat'),
 ];
 
+let http: FakeHttp;
+
 beforeEach(() => {
-    installFakes();
+    http = installFakes();
 });
 
 afterEach(() => {
@@ -205,6 +208,20 @@ describe('connection', () => {
         expect(old.readyState).toBe(FakeWebSocket.CLOSED);
         // The batch was not sent
         expect(old.sent.map((r) => r.request)).toEqual(['GET /api/version']);
+        const count = FakeWebSocket.instances.length;
+        await new Promise((r) => setTimeout(r, 20));
+        expect(FakeWebSocket.instances).toHaveLength(count);
+    });
+
+    it('stops reconnecting when the password is refused', async () => {
+        const { session, ws } = await connected({ reconnectDelay: 1 });
+        ws.refuse(1006);
+        await vi.waitFor(() => expect(FakeWebSocket.last).not.toBe(ws));
+        http.versionStatus = 401;
+        http.versionBody = { error: 'Invalid password' };
+        FakeWebSocket.last.refuse();
+        await vi.waitFor(() => expect(session.state.status).toBe('disconnected'));
+        expect(session.state.error?.kind).toBe('auth');
         const count = FakeWebSocket.instances.length;
         await new Promise((r) => setTimeout(r, 20));
         expect(FakeWebSocket.instances).toHaveLength(count);
@@ -441,6 +458,54 @@ describe('lines', () => {
     });
 });
 
+describe('requests of a previous connection', () => {
+    it("don't block loading lines and nicks after reconnecting", async () => {
+        const { session, ws } = await connected();
+        // Lines and nicks of buffer 2 requested, never answered
+        session.activate(2);
+        expect(session.state.buffers[2].loadingLines).toBe(true);
+        session.disconnect();
+        const connecting = session.connect(OPTIONS);
+        const current = await acceptConnection();
+        await connecting;
+        expect(current).not.toBe(ws);
+        expect(current.sent.map((r) => r.request)).toEqual(
+            expect.arrayContaining([
+                'GET /api/buffers/2/lines?lines=-100&colors=weechat',
+                'GET /api/buffers/2/nicks?colors=weechat',
+            ]),
+        );
+    });
+});
+
+describe('hotlist refresh', () => {
+    it('follows the setting while connected', async () => {
+        vi.useFakeTimers();
+        let sync = false;
+        const session = newSession({ hotlistSync: () => sync, hotlistInterval: 1000 });
+        const connecting = session.connect(OPTIONS);
+        await vi.advanceTimersByTimeAsync(0);
+        const ws = FakeWebSocket.last;
+        ws.open();
+        await vi.advanceTimersByTimeAsync(0);
+        await answerInitialSync(ws);
+        await connecting;
+        const hotlists = () =>
+            ws.sent.filter((r) => r.request === 'GET /api/hotlist').length;
+        const initial = hotlists();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(hotlists()).toBe(initial);
+        sync = true;
+        session.updateHotlistSync();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(hotlists()).toBe(initial + 3);
+        sync = false;
+        session.updateHotlistSync();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(hotlists()).toBe(initial + 3);
+    });
+});
+
 describe('latency', () => {
     it('is measured when connected, and forgotten when disconnected', async () => {
         const { session, ws } = await connected();
@@ -546,6 +611,21 @@ describe('input history', () => {
         // At the bottom, the text is stashed in the history like WeeChat does
         expect(session.historyDown(1, 'typing')).toBe('');
         expect(session.historyUp(1, '')).toBe('typing');
+    });
+
+    it('keeps the text typed or edited anywhere in the history', () => {
+        const session = newSession();
+        session.addToHistory(1, 'one');
+        session.addToHistory(1, 'two');
+        expect(session.historyUp(1, 'typing')).toBe('two');
+        // Edited, then up and back down
+        expect(session.historyUp(1, 'two edited')).toBe('one');
+        expect(session.historyDown(1, 'one')).toBe('two edited');
+        expect(session.historyDown(1, 'two edited')).toBe('typing');
+        // The edits are forgotten once a line is sent
+        session.addToHistory(1, 'three');
+        expect(session.historyUp(1, '')).toBe('three');
+        expect(session.historyUp(1, 'three')).toBe('two');
     });
 
     it('keeps the text with an empty history', () => {

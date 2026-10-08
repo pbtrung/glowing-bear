@@ -57,6 +57,18 @@ export function escapeInsert(text: string): string {
         .replace(/ +$/, (spaces) => '\\x20'.repeat(spaces.length));
 }
 
+/** Input history of a buffer */
+interface InputHistory {
+    /** Lines sent, oldest first */
+    lines: string[];
+    /** Position in the lines (lines.length: the line being typed) */
+    pos: number;
+    /** The line being typed, while navigating the history */
+    typing: string;
+    /** Lines of the history edited while navigating, by position */
+    edits: Map<number, string>;
+}
+
 /** Lines loaded when a buffer is shown */
 const LINES_WANTED = 100;
 
@@ -146,10 +158,13 @@ export class Session {
     private attempt = 0;
     private hotlistTimer: ReturnType<typeof setInterval> | undefined;
     private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-    private history = new Map<number, { lines: string[]; pos: number }>();
-    /** Buffers whose lines / nicklist are being fetched */
-    private fetching = new Set<number>();
-    private loadingNicklist = new Set<number>();
+    private history = new Map<number, InputHistory>();
+    /**
+     * Buffers whose lines / nicklist are being fetched, with the API of the
+     * request (one of a previous connection doesn't block the current one)
+     */
+    private fetching = new Map<number, RelayApi>();
+    private loadingNicklist = new Map<number, RelayApi>();
     private readonly options: SessionOptions;
 
     constructor(options: SessionOptions) {
@@ -323,8 +338,17 @@ export class Session {
             this.activate(target.id);
         }
 
+        this.updateHotlistSync();
+    }
+
+    /**
+     * Start or stop refreshing the hotlist, following the hotlistSync option
+     * (to call when it changes)
+     */
+    updateHotlistSync(): void {
         clearInterval(this.hotlistTimer);
-        if (this.options.hotlistSync()) {
+        this.hotlistTimer = undefined;
+        if (this.api && this.options.hotlistSync()) {
             this.hotlistTimer = setInterval(
                 () => void this.refreshHotlist(),
                 this.options.hotlistInterval ?? 60000,
@@ -372,8 +396,8 @@ export class Session {
             if (e instanceof Cancelled) {
                 return;
             }
-            if (e instanceof ConnectError && e.kind === 'version') {
-                // retrying won't help
+            if (e instanceof ConnectError && e.kind !== 'network') {
+                // retrying won't help (password changed, TOTP enabled...)
                 this.set({ status: 'disconnected', error: e });
                 return;
             }
@@ -505,13 +529,14 @@ export class Session {
      */
     async fetchLines(bufferId: number, count?: number, unreadHint = 0): Promise<void> {
         const buffer = this.state.buffers[bufferId];
-        if (!this.api || !buffer || this.fetching.has(bufferId)) {
+        if (!this.api || !buffer || this.fetching.get(bufferId) === this.api) {
             return;
         }
         if (count === undefined && buffer.linesFetched && !canFetchMore(buffer)) {
             return;
         }
-        this.fetching.add(bufferId);
+        const api = this.api;
+        this.fetching.set(bufferId, api);
         // Free buffers (e.g. /fset) are fetched whole: their lines are a screen
         const wanted = buffer.free
             ? Infinity
@@ -524,7 +549,7 @@ export class Session {
               );
         this.update((s) => setLoadingLines(s, bufferId, true));
         try {
-            const lines = await this.api.lines(
+            const lines = await api.lines(
                 bufferId,
                 buffer.free ? undefined : -wanted,
                 'weechat',
@@ -533,23 +558,28 @@ export class Session {
         } catch {
             // connection lost (the reconnection reloads them), or buffer closed
         } finally {
-            this.fetching.delete(bufferId);
-            this.update((s) => setLoadingLines(s, bufferId, false));
+            if (this.fetching.get(bufferId) === api) {
+                this.fetching.delete(bufferId);
+                this.update((s) => setLoadingLines(s, bufferId, false));
+            }
         }
     }
 
     async loadNicklist(bufferId: number): Promise<void> {
-        if (!this.api || this.loadingNicklist.has(bufferId)) {
+        if (!this.api || this.loadingNicklist.get(bufferId) === this.api) {
             return;
         }
-        this.loadingNicklist.add(bufferId);
+        const api = this.api;
+        this.loadingNicklist.set(bufferId, api);
         try {
-            const root = await this.api.nicks(bufferId, 'weechat');
+            const root = await api.nicks(bufferId, 'weechat');
             this.update((s) => applyNicklist(s, bufferId, root));
         } catch {
             // connection lost (the reconnection reloads it), or buffer closed
         } finally {
-            this.loadingNicklist.delete(bufferId);
+            if (this.loadingNicklist.get(bufferId) === api) {
+                this.loadingNicklist.delete(bufferId);
+            }
         }
     }
 
@@ -716,10 +746,10 @@ export class Session {
      * Input history, per buffer
      */
 
-    private historyOf(bufferId: number): { lines: string[]; pos: number } {
+    private historyOf(bufferId: number): InputHistory {
         let history = this.history.get(bufferId);
         if (!history) {
-            history = { lines: [], pos: 0 };
+            history = { lines: [], pos: 0, typing: '', edits: new Map() };
             this.history.set(bufferId, history);
         }
         return history;
@@ -727,15 +757,31 @@ export class Session {
 
     addToHistory(bufferId: number, text: string): void {
         const history = this.historyOf(bufferId);
-        if (history.pos !== history.lines.length) {
-            // Drop the line cached when navigating the history
-            history.lines.pop();
-        }
         history.lines.push(text);
         if (history.lines.length > HISTORY_SIZE) {
             history.lines.shift();
         }
         history.pos = history.lines.length;
+        history.typing = '';
+        history.edits.clear();
+    }
+
+    /** Remember the text of the input at the current position of the history */
+    private keepInput(history: InputHistory, current: string): void {
+        if (history.pos >= history.lines.length) {
+            history.typing = current;
+        } else if (current !== history.lines[history.pos]) {
+            // edited, like WeeChat keeps it until a line is sent
+            history.edits.set(history.pos, current);
+        } else {
+            history.edits.delete(history.pos);
+        }
+    }
+
+    private historyLine(history: InputHistory): string {
+        return history.pos >= history.lines.length
+            ? history.typing
+            : (history.edits.get(history.pos) ?? history.lines[history.pos]);
     }
 
     /** Previous line of the history (the current one is kept for coming back) */
@@ -744,33 +790,23 @@ export class Session {
         if (history.pos <= 0) {
             return current;
         }
-        if (history.pos >= history.lines.length) {
-            // stash the line being typed, popped when coming back down
-            history.lines.push(current);
-        }
+        this.keepInput(history, current);
         history.pos--;
-        return history.lines[history.pos];
+        return this.historyLine(history);
     }
 
     /** Next line of the history; at the end, the current text is pushed to it */
     historyDown(bufferId: number, current: string): string {
         const history = this.historyOf(bufferId);
-        if (history.pos === history.lines.length) {
+        if (history.pos >= history.lines.length) {
             // stash the current text like WeeChat does
             if (current !== '') {
-                history.lines.push(current);
-                history.pos++;
+                this.addToHistory(bufferId, current);
             }
             return '';
         }
-        if (history.pos < 0 || history.pos > history.lines.length) {
-            return current;
-        }
+        this.keepInput(history, current);
         history.pos++;
-        if (history.lines.length > 0 && history.pos === history.lines.length - 1) {
-            // back to the line we were typing
-            return history.lines.pop() ?? '';
-        }
-        return history.lines[history.pos];
+        return this.historyLine(history);
     }
 }

@@ -124,6 +124,17 @@ describe('URL parameters', () => {
         expect(hashSettings(saved, { port: '9002' }).changes.password).toBe('');
         expect(hashSettings(saved, { path: 'x' }).changes.password).toBe('');
     });
+
+    it('forgets the saved password when a link turns off TLS', () => {
+        const tls = { ...saved, tls: true };
+        const plain = hashSettings(tls, { host: 'http://example.com:9001' });
+        expect(plain.changes.tls).toBe(false);
+        expect(plain.relayChanged).toBe(true);
+        expect(plain.changes.password).toBe('');
+        const secure = hashSettings(tls, { host: 'https://example.com:9001' });
+        expect(secure.relayChanged).toBe(false);
+        expect(secure.changes.password).toBeUndefined();
+    });
 });
 
 describe('default relay host', () => {

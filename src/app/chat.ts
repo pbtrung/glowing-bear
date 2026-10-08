@@ -8,7 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { activeBuffer } from '../lib/state/reducers';
 import { Session, type SessionState } from '../lib/state/session';
 import type { Buffer } from '../lib/state/model';
-import { getSettings, updateSettings, type Settings } from './settings';
+import { getSettings, settingsStore, updateSettings, type Settings } from './settings';
 import { notifyHighlight } from './notifications';
 
 /** Key of the relay in the settings (buffer to resume per relay) */
@@ -51,6 +51,13 @@ export const session = new Session({
     },
     onActiveBufferLine: () => activeBufferLineListeners.forEach((l) => l()),
     resumeBuffer: () => getSettings().currentlyViewedBuffers[relayKey()],
+});
+
+// Start or stop refreshing the hotlist when the setting changes
+settingsStore.subscribe((settings, previous) => {
+    if (settings.hotlistsync !== previous.hotlistsync) {
+        session.updateHotlistSync();
+    }
 });
 
 export function useChat<T>(selector: (state: SessionState) => T): T {

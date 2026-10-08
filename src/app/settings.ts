@@ -264,8 +264,9 @@ export function parseHashParams(hash: string): HashParams {
 
 /**
  * Settings changed by the URL parameters host, port and path. If they point
- * to another relay, the saved password is forgotten: a link must not get the
- * password of the user's relay sent to another one.
+ * to another relay, or turn off TLS, the saved password is forgotten: a link
+ * must not get the password of the user's relay sent to another one, or sent
+ * unencrypted.
  */
 export function hashSettings(
     s: Settings,
@@ -300,13 +301,15 @@ export function hashSettings(
     }
     const relay = (h: string, p: string | number, pa: string) =>
         `${h.toLowerCase()}:${p}/${pa}`;
+    // Turning off TLS counts too: the password would be sent unencrypted
     const relayChanged =
         relay(host, port, path) !==
-        relay(
-            current?.host ?? s.host,
-            current?.port ?? s.port,
-            current?.path ?? s.path,
-        );
+            relay(
+                current?.host ?? s.host,
+                current?.port ?? s.port,
+                current?.path ?? s.path,
+            ) ||
+        (changes.tls === false && s.tls);
     if (relayChanged) {
         changes.password = '';
     }

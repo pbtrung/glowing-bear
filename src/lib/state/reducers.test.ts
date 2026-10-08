@@ -8,6 +8,9 @@ import {
     applyNicklist,
     HANDLED_EVENTS,
     MAX_LINES,
+    MAX_ACTIVE_LINES,
+    MAX_FETCHED_LINES,
+    canFetchMore,
     initialState,
     markAllRead,
     setActiveBuffer,
@@ -849,6 +852,28 @@ describe('lines kept', () => {
         expect(state.buffers[2].requestedLines).toBe(MAX_LINES);
     });
 
+    it('keeps the most lines that can be fetched in the buffer shown', () => {
+        let state = setActiveBuffer(setup(), 2);
+        state = applyLines(state, 2, many(1, MAX_FETCHED_LINES), MAX_FETCHED_LINES);
+        expect(canFetchMore(state.buffers[2])).toBe(false);
+        state = send(state, 'buffer_line_added', 2, apiLine(9000, 'new')).state;
+        const lines = state.buffers[2].lines.filter((l) => !l.isDateChange);
+        expect(lines).toHaveLength(MAX_FETCHED_LINES + 1);
+    });
+
+    it('keeps the line objects already loaded when fetching older lines', () => {
+        const last = (state: ChatState) =>
+            state.buffers[2].lines.findLast((l) => !l.isDateChange);
+        let state = applyLines(setup(), 2, many(11, 10), 10);
+        const before = last(state);
+        state = applyLines(state, 2, many(1, 20), 20);
+        expect(last(state)).toBe(before);
+        // Not a line that changed
+        state = applyLines(state, 2, [...many(1, 19), apiLine(20, 'edited')], 20);
+        expect(last(state)).not.toBe(before);
+        expect(last(state)?.text).toBe('edited');
+    });
+
     it('keeps the lines of the buffer shown until it is left', () => {
         let state = setActiveBuffer(setup(), 2);
         state = applyLines(state, 2, many(1, 3 * MAX_LINES), 4 * MAX_LINES);
@@ -864,7 +889,7 @@ describe('lines kept', () => {
 
     it('trims the buffer shown when it gets very long', () => {
         let state = setActiveBuffer(setup(), 2);
-        state = applyLines(state, 2, many(1, 4 * MAX_LINES), 4 * MAX_LINES);
+        state = applyLines(state, 2, many(1, MAX_ACTIVE_LINES), MAX_ACTIVE_LINES);
         state = send(state, 'buffer_line_added', 2, apiLine(9000, 'one more')).state;
         const lines = state.buffers[2].lines.filter((l) => !l.isDateChange);
         expect(lines).toHaveLength(2 * MAX_LINES);

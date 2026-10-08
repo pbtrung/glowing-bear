@@ -20,7 +20,9 @@ import {
     applyHotlist,
     applyLines,
     applyNicklist,
+    canFetchMore,
     initialState,
+    MAX_FETCHED_LINES,
     markAllRead,
     markRead,
     setActiveBuffer,
@@ -506,13 +508,19 @@ export class Session {
         if (!this.api || !buffer || this.fetching.has(bufferId)) {
             return;
         }
+        if (count === undefined && buffer.linesFetched && !canFetchMore(buffer)) {
+            return;
+        }
         this.fetching.add(bufferId);
         // Free buffers (e.g. /fset) are fetched whole: their lines are a screen
         const wanted = buffer.free
             ? Infinity
-            : Math.max(
-                  count ?? 0,
-                  buffer.linesFetched ? buffer.requestedLines * 2 : LINES_WANTED,
+            : Math.min(
+                  MAX_FETCHED_LINES,
+                  Math.max(
+                      count ?? 0,
+                      buffer.linesFetched ? buffer.requestedLines * 2 : LINES_WANTED,
+                  ),
               );
         this.update((s) => setLoadingLines(s, bufferId, true));
         try {

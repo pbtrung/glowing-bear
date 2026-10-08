@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { History, LoaderCircle } from 'lucide-react';
 import { READ_MARKER_TOP, type Buffer, type Line } from '../../lib/state/model';
+import { canFetchMore } from '../../lib/state/reducers';
 import {
     activeBufferLineListeners,
     addMention,
@@ -237,7 +238,7 @@ export function BufferLines() {
     }, [scrollToBottom]);
 
     const fetchMore = useCallback(() => {
-        if (buffer && !buffer.loadingLines && !buffer.allLinesFetched) {
+        if (buffer && !buffer.loadingLines && canFetchMore(buffer)) {
             void session.fetchLines(buffer.id);
         }
     }, [buffer]);
@@ -281,6 +282,10 @@ export function BufferLines() {
                                     <span className="text-body-secondary">
                                         <Icon icon={LoaderCircle} spin /> Fetching more
                                         lines…
+                                    </span>
+                                ) : !canFetchMore(buffer) ? (
+                                    <span className="text-body-secondary">
+                                        Older lines are only in WeeChat
                                     </span>
                                 ) : (
                                     <button

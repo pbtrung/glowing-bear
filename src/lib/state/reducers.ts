@@ -186,6 +186,40 @@ function setFreeLine(buffer: Draft<Buffer>, line: Line): void {
 /** Lines kept in buffers not shown (older ones are fetched again if needed) */
 export const MAX_LINES = 500;
 
+/** Most lines fetched for a buffer (the history shown when scrolling up) */
+export const MAX_FETCHED_LINES = 8 * MAX_LINES;
+
+/**
+ * Lines of the buffer shown above which it's trimmed (to 2 * MAX_LINES).
+ * More than MAX_FETCHED_LINES, so that a new line doesn't trim the history
+ * just fetched (whose reading would fetch it again, and so on).
+ */
+export const MAX_ACTIVE_LINES = 10 * MAX_LINES;
+
+/** Whether two versions of a line show the same thing */
+function sameLine(a: Line, b: Line): boolean {
+    return (
+        a.key === b.key &&
+        a.id === b.id &&
+        a.date.getTime() === b.date.getTime() &&
+        a.prefixText === b.prefixText &&
+        a.text === b.text &&
+        a.highlight === b.highlight &&
+        a.notifyLevel === b.notifyLevel &&
+        a.displayed === b.displayed &&
+        a.tags.join(',') === b.tags.join(',')
+    );
+}
+
+/** Whether older lines of a buffer can be fetched */
+export function canFetchMore(buffer: Buffer): boolean {
+    return (
+        !buffer.free &&
+        !buffer.allLinesFetched &&
+        buffer.requestedLines < MAX_FETCHED_LINES
+    );
+}
+
 /** Keep the last `max` lines of a buffer (memory of long sessions) */
 function trimLines(buffer: Draft<Buffer>, max = MAX_LINES): void {
     if (buffer.free) {
@@ -244,7 +278,7 @@ function addNewLine(
     const active = draft.activeBufferId === buffer.id;
     if (!active) {
         trimLines(buffer);
-    } else if (buffer.lines.length > 4 * MAX_LINES) {
+    } else if (buffer.lines.length > MAX_ACTIVE_LINES) {
         // The lines of the active buffer are kept while it's read, up to a
         // point (e.g. a busy buffer shown all night)
         trimLines(buffer, 2 * MAX_LINES);
@@ -308,6 +342,13 @@ export function applyLines(
         if (!buffer) {
             return;
         }
+        // Lines already loaded are kept as they are (no new objects: the rows
+        // of the lines shown aren't rendered again when older ones are fetched)
+        const previous = new Map(state.buffers[bufferId].lines.map((l) => [l.key, l]));
+        const reuse = (line: Line): Line => {
+            const old = previous.get(line.key);
+            return old && sameLine(old, line) ? old : line;
+        };
         buffer.lines = [];
         buffer.requestedLines = apiLines.length;
         buffer.allLinesFetched = apiLines.length < requested;
@@ -323,6 +364,7 @@ export function applyLines(
         if (buffer.free) {
             return;
         }
+        buffer.lines = buffer.lines.map((l) => reuse(l as Line)) as Draft<Line>[];
         // Read marker, if none yet: WeeChat's one, else guess from the number
         // of unread lines (WeeChat's marker comes again with each buffer
         // event, and must not replace the local one)

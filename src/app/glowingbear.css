@@ -962,6 +962,74 @@ pre {
     border-collapse: collapse;
 }
 
+/* Jump buttons over the lines: to the read marker, to the new lines */
+.jump-top,
+.jump-bottom {
+    position: sticky;
+    z-index: 2;
+    height: 0;
+}
+
+.jump-top {
+    top: 0;
+}
+
+.jump-bottom {
+    bottom: 0;
+}
+
+.jump-top > .jump-pill {
+    position: absolute;
+    top: 0.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.jump-bottom > .jump-pill {
+    position: absolute;
+    right: 0.25rem;
+    bottom: 0.5rem;
+}
+
+.jump-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--gb-border);
+    border-radius: 999px;
+    background: var(--gb-chrome-bg);
+    color: var(--gb-fg);
+    box-shadow: var(--gb-shadow);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    animation: gb-fadein 0.15s;
+}
+
+.jump-pill button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+}
+
+button.jump-pill {
+    cursor: pointer;
+}
+
+.jump-pill:hover,
+.jump-pill button:hover {
+    color: var(--gb-accent);
+}
+
+.jump-pill.jump-highlight {
+    border-color: var(--gb-readmarker);
+    color: var(--gb-readmarker);
+}
+
 tr.bufferline:hover {
     background: var(--gb-line-hover);
 }

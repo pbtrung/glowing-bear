@@ -44,13 +44,21 @@ function useUnreadIndicators(): void {
     }, [unread, notifications, connected, useFavico]);
 }
 
-/** Lines read while the window was hidden are read when it comes back */
+/**
+ * Lines read while the window was hidden are read when it comes back; the
+ * read marker shows where they start
+ */
 function useVisibility(): void {
     useEffect(() => {
         const onVisible = () => {
             const id = session.state.activeBufferId;
-            if (document.visibilityState === 'visible' && id !== null) {
+            if (id === null) {
+                return;
+            }
+            if (document.visibilityState === 'visible') {
                 session.markRead(id);
+            } else {
+                session.moveReadMarker(id);
             }
         };
         document.addEventListener('visibilitychange', onVisible);

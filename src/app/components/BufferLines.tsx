@@ -5,11 +5,13 @@ import {
     useLayoutEffect,
     useMemo,
     useRef,
+    useState,
     type KeyboardEvent,
 } from 'react';
-import { History, LoaderCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, History, LoaderCircle, X } from 'lucide-react';
 import { READ_MARKER_TOP, type Buffer, type Line } from '../../lib/state/model';
-import { canFetchMore } from '../../lib/state/reducers';
+import { canFetchMore, linesAfter } from '../../lib/state/reducers';
+import { formatTimeText } from '../../lib/time-format';
 import {
     activeBufferLineListeners,
     addMention,
@@ -21,6 +23,8 @@ import { useSettings } from '../settings';
 import { Icon } from './Icon';
 import { RichText, Time } from './RichText';
 import { useSwipe } from '../swipe';
+
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
 /** Same minute (the time of a line is hidden when it repeats) */
 const sameMinute = (a: Date, b: Date) =>
@@ -130,29 +134,49 @@ function ReadMarker() {
     );
 }
 
-function Lines({ buffer }: { buffer: Buffer }) {
+/**
+ * The lines shown (without the joins/parts/quits hidden) and the key of the
+ * read marker among them
+ */
+function useShownLines(buffer: Buffer | undefined): {
+    lines: Line[];
+    marker: string | null;
+} {
+    const hideSmartFiltered = useSettings((s) => s.hideSmartFiltered);
+    const all = buffer?.lines;
+    const lastReadKey = buffer?.lastReadKey ?? null;
+    return useMemo(() => {
+        if (!all) {
+            return { lines: [], marker: null };
+        }
+        const lines = hideSmartFiltered ? all.filter((l) => !l.smartFiltered) : all;
+        // The read marker goes after the last line shown before it
+        let marker = lastReadKey;
+        if (hideSmartFiltered && marker !== null && marker !== READ_MARKER_TOP) {
+            const at = all.findIndex((l) => l.key === marker);
+            if (at >= 0) {
+                marker =
+                    all.slice(0, at + 1).findLast((l) => !l.smartFiltered)?.key ??
+                    READ_MARKER_TOP;
+            }
+        }
+        return { lines, marker };
+    }, [all, lastReadKey, hideSmartFiltered]);
+}
+
+function Lines({
+    buffer,
+    lines,
+    marker,
+}: {
+    buffer: Buffer;
+    lines: Line[];
+    marker: string | null;
+}) {
     const timeFormat = useChat(
         (s) => s.options['weechat.look.buffer_time_format'] ?? '%H:%M:%S',
     );
     const math = useSettings((s) => s.enableMathjax);
-    const hideSmartFiltered = useSettings((s) => s.hideSmartFiltered);
-    const lines = useMemo(
-        () =>
-            hideSmartFiltered
-                ? buffer.lines.filter((l) => !l.smartFiltered)
-                : buffer.lines,
-        [buffer.lines, hideSmartFiltered],
-    );
-    // The read marker goes after the last line shown before it
-    let marker = buffer.lastReadKey;
-    if (hideSmartFiltered && marker !== null && marker !== READ_MARKER_TOP) {
-        const at = buffer.lines.findIndex((l) => l.key === marker);
-        if (at >= 0) {
-            marker =
-                buffer.lines.slice(0, at + 1).findLast((l) => !l.smartFiltered)?.key ??
-                READ_MARKER_TOP;
-        }
-    }
     const rows = [];
     if (marker === READ_MARKER_TOP && lines.length > 0) {
         rows.push(
@@ -180,7 +204,6 @@ function Lines({ buffer }: { buffer: Buffer }) {
     return <>{rows}</>;
 }
 
-/** The lines of the active buffer */
 /**
  * The lines of the active buffer
  *
@@ -196,6 +219,20 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
     /** The last scroll was ours, not the user's (it loads no older lines) */
     const ownScroll = useRef(false);
     const swipe = useSwipe();
+    const { lines, marker } = useShownLines(buffer);
+    /**
+     * The jump buttons: the last line when the user left the bottom (the
+     * lines after it are new), whether the read marker is above the view
+     */
+    const [indicators, setIndicators] = useState({
+        bufferId: -1,
+        newFrom: null as string | null,
+        farFromBottom: false,
+        markerAbove: false,
+    });
+    /** Read marker ("buffer:key") whose button was closed */
+    const [dismissed, setDismissed] = useState<string | null>(null);
+    const markerId = `${buffer?.id}:${marker}`;
 
     const scrollToBottom = useCallback(() => {
         const el = ref.current;
@@ -203,6 +240,55 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
             el.scrollTop = el.scrollHeight;
         }
     }, []);
+
+    /** Scroll to the read marker (a third of the view down), else the bottom */
+    const scrollToMarker = useCallback(() => {
+        const el = ref.current;
+        const row = el?.querySelector<HTMLElement>('.readmarker');
+        if (!el) {
+            return;
+        }
+        if (row) {
+            // (offsetTop would be from its table)
+            const top =
+                row.getBoundingClientRect().top -
+                el.getBoundingClientRect().top +
+                el.scrollTop;
+            ownScroll.current = true;
+            el.scrollTop = Math.max(0, top - el.clientHeight / 3);
+        } else {
+            el.scrollTop = el.scrollHeight;
+        }
+    }, []);
+
+    const updateIndicators = useCallback(() => {
+        const el = ref.current;
+        if (!el || !buffer) {
+            return;
+        }
+        const bottom = atBottom.current;
+        const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        const row = el.querySelector('.readmarker');
+        const markerAbove =
+            row !== null &&
+            row.getBoundingClientRect().bottom <= el.getBoundingClientRect().top;
+        const lastKey = lines.findLast((l) => !l.isDateChange)?.key ?? null;
+        setIndicators((prev) => {
+            const previousFrom = prev.bufferId === buffer.id ? prev.newFrom : null;
+            const next = {
+                bufferId: buffer.id,
+                newFrom: bottom ? null : (previousFrom ?? lastKey),
+                farFromBottom: fromBottom > el.clientHeight,
+                markerAbove,
+            };
+            return next.bufferId === prev.bufferId &&
+                next.newFrom === prev.newFrom &&
+                next.farFromBottom === prev.farFromBottom &&
+                next.markerAbove === prev.markerAbove
+                ? prev
+                : next;
+        });
+    }, [buffer, lines]);
 
     // Keep the scroll position meaningful when lines change
     useLayoutEffect(() => {
@@ -212,20 +298,7 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
         }
         const state = scrollState.current;
         const firstKey = buffer.lines[0]?.key ?? '';
-        const showMarker = () => {
-            const marker = el.querySelector<HTMLElement>('.readmarker');
-            if (marker) {
-                // (offsetTop would be from its table)
-                const top =
-                    marker.getBoundingClientRect().top -
-                    el.getBoundingClientRect().top +
-                    el.scrollTop;
-                ownScroll.current = true;
-                el.scrollTop = Math.max(0, top - el.clientHeight / 3);
-            } else {
-                el.scrollTop = el.scrollHeight;
-            }
-        };
+        const showMarker = scrollToMarker;
         const fetched = buffer.linesFetched && !buffer.loadingLines;
         if (state.bufferId !== buffer.id) {
             // Switched buffer: show the read marker, else the bottom (again
@@ -247,7 +320,8 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
             firstKey,
             height: el.scrollHeight,
         };
-    }, [buffer]);
+        updateIndicators();
+    }, [buffer, scrollToMarker, updateIndicators]);
 
     // Follow new lines; keep the bottom when the window is resized (keyboard)
     useEffect(() => {
@@ -275,12 +349,46 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
         if (!el) {
             return;
         }
+        const wasAtBottom = atBottom.current;
         atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
         scrollState.current.height = el.scrollHeight;
+        if (atBottom.current && !wasAtBottom) {
+            // Scrolled down to the end: the unread lines were read
+            setDismissed(markerId);
+        }
         if (ownScroll.current) {
             ownScroll.current = false;
         } else if (el.scrollTop < 50) {
             fetchMore();
+        }
+        updateIndicators();
+    };
+
+    /** Show the read marker, fetching older lines if it's above them */
+    const jumpToMarker = () => {
+        if (buffer && marker === READ_MARKER_TOP && canFetchMore(buffer)) {
+            markerPending.current = true;
+            fetchMore();
+        }
+        scrollToMarker();
+        setDismissed(markerId);
+    };
+
+    const jumpToBottom = () => {
+        const el = ref.current;
+        if (!el) {
+            return;
+        }
+        const reduceMotion =
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (typeof el.scrollTo === 'function') {
+            el.scrollTo({
+                top: el.scrollHeight,
+                behavior: reduceMotion ? 'auto' : 'smooth',
+            });
+        } else {
+            el.scrollTop = el.scrollHeight;
         }
     };
 
@@ -292,6 +400,18 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
     if (buffer.hideTime) classes.push('hideTime');
     if (buffer.free) classes.push('freeBuffer');
 
+    const current = indicators.bufferId === buffer.id;
+    const unread =
+        current && indicators.markerAbove && dismissed !== markerId
+            ? linesAfter(lines, marker)
+            : null;
+    const newLines =
+        current && indicators.newFrom !== null
+            ? linesAfter(lines, indicators.newFrom)
+            : null;
+    const showNew =
+        newLines !== null && (newLines.count > 0 || indicators.farFromBottom);
+
     return (
         <main
             id="bufferlines"
@@ -301,6 +421,29 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
             inert={inert}
             {...swipe}
         >
+            {unread?.first && (
+                <div className="jump-top">
+                    <div className="jump-pill" role="group" aria-label="Unread lines">
+                        <button type="button" onClick={jumpToMarker}>
+                            <Icon icon={ArrowUp} /> {unread.count} unread since{' '}
+                            {formatTimeText(
+                                unread.first.date,
+                                sameDay(unread.first.date, new Date())
+                                    ? '%H:%M'
+                                    : '%a %H:%M',
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Dismiss"
+                            title="Dismiss"
+                            onClick={() => setDismissed(markerId)}
+                        >
+                            <Icon icon={X} />
+                        </button>
+                    </div>
+                </div>
+            )}
             <table>
                 <tbody>
                     <tr className="bufferline fetch-more">
@@ -328,8 +471,27 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
                         )}
                     </tr>
                 </tbody>
-                <Lines buffer={buffer} />
+                <Lines buffer={buffer} lines={lines} marker={marker} />
             </table>
+            {showNew && (
+                <div className="jump-bottom">
+                    <button
+                        type="button"
+                        className={
+                            'jump-pill' + (newLines.highlight ? ' jump-highlight' : '')
+                        }
+                        onClick={jumpToBottom}
+                        aria-label={
+                            newLines.count > 0
+                                ? `${newLines.count} new lines, jump to the end`
+                                : 'Jump to the end'
+                        }
+                    >
+                        {newLines.count > 0 && <span>{newLines.count} new</span>}
+                        <Icon icon={ArrowDown} />
+                    </button>
+                </div>
+            )}
             <span id="end-of-buffer" />
         </main>
     );

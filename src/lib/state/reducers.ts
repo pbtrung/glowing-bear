@@ -515,6 +515,40 @@ export function setActiveBuffer(state: ChatState, bufferId: number): ChatState {
     });
 }
 
+/**
+ * Put the read marker of a buffer after its last line (e.g. the buffer shown
+ * when the window is hidden: the lines added meanwhile come after it)
+ */
+export function moveReadMarker(state: ChatState, bufferId: number): ChatState {
+    const last = state.buffers[bufferId]?.lines.findLast((l) => !l.isDateChange);
+    if (!last || state.buffers[bufferId].lastReadKey === last.key) {
+        return state;
+    }
+    return produce(state, (draft) => {
+        draft.buffers[bufferId].lastReadKey = last.key;
+    });
+}
+
+/**
+ * The lines after a line (READ_MARKER_TOP: all), without date changes; none
+ * if the line isn't there
+ */
+export function linesAfter(
+    lines: readonly Line[],
+    key: string | null,
+): { count: number; highlight: boolean; first: Line | undefined } {
+    const index = key === READ_MARKER_TOP ? -1 : lines.findIndex((l) => l.key === key);
+    const after =
+        key === null || (index < 0 && key !== READ_MARKER_TOP)
+            ? []
+            : lines.slice(index + 1).filter((l) => !l.isDateChange);
+    return {
+        count: after.length,
+        highlight: after.some((l) => l.highlight),
+        first: after[0],
+    };
+}
+
 /** Lines of a buffer are being fetched, or no more */
 export function setLoadingLines(
     state: ChatState,

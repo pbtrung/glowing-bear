@@ -25,6 +25,7 @@ import {
     MAX_FETCHED_LINES,
     markAllRead,
     markRead,
+    moveReadMarker,
     setActiveBuffer,
     setLoadingLines,
     type ChatState,
@@ -586,6 +587,11 @@ export class Session {
     /** Clear the unread counters of a buffer, locally */
     markRead(bufferId: number): void {
         this.update((s) => markRead(s, bufferId));
+    }
+
+    /** Put the read marker of a buffer after its last line, locally */
+    moveReadMarker(bufferId: number): void {
+        this.update((s) => moveReadMarker(s, bufferId));
     }
 
     /** Remove a buffer from WeeChat's hotlist and move its read marker */

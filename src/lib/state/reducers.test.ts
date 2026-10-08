@@ -11,6 +11,8 @@ import {
     MAX_ACTIVE_LINES,
     MAX_FETCHED_LINES,
     canFetchMore,
+    linesAfter,
+    moveReadMarker,
     initialState,
     markAllRead,
     setActiveBuffer,
@@ -965,5 +967,33 @@ describe('line tags and buffer details', () => {
         expect(state.buffers[2].activityAt).toBe(
             Date.parse('2024-01-07T08:54:00.179Z'),
         );
+    });
+});
+
+describe('lines after a line', () => {
+    it('counts the lines after a key, with highlights', () => {
+        const state = applyLines(
+            setup(),
+            2,
+            [apiLine(1, 'one'), apiLine(2, 'two'), apiLine(3, 'three')],
+            100,
+        );
+        const lines = state.buffers[2].lines;
+        expect(linesAfter(lines, 'l1')).toMatchObject({ count: 2, highlight: false });
+        expect(linesAfter(lines, 'l1').first?.text).toBe('two');
+        expect(linesAfter(lines, 'l3').count).toBe(0);
+        expect(linesAfter(lines, READ_MARKER_TOP).count).toBe(3);
+        // Unknown (trimmed) or no line
+        expect(linesAfter(lines, 'l99').count).toBe(0);
+        expect(linesAfter(lines, null).count).toBe(0);
+        const highlighted = [...lines, { ...lines[0], key: 'l4', highlight: true }];
+        expect(linesAfter(highlighted, 'l3').highlight).toBe(true);
+    });
+
+    it('moves the read marker after the last line', () => {
+        let state = applyLines(setup(), 2, [apiLine(1, 'one'), apiLine(2, 'two')], 100);
+        state = moveReadMarker(state, 2);
+        expect(state.buffers[2].lastReadKey).toBe('l2');
+        expect(moveReadMarker(state, 2)).toBe(state);
     });
 });

@@ -1798,6 +1798,10 @@ label.settings-row:hover {
  * the nicklist taking the whole height (the top bar is over the lines only)
  */
 @media (min-width: 968px) {
+    .login {
+        max-width: 36rem;
+    }
+
     .content {
         grid-template-columns: var(--gb-sidebar-width) minmax(0, 1fr) auto;
         grid-template-areas:

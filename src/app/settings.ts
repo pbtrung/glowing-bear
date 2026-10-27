@@ -96,7 +96,7 @@ export const DEFAULT_SETTINGS: Settings = {
     fontsize: '14px',
     fontfamily: DEFAULT_FONT,
     nickColumnWidth: 12,
-    edgeToEdgeInput: false,
+    edgeToEdgeInput: true,
     readlineBindings: false,
     enableMathjax: false,
     enableQuickKeys: false,

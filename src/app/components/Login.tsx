@@ -222,10 +222,7 @@ function ConnectForm() {
                                     }
                                 />
                                 <label className="form-check-label" htmlFor="tls">
-                                    Encryption (TLS){' '}
-                                    <span className="text-body-secondary">
-                                        — strongly recommended
-                                    </span>
+                                    Encryption (TLS)
                                 </label>
                             </div>
                             <div className="form-check form-switch">

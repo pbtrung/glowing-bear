@@ -183,18 +183,11 @@ function setFreeLine(buffer: Draft<Buffer>, line: Line): void {
     }
 }
 
-/** Lines kept in buffers not shown (older ones are fetched again if needed) */
-export const MAX_LINES = 500;
+/** Maximum message lines kept per buffer, including the active buffer */
+export const MAX_LINES = 1000;
 
 /** Most lines fetched for a buffer (the history shown when scrolling up) */
-export const MAX_FETCHED_LINES = 3 * MAX_LINES;
-
-/**
- * Lines of the buffer shown above which it's trimmed (to 2 * MAX_LINES).
- * More than MAX_FETCHED_LINES, so that a new line doesn't trim the history
- * just fetched (whose reading would fetch it again, and so on).
- */
-export const MAX_ACTIVE_LINES = 4 * MAX_LINES;
+export const MAX_FETCHED_LINES = MAX_LINES;
 
 /** Whether two versions of a line show the same thing */
 function sameLine(a: Line, b: Line): boolean {
@@ -276,13 +269,7 @@ function addNewLine(
     updateNickSpeak(buffer, line, Date.now());
 
     const active = draft.activeBufferId === buffer.id;
-    if (!active) {
-        trimLines(buffer);
-    } else if (buffer.lines.length > MAX_ACTIVE_LINES) {
-        // The lines of the active buffer are kept while it's read, up to a
-        // point (e.g. a busy buffer shown all night)
-        trimLines(buffer, 2 * MAX_LINES);
-    }
+    trimLines(buffer);
     if (active) {
         effects.push({ type: 'activeBufferLine', bufferId: buffer.id });
     }
@@ -381,10 +368,7 @@ export function applyLines(
             buffer.lastReadKey = guessLastRead(buffer.lines, unreadHint);
         }
         buffer.linesFetched = true;
-        if (draft.activeBufferId !== bufferId) {
-            // fetched for a buffer left meanwhile
-            trimLines(buffer);
-        }
+        trimLines(buffer);
         // Show a date change before today's first message
         const last = buffer.lines[buffer.lines.length - 1];
         if (last && startOfDay(last.date) !== startOfDay(new Date())) {

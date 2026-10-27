@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { applyBuffers, applyLines, initialState } from '../../lib/state/reducers';
 import { apiBuffer, apiLine } from '../../lib/state/fixtures.test-helper';
 import { session } from '../chat';
+import { settingsStore, updateSettings } from '../settings';
 import { BufferLines } from './BufferLines';
 
 /** Scroll geometry of #bufferlines (jsdom has no layout) */
@@ -84,8 +85,83 @@ beforeEach(() => {
 
 afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+});
+
+describe('read marker expiry', () => {
+    beforeEach(() => vi.useFakeTimers());
+
+    const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+
+    it('hides after five seconds at the bottom and stays hidden for live messages', () => {
+        show(5, 'l2');
+        const { container } = render(<BufferLines />);
+        advance(4000);
+        show(6, 'l2');
+        expect(container.querySelector('.readmarker')).not.toBeNull();
+        advance(1000);
+        expect(container.querySelector('.readmarker')).toBeNull();
+        show(7, 'l2');
+        expect(container.querySelector('.readmarker')).toBeNull();
+        markerAbove = true;
+        scrollTo(500);
+        expect(container.querySelector('.jump-top')).toBeNull();
+    });
+
+    it('waits until the user returns to the bottom', () => {
+        show(5, 'l2');
+        const { container } = render(<BufferLines />);
+        advance(4000);
+        scrollTo(500);
+        advance(10000);
+        expect(container.querySelector('.readmarker')).not.toBeNull();
+        scrollTo(800);
+        advance(4999);
+        expect(container.querySelector('.readmarker')).not.toBeNull();
+        advance(1);
+        expect(container.querySelector('.readmarker')).toBeNull();
+    });
+
+    it('restarts the delay when a hidden tab becomes visible', () => {
+        const visibility = vi.spyOn(document, 'visibilityState', 'get');
+        visibility.mockReturnValue('visible');
+        show(5, 'l2');
+        const { container } = render(<BufferLines />);
+        advance(4000);
+        visibility.mockReturnValue('hidden');
+        fireEvent(document, new Event('visibilitychange'));
+        advance(10000);
+        expect(container.querySelector('.readmarker')).not.toBeNull();
+        visibility.mockReturnValue('visible');
+        fireEvent(document, new Event('visibilitychange'));
+        advance(5000);
+        expect(container.querySelector('.readmarker')).toBeNull();
+    });
+
+    it('keeps the divider while the channel is behind a mobile panel', () => {
+        show(5, 'l2');
+        const { container, rerender } = render(<BufferLines inert />);
+        advance(10000);
+        expect(container.querySelector('.readmarker')).not.toBeNull();
+        rerender(<BufferLines />);
+        advance(5000);
+        expect(container.querySelector('.readmarker')).toBeNull();
+    });
+
+    it('gives a new read boundary its own delay after switching channels', () => {
+        show(5, 'l2');
+        const { container } = render(<BufferLines />);
+        advance(4000);
+        show(5, 'l2', 3);
+        advance(1000);
+        expect(container.querySelector('.readmarker')).not.toBeNull();
+        advance(4000);
+        expect(container.querySelector('.readmarker')).toBeNull();
+        show(8, 'l6', 2);
+        expect(container.querySelector('.readmarker')).not.toBeNull();
+    });
 });
 
 describe.each(['channel', 'server'])('opening a %s buffer', (type) => {
@@ -256,4 +332,42 @@ describe('scroll position', () => {
         scrollTo(800);
         expect(container.querySelector('.scroll-position')).toBeNull();
     });
+});
+
+it('applies nickname width changes while preserving full nicknames', () => {
+    const previous = settingsStore.getState();
+    show(1);
+    const nickname = 'a_very_long_nickname_that_should_stay_available';
+    act(() => {
+        session.store.setState((state) => ({
+            buffers: {
+                2: {
+                    ...state.buffers[2],
+                    lines: [
+                        {
+                            ...state.buffers[2].lines[0],
+                            prefixText: nickname,
+                            prefix: [{ text: nickname, classes: [] }],
+                        },
+                    ],
+                },
+            },
+        }));
+    });
+    try {
+        const { container } = render(<BufferLines />);
+        act(() => updateSettings({ nickColumnWidth: 12 }));
+        expect(
+            (container.querySelector('main') as HTMLElement).style.getPropertyValue(
+                '--gb-nick-column-width',
+            ),
+        ).toBe('12ch');
+        const nick = container.querySelector('td.prefix a')!;
+        expect(nick.textContent).toBe(`<${nickname}>`);
+        expect(nick.getAttribute('title')).toBe(nickname);
+        expect(JSON.parse(localStorage.getItem('nickColumnWidth')!)).toBe(12);
+    } finally {
+        act(() => settingsStore.setState(previous, true));
+        localStorage.removeItem('nickColumnWidth');
+    }
 });

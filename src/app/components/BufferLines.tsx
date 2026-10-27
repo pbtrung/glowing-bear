@@ -7,6 +7,7 @@ import {
     useRef,
     useState,
     type KeyboardEvent,
+    type CSSProperties,
 } from 'react';
 import { ArrowDown, ArrowUp, History, LoaderCircle, X } from 'lucide-react';
 import { READ_MARKER_TOP, type Buffer, type Line } from '../../lib/state/model';
@@ -18,6 +19,7 @@ import {
     session,
     useActiveBuffer,
     useChat,
+    windowFocused,
 } from '../chat';
 import { useSettings } from '../settings';
 import { Icon } from './Icon';
@@ -25,6 +27,7 @@ import { RichText, Time } from './RichText';
 import { useSwipe } from '../swipe';
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+const READ_MARKER_DELAY = 5000;
 
 /** Number of lines below the view of the lines (binary search of the rows) */
 function linesBelow(el: HTMLElement): number {
@@ -104,7 +107,11 @@ const LineRow = memo(function LineRow({
                 <span className={repeatedPrefix ? 'repeated-prefix' : undefined}>
                     <a
                         onClick={mention}
-                        title={line.host ?? undefined}
+                        title={
+                            line.host
+                                ? `${line.prefixText}\n${line.host}`
+                                : line.prefixText
+                        }
                         {...(line.isMessage && {
                             role: 'button',
                             tabIndex: 0,
@@ -118,7 +125,7 @@ const LineRow = memo(function LineRow({
                         })}
                     >
                         {line.isMessage && <span className="hidden-bracket">&lt;</span>}
-                        <RichText parts={line.prefix} links={false} maxLength={25} />
+                        <RichText parts={line.prefix} links={false} />
                         {line.isMessage && <span className="hidden-bracket">&gt;</span>}
                     </a>
                 </span>
@@ -234,6 +241,7 @@ const Lines = memo(function Lines({
  */
 export function BufferLines({ inert = false }: { inert?: boolean }) {
     const buffer = useActiveBuffer();
+    const nickColumnWidth = useSettings((s) => s.nickColumnWidth);
     const ref = useRef<HTMLElement>(null);
     const atBottom = useRef(true);
     const scrollState = useRef({ bufferId: -1, firstKey: '', height: 0 });
@@ -242,7 +250,10 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
     /** The last scroll was ours, not the user's (it loads no older lines) */
     const ownScroll = useRef(false);
     const swipe = useSwipe();
-    const { lines, marker } = useShownLines(buffer);
+    const { lines, marker: readMarker } = useShownLines(buffer);
+    const markerId = `${buffer?.id}:${readMarker}`;
+    const [clearedMarker, setClearedMarker] = useState<string | null>(null);
+    const marker = clearedMarker === markerId ? null : readMarker;
     /**
      * The jump buttons: the last line when the user left the bottom (the
      * lines after it are new), whether the read marker is above the view
@@ -257,7 +268,30 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
     });
     /** Read marker ("buffer:key") whose button was closed */
     const [dismissed, setDismissed] = useState<string | null>(null);
-    const markerId = `${buffer?.id}:${marker}`;
+    const readingBottom =
+        indicators.bufferId === buffer?.id && indicators.below === null;
+    const hasUnreadLines = linesAfter(lines, marker).count > 0;
+
+    // Leave the divider briefly as a reading aid, then hide it until the next
+    // read boundary. New live messages must not bring the old divider back.
+    useEffect(() => {
+        if (!readingBottom || !hasUnreadLines || inert) {
+            return;
+        }
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const onVisible = () => {
+            clearTimeout(timer);
+            if (windowFocused()) {
+                timer = setTimeout(() => setClearedMarker(markerId), READ_MARKER_DELAY);
+            }
+        };
+        onVisible();
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearTimeout(timer);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, [readingBottom, hasUnreadLines, inert, markerId]);
 
     const scrollToBottom = useCallback(() => {
         const el = ref.current;
@@ -293,7 +327,7 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
         }
         const bottom = atBottom.current;
         const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        const row = el.querySelector('.readmarker');
+        const row = marker === null ? null : el.querySelector('.readmarker');
         const markerAbove =
             row !== null &&
             row.getBoundingClientRect().bottom <= el.getBoundingClientRect().top;
@@ -316,7 +350,7 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
                 ? prev
                 : next;
         });
-    }, [buffer, lines]);
+    }, [buffer, lines, marker]);
 
     // Keep the scroll position meaningful when lines change
     useLayoutEffect(() => {
@@ -460,6 +494,9 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
         <main
             id="bufferlines"
             className={classes.join(' ')}
+            style={
+                { '--gb-nick-column-width': `${nickColumnWidth}ch` } as CSSProperties
+            }
             ref={ref}
             onScroll={onScroll}
             inert={inert}

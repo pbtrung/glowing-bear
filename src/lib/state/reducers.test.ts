@@ -8,7 +8,6 @@ import {
     applyNicklist,
     HANDLED_EVENTS,
     MAX_LINES,
-    MAX_ACTIVE_LINES,
     MAX_FETCHED_LINES,
     canFetchMore,
     linesAfter,
@@ -854,13 +853,16 @@ describe('lines kept', () => {
         expect(state.buffers[2].requestedLines).toBe(MAX_LINES);
     });
 
-    it('keeps the most lines that can be fetched in the buffer shown', () => {
+    it('caps the buffer shown at 1000 messages as new lines arrive', () => {
         let state = setActiveBuffer(setup(), 2);
         state = applyLines(state, 2, many(1, MAX_FETCHED_LINES), MAX_FETCHED_LINES);
         expect(canFetchMore(state.buffers[2])).toBe(false);
         state = send(state, 'buffer_line_added', 2, apiLine(9000, 'new')).state;
         const lines = state.buffers[2].lines.filter((l) => !l.isDateChange);
-        expect(lines).toHaveLength(MAX_FETCHED_LINES + 1);
+        expect(lines).toHaveLength(1000);
+        expect(lines[0].id).toBe(2);
+        expect(lines.at(-1)?.id).toBe(9000);
+        expect(canFetchMore(state.buffers[2])).toBe(false);
     });
 
     it('keeps the line objects already loaded when fetching older lines', () => {
@@ -876,11 +878,13 @@ describe('lines kept', () => {
         expect(last(state)?.text).toBe('edited');
     });
 
-    it('keeps the lines of the buffer shown until it is left', () => {
+    it('caps fetched history and retains the newest messages when leaving', () => {
         let state = setActiveBuffer(setup(), 2);
         state = applyLines(state, 2, many(1, 3 * MAX_LINES), 4 * MAX_LINES);
         state = send(state, 'buffer_line_added', 2, apiLine(5000, 'new')).state;
-        expect(state.buffers[2].lines.length).toBeGreaterThan(3 * MAX_LINES);
+        expect(state.buffers[2].lines.filter((l) => !l.isDateChange)).toHaveLength(
+            1000,
+        );
         state = setActiveBuffer(state, 1);
         const lines = state.buffers[2].lines.filter((l) => !l.isDateChange);
         expect(lines).toHaveLength(MAX_LINES);
@@ -889,13 +893,13 @@ describe('lines kept', () => {
         expect(state.buffers[2].lastReadKey).toBe('l5000');
     });
 
-    it('trims the buffer shown when it gets very long', () => {
+    it('caps oversized fetch responses for the buffer shown', () => {
         let state = setActiveBuffer(setup(), 2);
-        state = applyLines(state, 2, many(1, MAX_ACTIVE_LINES), MAX_ACTIVE_LINES);
-        state = send(state, 'buffer_line_added', 2, apiLine(9000, 'one more')).state;
+        state = applyLines(state, 2, many(1, 1500), 1500);
         const lines = state.buffers[2].lines.filter((l) => !l.isDateChange);
-        expect(lines).toHaveLength(2 * MAX_LINES);
-        expect(lines.at(-1)?.id).toBe(9000);
+        expect(lines).toHaveLength(1000);
+        expect(lines[0].id).toBe(501);
+        expect(lines.at(-1)?.id).toBe(1500);
     });
 
     it('trims lines fetched for a buffer left meanwhile', () => {

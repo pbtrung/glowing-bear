@@ -177,6 +177,20 @@ describe('default relay host', () => {
 });
 
 describe('stored settings', () => {
+    it('restores nickname width and keeps it within the supported range', () => {
+        for (const [saved, expected] of [
+            ['12', 12],
+            ['"18"', 18],
+            ['-3', 6],
+            ['100', 60],
+            ['"invalid"', 12],
+        ] as const) {
+            expect(
+                loadSettings(fakeStorage({ nickColumnWidth: saved })).nickColumnWidth,
+            ).toBe(expected);
+        }
+    });
+
     it('falls back to defaults if storage refuses reads', () => {
         const store = fakeStorage({});
         store.getItem = () => {

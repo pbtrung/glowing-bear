@@ -295,6 +295,15 @@ function Appearance() {
                 </div>
             </div>
 
+            <h3 className="settings-heading">Message input</h3>
+            <div className="settings-group">
+                <SwitchRow
+                    setting="edgeToEdgeInput"
+                    title="Touch the edges"
+                    help="Extend the input box to the sides and bottom of the chat pane, with square corners."
+                />
+            </div>
+
             <details className="settings-advanced">
                 <summary>Custom CSS</summary>
                 <textarea
@@ -313,6 +322,7 @@ function Appearance() {
 }
 
 function Chat() {
+    const nickColumnWidth = useSettings((s) => s.nickColumnWidth);
     return (
         <>
             <h3 className="settings-heading">Buffer list</h3>
@@ -365,6 +375,32 @@ function Chat() {
             </div>
             <h3 className="settings-heading">Messages</h3>
             <div className="settings-group">
+                <div className="settings-row settings-row-stacked">
+                    <div className="settings-row-text">
+                        <label
+                            className="settings-row-title"
+                            htmlFor="nick-column-width"
+                        >
+                            Maximum nickname width
+                        </label>
+                        <div className="settings-row-help">
+                            {nickColumnWidth} characters. Longer names show an ellipsis;
+                            hover to see the full name.
+                        </div>
+                    </div>
+                    <input
+                        type="range"
+                        className="form-range"
+                        id="nick-column-width"
+                        min={6}
+                        max={60}
+                        step={1}
+                        value={nickColumnWidth}
+                        onChange={(e) =>
+                            updateSettings({ nickColumnWidth: Number(e.target.value) })
+                        }
+                    />
+                </div>
                 <SwitchRow
                     setting="hotlistsync"
                     title="Mark messages as read in WeeChat"

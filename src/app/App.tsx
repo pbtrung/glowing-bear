@@ -110,6 +110,7 @@ function Chat() {
     const nicklistOpen = useUi((s) => s.nicklistOpen);
     const nonicklist = useSettings((s) => s.nonicklist);
     const alwaysnicklist = useSettings((s) => s.alwaysnicklist);
+    const edgeToEdgeInput = useSettings((s) => s.edgeToEdgeInput);
     const mobile = useMobileUi();
     const showNicklist =
         buffer !== undefined &&
@@ -145,7 +146,10 @@ function Chat() {
             <ErrorBoundary what="This buffer" resetKey={buffer?.id}>
                 <BufferLines inert={behindPanel} />
             </ErrorBoundary>
-            <footer className="footer" inert={behindPanel}>
+            <footer
+                className={`footer${edgeToEdgeInput ? ' footer-edge-to-edge' : ''}`}
+                inert={behindPanel}
+            >
                 {buffer && <InputBar key={buffer.id} buffer={buffer} />}
             </footer>
         </div>

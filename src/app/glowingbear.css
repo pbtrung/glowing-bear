@@ -1047,6 +1047,11 @@ td.prefix {
 }
 
 td.prefix a {
+    display: inline-block;
+    max-width: var(--gb-nick-column-width, 12ch);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
     color: inherit;
     text-decoration: none;
 }
@@ -1244,6 +1249,22 @@ span.colourbox {
 
 .btn-send {
     color: var(--gb-accent);
+}
+
+/* Flat input box spanning the chat pane, without the outer gutter */
+.footer.footer-edge-to-edge {
+    padding: 0;
+}
+
+.footer-edge-to-edge #inputform .input-group {
+    padding: 0.5rem 0.75rem;
+    border-width: 1px 0 0;
+    border-radius: 0;
+}
+
+.footer-edge-to-edge #sendMessage,
+.footer-edge-to-edge .btn-input {
+    border-radius: 0 !important;
 }
 
 /*

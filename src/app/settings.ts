@@ -31,6 +31,10 @@ export interface Settings {
     soundnotification: boolean;
     fontsize: string;
     fontfamily: string;
+    /** Maximum width of message nicknames, in character units */
+    nickColumnWidth: number;
+    /** Extend the message input to the edges of the chat pane */
+    edgeToEdgeInput: boolean;
     readlineBindings: boolean;
     enableMathjax: boolean;
     enableQuickKeys: boolean;
@@ -91,6 +95,8 @@ export const DEFAULT_SETTINGS: Settings = {
     soundnotification: true,
     fontsize: '14px',
     fontfamily: DEFAULT_FONT,
+    nickColumnWidth: 12,
+    edgeToEdgeInput: false,
     readlineBindings: false,
     enableMathjax: false,
     enableQuickKeys: false,
@@ -101,6 +107,13 @@ export const DEFAULT_SETTINGS: Settings = {
     currentlyViewedBuffers: {},
     collapsedServers: [],
 };
+
+function normalizeNickColumnWidth(value: unknown): number {
+    const width = Number(value);
+    return Number.isFinite(width)
+        ? Math.min(60, Math.max(6, Math.round(width)))
+        : DEFAULT_SETTINGS.nickColumnWidth;
+}
 
 function storage(): Storage | null {
     try {
@@ -179,6 +192,7 @@ export function loadSettings(store: Storage | null = storage()): Settings {
     settings.collapsedServers = settings.collapsedServers.filter(
         (value) => typeof value === 'string',
     );
+    settings.nickColumnWidth = normalizeNickColumnWidth(settings.nickColumnWidth);
     if (!settings.savepassword) {
         settings.password = '';
     }
@@ -190,6 +204,7 @@ export const settingsStore = createStore<Settings>(() => loadSettings());
 /** Change settings and save them */
 export function updateSettings(changes: Partial<Settings>): void {
     const next = { ...settingsStore.getState(), ...changes };
+    next.nickColumnWidth = normalizeNickColumnWidth(next.nickColumnWidth);
     if (!next.savepassword) {
         next.password = '';
     }

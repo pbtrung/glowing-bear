@@ -115,9 +115,10 @@ screen" option.
 
 ### Navigation
 
-Channels open at the latest messages. Scroll up to read history; the scroll-position
-indicator shows `[lines below/lines loaded]`, and the down-arrow button returns to
-the bottom. The unread button jumps to the read marker when it is above the view.
+Channel and network buffers open at the latest messages and stay at the bottom as
+the layout changes. Scroll up to read history; the scroll-position indicator shows
+`[lines below/lines loaded]`, and the down-arrow button returns to the bottom. The
+unread button jumps to the read marker when it is above the view.
 
 The left buffer pane starts hidden on screens narrower than 968 CSS pixels and
 visible on larger screens. Toggle it with the menu button on mobile or the Glowing

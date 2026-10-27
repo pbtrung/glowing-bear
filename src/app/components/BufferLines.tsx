@@ -349,20 +349,38 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
         updateIndicators();
     }, [buffer, scrollToBottom, scrollToMarker, updateIndicators]);
 
-    // Follow new lines; keep the bottom when the window is resized (keyboard)
+    // Follow new lines and layout changes (fonts, nicklist, keyboard).
     useEffect(() => {
+        let frame = 0;
         const follow = () => {
             if (atBottom.current) {
-                requestAnimationFrame(scrollToBottom);
+                cancelAnimationFrame(frame);
+                frame = requestAnimationFrame(() => {
+                    if (atBottom.current) {
+                        scrollToBottom();
+                    }
+                });
             }
         };
+        const el = ref.current;
+        const observer =
+            typeof ResizeObserver === 'function' ? new ResizeObserver(follow) : null;
+        if (el) {
+            observer?.observe(el);
+            const table = el.querySelector('table');
+            if (table) {
+                observer?.observe(table);
+            }
+        }
         activeBufferLineListeners.add(follow);
         window.addEventListener('resize', follow);
         return () => {
+            cancelAnimationFrame(frame);
+            observer?.disconnect();
             activeBufferLineListeners.delete(follow);
             window.removeEventListener('resize', follow);
         };
-    }, [scrollToBottom]);
+    }, [buffer?.id, scrollToBottom]);
 
     const fetchMore = useCallback(() => {
         if (buffer && !buffer.loadingLines && canFetchMore(buffer)) {

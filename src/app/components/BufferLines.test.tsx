@@ -13,9 +13,16 @@ let rowsLaidOut = false;
 const lines = (count: number) =>
     Array.from({ length: count }, (_, i) => apiLine(i + 1, 'line ' + (i + 1)));
 
-function show(count: number, lastReadKey: string | null = null, bufferId = 2): void {
+function show(
+    count: number,
+    lastReadKey: string | null = null,
+    bufferId = 2,
+    type = 'channel',
+): void {
     let state = applyBuffers(initialState, [
-        apiBuffer(bufferId, bufferId, 'irc.libera.#weechat', '#weechat'),
+        apiBuffer(bufferId, bufferId, 'irc.libera.#weechat', '#weechat', {
+            local_variables: { plugin: 'irc', type, server: 'libera' },
+        }),
     ]);
     state = applyLines(state, bufferId, lines(count), 100);
     const buffers = { [bufferId]: { ...state.buffers[bufferId], lastReadKey } };
@@ -78,11 +85,12 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
 });
 
-describe('opening a buffer', () => {
+describe.each(['channel', 'server'])('opening a %s buffer', (type) => {
     it('starts at the bottom even with an unread marker', () => {
-        show(5, 'l2');
+        show(5, 'l2', 2, type);
         geometry.scrollTop = 0;
         render(<BufferLines />);
         expect(geometry.scrollTop).toBe(800);
@@ -92,12 +100,12 @@ describe('opening a buffer', () => {
         show(5);
         render(<BufferLines />);
         scrollTo(300);
-        show(5, 'l2', 3);
+        show(5, 'l2', 3, type);
         expect(geometry.scrollTop).toBe(800);
     });
 
     it('stays at the bottom when the initial history finishes loading', () => {
-        show(0);
+        show(0, null, 2, type);
         act(() =>
             session.store.setState((state) => ({
                 buffers: {
@@ -113,8 +121,73 @@ describe('opening a buffer', () => {
         render(<BufferLines />);
         expect(geometry.scrollTop).toBe(0);
         geometry.scrollHeight = 1000;
-        show(5, 'l2');
+        show(5, 'l2', 2, type);
         expect(geometry.scrollTop).toBe(800);
+    });
+});
+
+describe('network buffer layout changes', () => {
+    let resize: () => void;
+    let frame: FrameRequestCallback;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+
+    beforeEach(() => {
+        observe.mockClear();
+        disconnect.mockClear();
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                constructor(callback: () => void) {
+                    resize = callback;
+                }
+                observe = observe;
+                disconnect = disconnect;
+            },
+        );
+        vi.stubGlobal(
+            'requestAnimationFrame',
+            vi.fn((callback: FrameRequestCallback) => {
+                frame = callback;
+                return 1;
+            }),
+        );
+        vi.stubGlobal('cancelAnimationFrame', vi.fn());
+        show(100, null, 2, 'server');
+    });
+
+    it('keeps the latest lines visible after the log or viewport resizes', () => {
+        const { container, unmount } = render(<BufferLines />);
+        expect(observe).toHaveBeenCalledWith(container.querySelector('#bufferlines'));
+        expect(observe).toHaveBeenCalledWith(container.querySelector('table'));
+        geometry.scrollHeight = 1500;
+        resize();
+        act(() => frame(0));
+        expect(geometry.scrollTop).toBe(1300);
+        geometry.clientHeight = 100;
+        resize();
+        act(() => frame(0));
+        expect(geometry.scrollTop).toBe(1400);
+        unmount();
+        expect(disconnect).toHaveBeenCalled();
+    });
+
+    it('preserves the position when reading history', () => {
+        render(<BufferLines />);
+        scrollTo(300);
+        geometry.scrollHeight = 1500;
+        resize();
+        expect(requestAnimationFrame).not.toHaveBeenCalled();
+        expect(geometry.scrollTop).toBe(300);
+    });
+
+    it('lets the user scroll up before a scheduled follow runs', () => {
+        render(<BufferLines />);
+        geometry.scrollHeight = 1500;
+        resize();
+        scrollTo(300);
+        act(() => frame(0));
+        expect(geometry.scrollTop).toBe(300);
     });
 });
 

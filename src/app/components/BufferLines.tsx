@@ -27,7 +27,7 @@ import { RichText, Time } from './RichText';
 import { useSwipe } from '../swipe';
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-const READ_MARKER_DELAY = 5000;
+const READ_MARKER_DELAY = 8000;
 
 /** Number of lines below the view of the lines (binary search of the rows) */
 function linesBelow(el: HTMLElement): number {
@@ -268,14 +268,12 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
     });
     /** Read marker ("buffer:key") whose button was closed */
     const [dismissed, setDismissed] = useState<string | null>(null);
-    const readingBottom =
-        indicators.bufferId === buffer?.id && indicators.below === null;
     const hasUnreadLines = linesAfter(lines, marker).count > 0;
 
-    // Leave the divider briefly as a reading aid, then hide it until the next
-    // read boundary. New live messages must not bring the old divider back.
+    // Hide the divider and its jump button after eight seconds in the active
+    // channel, regardless of scroll position. Live messages must not revive it.
     useEffect(() => {
-        if (!readingBottom || !hasUnreadLines || inert) {
+        if (!hasUnreadLines || inert) {
             return;
         }
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -291,7 +289,7 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
             clearTimeout(timer);
             document.removeEventListener('visibilitychange', onVisible);
         };
-    }, [readingBottom, hasUnreadLines, inert, markerId]);
+    }, [hasUnreadLines, inert, markerId]);
 
     const scrollToBottom = useCallback(() => {
         const el = ref.current;

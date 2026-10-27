@@ -9,6 +9,7 @@ import { BufferLines } from './BufferLines';
 /** Scroll geometry of #bufferlines (jsdom has no layout) */
 const geometry = { scrollTop: 0, scrollHeight: 1000, clientHeight: 200 };
 let markerAbove = false;
+let markerBelow = false;
 let rowsLaidOut = false;
 
 const lines = (count: number) =>
@@ -40,6 +41,7 @@ beforeEach(() => {
     geometry.scrollHeight = 1000;
     geometry.clientHeight = 200;
     markerAbove = false;
+    markerBelow = false;
     rowsLaidOut = false;
     const isLines = (el: Element) => el.id === 'bufferlines';
     for (const key of ['scrollHeight', 'clientHeight'] as const) {
@@ -79,6 +81,9 @@ beforeEach(() => {
             return { top, bottom: top + 10 } as DOMRect;
         }
         const above = markerAbove && this.classList.contains('readmarker');
+        if (markerBelow && this.classList.contains('readmarker')) {
+            return { top: 220, bottom: 230 } as DOMRect;
+        }
         return { top: above ? -20 : 50, bottom: above ? -10 : 60 } as DOMRect;
     });
 });
@@ -95,13 +100,13 @@ describe('read marker expiry', () => {
 
     const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
-    it('hides after five seconds at the bottom and stays hidden for live messages', () => {
+    it('hides after eight seconds at the bottom and stays hidden for live messages', () => {
         show(5, 'l2');
         const { container } = render(<BufferLines />);
         advance(4000);
         show(6, 'l2');
         expect(container.querySelector('.readmarker')).not.toBeNull();
-        advance(1000);
+        advance(4000);
         expect(container.querySelector('.readmarker')).toBeNull();
         show(7, 'l2');
         expect(container.querySelector('.readmarker')).toBeNull();
@@ -110,18 +115,55 @@ describe('read marker expiry', () => {
         expect(container.querySelector('.jump-top')).toBeNull();
     });
 
-    it('waits until the user returns to the bottom', () => {
+    it.each(['above', 'below'])(
+        'clears a divider %s the viewport and its unread button',
+        (position) => {
+            markerAbove = position === 'above';
+            markerBelow = position === 'below';
+            show(5, 'l2');
+            const { container, queryByText } = render(<BufferLines />);
+            advance(7999);
+            expect(container.querySelector('.readmarker')).not.toBeNull();
+            if (markerAbove) {
+                expect(queryByText(/3 unread since/)).not.toBeNull();
+            }
+            advance(1);
+            expect(container.querySelector('.readmarker')).toBeNull();
+            expect(container.querySelector('.jump-top')).toBeNull();
+            show(6, 'l2');
+            expect(container.querySelector('.readmarker')).toBeNull();
+            expect(container.querySelector('.jump-top')).toBeNull();
+        },
+    );
+
+    it('keeps the original expiry when scrolling away from the bottom', () => {
         show(5, 'l2');
         const { container } = render(<BufferLines />);
         advance(4000);
+        markerAbove = true;
         scrollTo(500);
-        advance(10000);
+        advance(3999);
         expect(container.querySelector('.readmarker')).not.toBeNull();
-        scrollTo(800);
-        advance(4999);
+        expect(container.querySelector('.jump-top')).not.toBeNull();
+        advance(1);
+        expect(container.querySelector('.readmarker')).toBeNull();
+        expect(container.querySelector('.jump-top')).toBeNull();
+    });
+
+    it('clears after jumping to the divider without requiring a scroll event', () => {
+        markerAbove = true;
+        show(5, 'l2');
+        const { container, getByRole } = render(<BufferLines />);
+        advance(1000);
+        fireEvent.click(getByRole('button', { name: /3 unread since/ }));
+        expect(geometry.scrollTop).toBeLessThan(800);
+        expect(container.querySelector('.jump-top')).toBeNull();
+        advance(6999);
         expect(container.querySelector('.readmarker')).not.toBeNull();
         advance(1);
         expect(container.querySelector('.readmarker')).toBeNull();
+        scrollTo(500);
+        expect(container.querySelector('.jump-top')).toBeNull();
     });
 
     it('restarts the delay when a hidden tab becomes visible', () => {
@@ -136,7 +178,7 @@ describe('read marker expiry', () => {
         expect(container.querySelector('.readmarker')).not.toBeNull();
         visibility.mockReturnValue('visible');
         fireEvent(document, new Event('visibilitychange'));
-        advance(5000);
+        advance(8000);
         expect(container.querySelector('.readmarker')).toBeNull();
     });
 
@@ -146,7 +188,7 @@ describe('read marker expiry', () => {
         advance(10000);
         expect(container.querySelector('.readmarker')).not.toBeNull();
         rerender(<BufferLines />);
-        advance(5000);
+        advance(8000);
         expect(container.querySelector('.readmarker')).toBeNull();
     });
 
@@ -157,7 +199,7 @@ describe('read marker expiry', () => {
         show(5, 'l2', 3);
         advance(1000);
         expect(container.querySelector('.readmarker')).not.toBeNull();
-        advance(4000);
+        advance(7000);
         expect(container.querySelector('.readmarker')).toBeNull();
         show(8, 'l6', 2);
         expect(container.querySelector('.readmarker')).not.toBeNull();

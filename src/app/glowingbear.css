@@ -275,46 +275,6 @@ pre {
     margin-bottom: 0.35rem;
 }
 
-.login-help {
-    --bs-accordion-bg: var(--gb-chrome-bg);
-    --bs-accordion-border-color: var(--gb-border);
-    --bs-accordion-btn-bg: var(--gb-chrome-bg);
-    --bs-accordion-active-bg: var(--gb-hover-bg);
-    --bs-accordion-active-color: var(--gb-fg);
-    --bs-accordion-btn-focus-box-shadow: none;
-    --bs-accordion-border-radius: 1rem;
-    --bs-accordion-inner-border-radius: calc(1rem - 1px);
-}
-
-.login-help .accordion-body {
-    font-size: 0.925rem;
-}
-
-.login-help .accordion-body h3 {
-    margin-top: 1.25rem;
-}
-
-/* Accordion items are toggled through data-state (see toggleAccordion) */
-.accordion-item[data-state='collapsed'] .accordion-collapse {
-    display: none;
-}
-
-.accordion-item[data-state='collapsed'] .accordion-button {
-    color: var(--bs-accordion-btn-color);
-    background-color: var(--bs-accordion-btn-bg);
-    box-shadow: none;
-}
-
-.accordion-item[data-state='collapsed']:last-of-type .accordion-button {
-    border-bottom-right-radius: var(--bs-accordion-inner-border-radius);
-    border-bottom-left-radius: var(--bs-accordion-inner-border-radius);
-}
-
-.accordion-item[data-state='collapsed'] .accordion-button::after {
-    background-image: var(--bs-accordion-btn-icon);
-    transform: none;
-}
-
 /*
  * Main layout
  */
@@ -438,17 +398,6 @@ pre {
 .btn-on-alert:focus-visible {
     color: inherit;
     background: color-mix(in srgb, currentColor 15%, transparent);
-}
-
-#topbar .latency {
-    font-size: 0.75rem;
-    color: var(--gb-muted);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-#topbar .latency.slow {
-    color: var(--bs-warning-text-emphasis);
 }
 
 #topbar .title {
@@ -1049,6 +998,11 @@ button.jump-pill {
 .jump-pill.jump-highlight {
     border-color: var(--gb-readmarker);
     color: var(--gb-readmarker);
+}
+
+.jump-bottom > .jump-pill {
+    background: var(--gb-accent);
+    color: var(--gb-accent-fg);
 }
 
 tr.bufferline:hover {
@@ -1823,6 +1777,14 @@ label.settings-row:hover {
             'side input nick';
     }
 
+    .content[data-sidebar='hidden'] {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            'top nick'
+            'lines nick'
+            'input nick';
+    }
+
     /* Same height and border as the top bar, so their bottoms line up */
     .bufferfilter,
     .nicklist-header {
@@ -1859,6 +1821,10 @@ label.settings-row:hover {
 
     #sidebar[data-state='visible'] {
         box-shadow: none;
+    }
+
+    #sidebar[data-state='hidden'] {
+        display: none;
     }
 
     .buffer a {

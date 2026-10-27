@@ -73,7 +73,7 @@ export function fontSizeInPx(size: string): number {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-    theme: 'catppuccin-macchiato',
+    theme: 'dracula',
     hostField: pageHost(),
     host: pageHost(),
     port: 443,

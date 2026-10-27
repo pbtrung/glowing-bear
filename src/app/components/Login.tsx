@@ -6,7 +6,6 @@ import {
     EyeOff,
     LoaderCircle,
     Lock,
-    LockOpen,
     Server,
 } from 'lucide-react';
 import { MIN_RELAY_API, type ConnectErrorKind } from '../../lib/relay/client';
@@ -14,11 +13,6 @@ import { useChat } from '../chat';
 import { parseHostField, updateSettings, useSettings } from '../settings';
 import { connectWithSettings } from '../connect';
 import { Icon } from './Icon';
-
-const showTlsWarning =
-    typeof location !== 'undefined' &&
-    !['https:', 'file:'].includes(location.protocol) &&
-    !['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname);
 
 function Alert({ icon, children }: { icon: typeof Lock; children: ReactNode }) {
     return (
@@ -296,133 +290,6 @@ function ConnectForm() {
     );
 }
 
-function HelpItem({ title, children }: { title: string; children: ReactNode }) {
-    const [open, setOpen] = useState(false);
-    return (
-        <div className="accordion-item" data-state={open ? 'active' : 'collapsed'}>
-            <h2 className="accordion-header">
-                <button
-                    type="button"
-                    className="accordion-button"
-                    aria-expanded={open}
-                    onClick={() => setOpen(!open)}
-                >
-                    {title}
-                </button>
-            </h2>
-            {open && (
-                <div className="accordion-collapse">
-                    <div className="accordion-body">{children}</div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-function Help() {
-    const host = useSettings((s) => s.host || 'your.domain.com');
-    const port = useSettings((s) => Number(s.port) || 443);
-    // WeeChat can't listen on privileged ports (e.g. 443, behind a proxy)
-    const relayPort = port < 1024 ? 9001 : port;
-    return (
-        <div className="accordion login-help">
-            <HelpItem title="Getting started">
-                <p>
-                    <span className="badge text-bg-danger">
-                        WeeChat {MIN_RELAY_API.weechat} or later is required.
-                    </span>
-                </p>
-                <p>
-                    Glowing Bear connects to the "api" relay of your WeeChat. All
-                    communication goes directly between your browser and your WeeChat:
-                    your server must be reachable from this device. Nobody else sees
-                    your data or your password, and all settings, including your
-                    password if you choose to save it, stay in this browser.
-                </p>
-                <h3 className="h6">Quick start (unencrypted, for local testing)</h3>
-                <pre>{`/set relay.network.password y0ur_StRonG-pa$sw0rd:of*choice\n/relay add api ${relayPort}`}</pre>
-                <h3 className="h6">Use TLS encryption</h3>
-                <p>
-                    With encryption, all communication between your browser and WeeChat
-                    is encrypted with TLS. This needs a certificate. Self-signed
-                    certificates are handled poorly by browsers and may not work at all
-                    on mobile devices, so we recommend a free certificate from{' '}
-                    <a href="https://letsencrypt.org/">Let's Encrypt</a>: follow the
-                    instructions at{' '}
-                    <a href="https://certbot.eff.org/">certbot.eff.org</a> (or proxy the
-                    relay through your web server, see below), with{' '}
-                    <code>certbot certonly --standalone -d {host}</code>. Then copy it
-                    where WeeChat expects it, replacing <strong>username</strong> with
-                    your user:
-                </p>
-                <pre>{`mkdir -p ~username/.config/weechat/tls\ncat /etc/letsencrypt/live/${host}/{fullchain,privkey}.pem > ~username/.config/weechat/tls/relay.pem\nchown -R username:username ~username/.config/weechat/tls/`}</pre>
-                <p>Then set up an encrypted relay:</p>
-                <pre>{`/set relay.network.password y0ur_StRonG-pa$sw0rd:of*choice\n/relay tlscertkey\n/relay add tls.api ${relayPort}`}</pre>
-                <p>
-                    Certificates must be renewed every few months (
-                    <code>certbot renew</code>). After renewing, copy the certificate
-                    again and run <code>/relay tlscertkey</code> in WeeChat.
-                </p>
-                <h3 className="h6">Behind a reverse proxy (port 443)</h3>
-                <p>
-                    WeeChat can't listen on port 443 as a normal user: a web server
-                    (Caddy, nginx…) can serve Glowing Bear and forward <code>/api</code>
-                    , including the WebSocket, to an unencrypted relay on localhost.
-                    Connect to port 443 with TLS on. See the{' '}
-                    <a href="https://github.com/pbtrung/glowing-bear#reverse-proxy">
-                        README
-                    </a>{' '}
-                    for Caddy and nginx examples.
-                </p>
-                <pre>{`/set relay.network.bind_address "127.0.0.1"\n/relay add api 9001`}</pre>
-                <h3 className="h6">TOTP (Time-based One-Time Password)</h3>
-                <p className="mb-0">
-                    WeeChat expects the TOTP in an HTTP header that browsers can't send
-                    on WebSocket connections, so TOTP can't be used with Glowing Bear.
-                    Make sure <code>relay.network.totp_secret</code> is empty.
-                </p>
-            </HelpItem>
-            <HelpItem title="Usage instructions">
-                <h3 className="h6">Host field and custom path</h3>
-                <p>
-                    Glowing Bear connects to{' '}
-                    <code>{'{scheme}://{host}:{port}/{path}'}</code>, where the path is{' '}
-                    <code>api</code> unless the relay is behind a proxy. The host field
-                    accepts <code>weechat.example.com</code>,{' '}
-                    <code>weechat.example.com:8000</code> or{' '}
-                    <code>weechat.example.com:443/relay/api</code> (the port is required
-                    with a path). IPv6 addresses must be wrapped in square brackets.
-                </p>
-                <h3 className="h6">URL parameters</h3>
-                <p>
-                    Fields can be prefilled from the URL:{' '}
-                    <code>
-                        #host=weechat.example.com&amp;port=8000&amp;autoconnect=true
-                    </code>
-                    . Available parameters: <code>host</code>, <code>port</code>,{' '}
-                    <code>path</code>, <code>password</code>, <code>autoconnect</code>,{' '}
-                    <code>buffer</code> (full name of the buffer to show). Passing the
-                    password this way is not recommended.
-                </p>
-                <h3 className="h6">Pinning buffers</h3>
-                <p className="mb-0">
-                    With "Only buffers with unread messages", pinned buffers stay
-                    visible. To pin a buffer, type{' '}
-                    <code>/buffer set localvar_set_pinned true</code>.
-                </p>
-            </HelpItem>
-            <HelpItem title="Install as an app">
-                <p className="mb-0">
-                    Glowing Bear can be installed as an app for a full-screen experience
-                    and an unread badge on its icon: use <kbd>Install</kbd> in the
-                    address bar or menu on desktop, or <kbd>Add to Home screen</kbd> on
-                    mobile.
-                </p>
-            </HelpItem>
-        </div>
-    );
-}
-
 export function Login() {
     return (
         <main className="login container">
@@ -433,21 +300,7 @@ export function Login() {
                     <p className="text-body-secondary mb-0">WeeChat web frontend</p>
                 </div>
             </header>
-            {showTlsWarning && (
-                <div className="alert alert-warning d-flex gap-2" role="alert">
-                    <Icon icon={LockOpen} className="flex-shrink-0" />
-                    <div>
-                        <strong>
-                            You're using Glowing Bear over an unencrypted connection
-                            (http://).
-                        </strong>{' '}
-                        This is not recommended! If your relay is on your local network
-                        that may be unavoidable, but be aware of the implications.
-                    </div>
-                </div>
-            )}
             <ConnectForm />
-            <Help />
         </main>
     );
 }

@@ -100,7 +100,7 @@ installable app also need the page to be served over HTTPS.
 
 ### Defaults
 
-New installs start with the Catppuccin Macchiato theme, the nicklist hidden, joins,
+New installs start with the Dracula theme, the nicklist hidden, joins,
 parts and quits of inactive users hidden (WeeChat's smart filter), and quick buffer
 switching (<kbd>Alt</kbd>+digit) off. All of them can be changed in the settings.
 Pinned buffers stay visible with "Only buffers with unread messages": pin one with

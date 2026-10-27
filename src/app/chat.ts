@@ -99,7 +99,7 @@ export const useActiveBuffer = (): Buffer | undefined => useChat(activeBuffer);
 export type Modal = 'settings' | 'topic' | null;
 
 export interface UiState {
-    /** Mobile: buffer list panel open */
+    /** Buffer list pane visible (an overlay on mobile) */
     sidebarOpen: boolean;
     /** Mobile: nicklist panel open */
     nicklistOpen: boolean;

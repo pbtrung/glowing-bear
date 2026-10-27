@@ -4,7 +4,7 @@ import { emojifyWord, loadShortcodes } from '../../lib/emoji';
 import { completeNick } from '../../lib/irc/completion';
 import type { Buffer } from '../../lib/state/model';
 import { SendError } from '../../lib/state/session';
-import { session, setUi, uiStore, useUi } from '../chat';
+import { isMobileUi, session, setUi, uiStore, useChat, useUi } from '../chat';
 import { flushInput } from '../input';
 import { handleBufferKey } from '../bufferkeys';
 import { promptNick } from '../nicks';
@@ -61,6 +61,7 @@ interface CommandCompletion {
 
 export function InputBar({ buffer }: { buffer: Buffer }) {
     const input = useUi((s) => s.input);
+    const latency = useChat((s) => s.latency);
     const ref = useRef<HTMLTextAreaElement>(null);
     const pendingCaret = useRef<number | null>(null);
     const nickIteration = useRef<string | null>(null);
@@ -336,14 +337,16 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                     onChange={onChange}
                     onKeyDown={onKeyDown}
                     onFocus={() => {
-                        setUi({ sidebarOpen: false });
+                        if (isMobileUi()) {
+                            setUi({ sidebarOpen: false });
+                        }
                         loadShortcodes();
                     }}
                     autoComplete="off"
                     autoCapitalize="sentences"
                     enterKeyHint="send"
                     aria-label="Message"
-                    placeholder={`Message ${buffer.shortName || buffer.fullName}`}
+                    placeholder={`Message ${buffer.shortName || buffer.fullName}${latency !== null ? ` (lag: ${latency} ms)` : ''}`}
                 />
                 <button
                     type="button"

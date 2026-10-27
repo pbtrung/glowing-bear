@@ -1,5 +1,5 @@
 /* Glowing Bear theme: Catppuccin Frappé (https://catppuccin.com) */
-@import 'base16-default.css';
+@import 'palette.css';
 
 :root {
     --base00: #303446;

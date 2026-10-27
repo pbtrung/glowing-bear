@@ -1,0 +1,26 @@
+/* Glowing Bear theme: Monokai Pro (https://monokai.pro) */
+@import 'palette.css';
+
+:root {
+    --base00: #2d2a2e;
+    --base01: #221f22;
+    --base02: #403e41;
+    --base03: #727072;
+    --base04: #939293;
+    --base05: #fcfcfa;
+    --base06: #fcfcfa;
+    --base07: #ffffff;
+    --base08: #ff6188;
+    --base09: #fc9867;
+    --base0A: #ffd866;
+    --base0B: #a9dc76;
+    --base0C: #78dce8;
+    --base0D: #78dce8;
+    --base0E: #ab9df2;
+    --base0F: #fc9867;
+    --gb-accent: #a9dc76;
+    --gb-accent-fg: #221f22;
+    --gb-link: #78dce8;
+    --gb-readmarker: #ff6188;
+    --gb-repeated-time: #727072;
+}

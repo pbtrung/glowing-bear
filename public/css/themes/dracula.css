@@ -1,5 +1,5 @@
-/* Glowing Bear theme: Dracula (https://draculatheme.com, base16 palette) */
-@import 'base16-default.css';
+/* Glowing Bear theme: Dracula (https://draculatheme.com) */
+@import 'palette.css';
 
 :root {
     --base00: #282a36;

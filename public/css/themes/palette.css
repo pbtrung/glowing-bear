@@ -1,5 +1,5 @@
 /*
- * Glowing Bear theme: base16 (default palette, also used by the other base16 themes)
+ * Shared palette and WeeChat color mappings for the palette-based themes.
  *
  * The first part sets the palette used by glowingbear.css (--gb-* variables);
  * the second part maps WeeChat colors (options cof-/cob-/coa-, basic colors

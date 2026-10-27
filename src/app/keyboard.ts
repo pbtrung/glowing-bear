@@ -62,6 +62,9 @@ function digitOf(event: KeyboardEvent): number | null {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
+    if (event.defaultPrevented || event.isComposing) {
+        return;
+    }
     // Escape closes a dialog, also one left open after a disconnection
     if (event.key === 'Escape' && uiStore.getState().modal) {
         event.preventDefault();
@@ -75,8 +78,8 @@ function onKeyDown(event: KeyboardEvent): void {
         return;
     }
     // AltGr is used to type characters: never a shortcut
-    if (event.getModifierState?.('AltGraph') || event.defaultPrevented) {
-        // (or already used, e.g. by the input bar)
+    if (uiStore.getState().modal || event.getModifierState?.('AltGraph')) {
+        // Dialog controls handle their own keys; AltGr types characters.
         return;
     }
     // Keys of free buffers (/fset...), here when not typing in a field
@@ -192,7 +195,7 @@ function onKeyDown(event: KeyboardEvent): void {
 }
 
 function onKeyUp(event: KeyboardEvent): void {
-    if (event.key === 'Alt') {
+    if (event.key === 'Alt' && !uiStore.getState().modal) {
         clearTimeout(quickKeysTimer);
         quickKeysTimer = setTimeout(() => setUi({ showQuickKeys: false }), 1000);
     }
@@ -202,6 +205,7 @@ export function initKeyboard(): () => void {
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
     return () => {
+        clearTimeout(quickKeysTimer);
         document.removeEventListener('keydown', onKeyDown);
         document.removeEventListener('keyup', onKeyUp);
     };

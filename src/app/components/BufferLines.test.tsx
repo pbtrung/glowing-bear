@@ -13,13 +13,13 @@ let rowsLaidOut = false;
 const lines = (count: number) =>
     Array.from({ length: count }, (_, i) => apiLine(i + 1, 'line ' + (i + 1)));
 
-function show(count: number, lastReadKey: string | null = null): void {
+function show(count: number, lastReadKey: string | null = null, bufferId = 2): void {
     let state = applyBuffers(initialState, [
-        apiBuffer(2, 2, 'irc.libera.#weechat', '#weechat'),
+        apiBuffer(bufferId, bufferId, 'irc.libera.#weechat', '#weechat'),
     ]);
-    state = applyLines(state, 2, lines(count), 100);
-    const buffers = { 2: { ...state.buffers[2], lastReadKey } };
-    act(() => session.store.setState({ ...state, buffers, activeBufferId: 2 }));
+    state = applyLines(state, bufferId, lines(count), 100);
+    const buffers = { [bufferId]: { ...state.buffers[bufferId], lastReadKey } };
+    act(() => session.store.setState({ ...state, buffers, activeBufferId: bufferId }));
 }
 
 function scrollTo(scrollTop: number): void {
@@ -29,6 +29,8 @@ function scrollTo(scrollTop: number): void {
 
 beforeEach(() => {
     geometry.scrollTop = 800;
+    geometry.scrollHeight = 1000;
+    geometry.clientHeight = 200;
     markerAbove = false;
     rowsLaidOut = false;
     const isLines = (el: Element) => el.id === 'bufferlines';
@@ -49,7 +51,10 @@ beforeEach(() => {
         value: number,
     ) {
         if (isLines(this)) {
-            geometry.scrollTop = Math.min(value, 800);
+            geometry.scrollTop = Math.max(
+                0,
+                Math.min(value, geometry.scrollHeight - geometry.clientHeight),
+            );
         }
     });
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
@@ -73,6 +78,44 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+});
+
+describe('opening a buffer', () => {
+    it('starts at the bottom even with an unread marker', () => {
+        show(5, 'l2');
+        geometry.scrollTop = 0;
+        render(<BufferLines />);
+        expect(geometry.scrollTop).toBe(800);
+    });
+
+    it('opens another buffer at the bottom after scrolling up', () => {
+        show(5);
+        render(<BufferLines />);
+        scrollTo(300);
+        show(5, 'l2', 3);
+        expect(geometry.scrollTop).toBe(800);
+    });
+
+    it('stays at the bottom when the initial history finishes loading', () => {
+        show(0);
+        act(() =>
+            session.store.setState((state) => ({
+                buffers: {
+                    2: {
+                        ...state.buffers[2],
+                        linesFetched: false,
+                        loadingLines: true,
+                    },
+                },
+            })),
+        );
+        geometry.scrollHeight = 200;
+        render(<BufferLines />);
+        expect(geometry.scrollTop).toBe(0);
+        geometry.scrollHeight = 1000;
+        show(5, 'l2');
+        expect(geometry.scrollTop).toBe(800);
+    });
 });
 
 describe('new lines button', () => {

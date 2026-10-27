@@ -1,7 +1,7 @@
 /*
  * Themes, fonts and custom CSS, applied from the settings.
  */
-import { settingsStore, type Settings } from './settings';
+import { DEFAULT_SETTINGS, settingsStore, type Settings } from './settings';
 
 export interface Theme {
     id: string;
@@ -114,7 +114,9 @@ export const THEMES: Theme[] = [
 
 /** Resolves when the stylesheet of the theme is loaded (or failed) */
 function applyTheme(themeId: string): Promise<void> {
-    const theme = THEMES.find((t) => t.id === themeId) ?? THEMES[0];
+    const theme =
+        THEMES.find((t) => t.id === themeId) ??
+        THEMES.find((t) => t.id === DEFAULT_SETTINGS.theme)!;
     let link = document.getElementById('themeCSS') as HTMLLinkElement | null;
     const href = `css/themes/${theme.id}.css`;
     if (!link) {
@@ -187,9 +189,9 @@ function apply(settings: Settings, previous?: Settings): void {
  */
 export function initAppearance(timeout = 1500): Promise<void> {
     const settings = settingsStore.getState();
+    const theme = applyTheme(settings.theme);
     applyCustomCss(settings.customCSS);
     applyFont(settings.fontfamily, settings.fontsize);
-    const theme = applyTheme(settings.theme);
     settingsStore.subscribe((settings, previous) => apply(settings, previous));
     return Promise.race([theme, new Promise<void>((r) => setTimeout(r, timeout))]);
 }

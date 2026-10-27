@@ -115,10 +115,12 @@ type Katex = typeof import('katex').default;
 let katexPromise: Promise<Katex> | null = null;
 
 function loadKatex(): Promise<Katex> {
-    katexPromise ??= Promise.all([
-        import('katex'),
-        import('katex/dist/katex.min.css'),
-    ]).then(([module]) => module.default);
+    katexPromise ??= Promise.all([import('katex'), import('katex/dist/katex.min.css')])
+        .then(([module]) => module.default)
+        .catch((error: unknown) => {
+            katexPromise = null;
+            throw error;
+        });
     return katexPromise;
 }
 
@@ -126,11 +128,14 @@ function MathText({ text }: { text: string }) {
     const [katex, setKatex] = useState<Katex | null>(null);
     useEffect(() => {
         let cancelled = false;
-        void loadKatex().then((k) => {
-            if (!cancelled) {
-                setKatex(() => k);
-            }
-        });
+        void loadKatex().then(
+            (k) => {
+                if (!cancelled) {
+                    setKatex(() => k);
+                }
+            },
+            () => undefined, // Keep the original text if a lazy chunk is unavailable.
+        );
         return () => {
             cancelled = true;
         };

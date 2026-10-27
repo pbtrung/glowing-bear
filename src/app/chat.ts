@@ -119,7 +119,7 @@ export interface UiState {
 }
 
 export const uiStore = createStore<UiState>(() => ({
-    sidebarOpen: true,
+    sidebarOpen: !isMobileUi(),
     nicklistOpen: false,
     modal: null,
     search: '',

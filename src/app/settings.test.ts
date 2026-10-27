@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
     DEFAULT_SETTINGS,
     fontSizeInPx,
@@ -7,6 +7,8 @@ import {
     pageHost,
     parseHashParams,
     parseHostField,
+    settingsStore,
+    updateSettings,
 } from './settings';
 
 function fakeStorage(items: Record<string, string>): Storage {
@@ -58,8 +60,22 @@ describe('host field', () => {
     });
 
     it('rejects invalid fields', () => {
-        expect(parseHostField('example.com/path')).toBeNull();
-        expect(parseHostField('2001:db8::1')).toBeNull();
+        for (const field of [
+            '',
+            '   ',
+            'example.com/path',
+            '2001:db8::1',
+            '[invalid]',
+            'user@example.com',
+            'example.com#fragment',
+            'example.com?query',
+            'example.com/path:443',
+            'example.com:0',
+            'example.com:65536',
+            'example .com',
+        ]) {
+            expect(parseHostField(field), field).toBeNull();
+        }
     });
 });
 
@@ -161,6 +177,42 @@ describe('default relay host', () => {
 });
 
 describe('stored settings', () => {
+    it('falls back to defaults if storage refuses reads', () => {
+        const store = fakeStorage({});
+        store.getItem = () => {
+            throw new Error('Storage blocked');
+        };
+        expect(loadSettings(store)).toEqual(DEFAULT_SETTINGS);
+    });
+
+    it('does not share mutable defaults between loads', () => {
+        const first = loadSettings(null);
+        first.currentlyViewedBuffers.relay = 'irc.libera.#test';
+        first.collapsedServers.push('irc.libera');
+        expect(loadSettings(null).currentlyViewedBuffers).toEqual({});
+        expect(loadSettings(null).collapsedServers).toEqual([]);
+        expect(DEFAULT_SETTINGS.currentlyViewedBuffers).toEqual({});
+    });
+
+    it('keeps settings usable if storage refuses writes and removals', () => {
+        const store = fakeStorage({});
+        store.setItem = store.removeItem = () => {
+            throw new Error('Storage blocked');
+        };
+        const previous = settingsStore.getState();
+        vi.stubGlobal('localStorage', store);
+        try {
+            expect(() =>
+                updateSettings({ savepassword: false, fontsize: '16px' }),
+            ).not.toThrow();
+            expect(settingsStore.getState().fontsize).toBe('16px');
+            expect(settingsStore.getState().password).toBe('');
+        } finally {
+            settingsStore.setState(previous, true);
+            vi.unstubAllGlobals();
+        }
+    });
+
     it('uses the defaults', () => {
         expect(loadSettings(fakeStorage({}))).toEqual(DEFAULT_SETTINGS);
     });

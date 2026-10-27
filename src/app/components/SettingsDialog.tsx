@@ -11,7 +11,7 @@ import {
     SlidersHorizontal,
     type LucideIcon,
 } from 'lucide-react';
-import { closeModal, useChat, useUi } from '../chat';
+import { useChat, useUi } from '../chat';
 import {
     DEFAULT_FONT,
     fontSizeInPx,
@@ -26,7 +26,7 @@ import {
 } from '../notifications';
 import { THEMES } from '../theme';
 import { Icon } from './Icon';
-import { Modal } from './Modal';
+import { Modal, ModalHeader } from './Modal';
 
 type Tab = 'appearance' | 'chat' | 'notifications' | 'shortcuts' | 'about';
 
@@ -666,24 +666,13 @@ export function SettingsDialog() {
             className="settings-modal"
             dialogClassName="modal-lg modal-fullscreen-sm-down"
         >
-            <div className="modal-header">
-                <h2
-                    className="modal-title h5 d-flex align-items-center gap-2"
-                    id="settingsTitle"
-                >
-                    <Icon icon={SlidersHorizontal} /> Settings
-                    <span className="settings-current">· {current.label}</span>
-                </h2>
-                <div className="d-flex align-items-center gap-1 ms-auto">
-                    <SectionMenu tab={tab} onSelect={setTab} />
-                    <button
-                        type="button"
-                        className="btn-close"
-                        onClick={closeModal}
-                        aria-label="Close"
-                    />
-                </div>
-            </div>
+            <ModalHeader
+                id="settingsTitle"
+                actions={<SectionMenu tab={tab} onSelect={setTab} />}
+            >
+                <Icon icon={SlidersHorizontal} /> Settings
+                <span className="settings-current">· {current.label}</span>
+            </ModalHeader>
             <div className="settings-layout">
                 <nav
                     className="settings-nav"

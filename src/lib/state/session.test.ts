@@ -333,6 +333,25 @@ describe('connection', () => {
 });
 
 describe('buffers', () => {
+    it('ignores history, nicklist and script replies resolved just before disconnect', async () => {
+        const { session, ws } = await connected();
+        session.activate(2);
+        const buffers = session.state.buffers;
+        ws.replyTo('GET /api/buffers/2/lines', 200, [apiLine(1, 'stale history')]);
+        ws.replyTo('GET /api/buffers/2/nicks', 200, {
+            id: 0,
+            name: 'root',
+            visible: true,
+            groups: [],
+            nicks: [],
+        });
+        ws.replyTo('GET /api/scripts', 200, [{ name: 'stale script' }]);
+        session.disconnect();
+        await flush();
+        expect(session.state.buffers).toBe(buffers);
+        expect(session.state.scripts).toEqual([]);
+    });
+
     it('fetches free buffers whole', async () => {
         const { session, ws } = await connected();
         ws.receive({

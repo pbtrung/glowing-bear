@@ -10,8 +10,37 @@ interface ModalProps {
     children: ReactNode;
 }
 
+/** Shared dialog title and close control, with optional actions. */
+export function ModalHeader({
+    id,
+    children,
+    actions,
+}: {
+    id: string;
+    children: ReactNode;
+    actions?: ReactNode;
+}) {
+    return (
+        <div className="modal-header">
+            <h2 className="modal-title h5 d-flex align-items-center gap-2" id={id}>
+                {children}
+            </h2>
+            <div className="d-flex align-items-center gap-1 ms-auto">
+                {actions}
+                <button
+                    type="button"
+                    className="btn-close"
+                    onClick={closeModal}
+                    aria-label="Close"
+                />
+            </div>
+        </div>
+    );
+}
+
 const FOCUSABLE = [
     'a[href]',
+    'summary',
     'button:not([disabled])',
     'input:not([disabled])',
     'select:not([disabled])',
@@ -35,10 +64,11 @@ function trapTab(event: KeyboardEvent<HTMLElement>): void {
     }
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
+    const inside = focusable.includes(document.activeElement as HTMLElement);
+    if (event.shiftKey && (!inside || document.activeElement === first)) {
         event.preventDefault();
         last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
+    } else if (!event.shiftKey && (!inside || document.activeElement === last)) {
         event.preventDefault();
         first.focus();
     }

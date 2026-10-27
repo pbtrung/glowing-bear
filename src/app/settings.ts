@@ -113,13 +113,23 @@ function storage(): Storage | null {
 
 /** Read the stored settings over the defaults */
 export function loadSettings(store: Storage | null = storage()): Settings {
-    const settings: Settings = { ...DEFAULT_SETTINGS };
+    const settings: Settings = {
+        ...DEFAULT_SETTINGS,
+        currentlyViewedBuffers: {},
+        collapsedServers: [],
+    };
     if (!store) {
         return settings;
     }
     const target = settings as unknown as Record<string, unknown>;
     for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
-        const raw = store.getItem(key);
+        let raw: string | null;
+        try {
+            raw = store.getItem(key);
+        } catch {
+            // Storage can exist but refuse reads (e.g. browser privacy settings).
+            break;
+        }
         if (raw === null) {
             continue;
         }
@@ -166,6 +176,9 @@ export function loadSettings(store: Storage | null = storage()): Settings {
             delete settings.currentlyViewedBuffers[key];
         }
     }
+    settings.collapsedServers = settings.collapsedServers.filter(
+        (value) => typeof value === 'string',
+    );
     if (!settings.savepassword) {
         settings.password = '';
     }
@@ -193,7 +206,11 @@ export function updateSettings(changes: Partial<Settings>): void {
         }
     }
     if (!next.savepassword) {
-        store.removeItem('password');
+        try {
+            store.removeItem('password');
+        } catch {
+            // Storage may refuse writes or removals; in-memory settings still work.
+        }
     }
 }
 
@@ -228,19 +245,28 @@ export function parseHostField(field: string): HostFieldResult | null {
         value = scheme[2];
         tls = scheme[1] === 'https' || scheme[1] === 'wss';
     }
-    let m = /^([^:/]*|\[.*\])$/.exec(value);
-    if (m) {
-        return { host: m[1], path: 'api', tls, hostField: value };
+    const match = /^(\[[^\]]+\]|[^:/\\?#@\s[\]]+)(?::(\d+))?(?:\/([^?#\s\\]+))?$/.exec(
+        value,
+    );
+    if (!match) {
+        return null;
     }
-    m = /^([^:]*|\[.*\]):(\d+)$/.exec(value);
-    if (m) {
-        return { host: m[1], port: m[2], path: 'api', tls, hostField: value };
+    const [, host, port, path] = match;
+    if ((path && !port) || (port && (Number(port) < 1 || Number(port) > 65535))) {
+        return null;
     }
-    m = /^([^:]*|\[.*\]):(\d+)\/(.+)$/.exec(value);
-    if (m) {
-        return { host: m[1], port: m[2], path: m[3], tls, hostField: value };
+    try {
+        new URL(`http://${host}`);
+    } catch {
+        return null;
     }
-    return null;
+    return {
+        host,
+        ...(port ? { port } : {}),
+        path: path ?? 'api',
+        tls,
+        hostField: value,
+    };
 }
 
 export interface HashParams {

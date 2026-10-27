@@ -1,15 +1,6 @@
 import { memo, type KeyboardEvent } from 'react';
-import {
-    ChevronDown,
-    Merge,
-    MessagesSquare,
-    Pin,
-    Server,
-    SquareTerminal,
-    type LucideIcon,
-} from 'lucide-react';
+import { ChevronDown, Merge, Pin } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
-import type { Buffer } from '../../lib/state/model';
 import {
     activateBuffer,
     listBuffers,
@@ -22,7 +13,7 @@ import {
 } from '../chat';
 import { useSettings } from '../settings';
 import { useSwipe } from '../swipe';
-import { Avatar } from './Avatar';
+import { BufferIcon } from './BufferIcon';
 import { Icon } from './Icon';
 import { SearchBox } from './SearchBox';
 
@@ -60,27 +51,6 @@ function onSearchKey(
             });
             break;
     }
-}
-
-/** Icon of a buffer: server, channel, avatar of a private chat... */
-export function BufferIcon({ buffer }: { buffer: Buffer }) {
-    if (buffer.type === 'private') {
-        return (
-            <Avatar
-                name={buffer.shortName || buffer.fullName}
-                className="buffer-avatar"
-            />
-        );
-    }
-    let icon: LucideIcon | null = null;
-    if (buffer.type === 'server') {
-        icon = Server;
-    } else if (buffer.type === 'channel') {
-        icon = MessagesSquare;
-    } else if (buffer.plugin === 'core') {
-        icon = SquareTerminal;
-    }
-    return <span className="buffer-icon">{icon && <Icon icon={icon} />}</span>;
 }
 
 type RowProps = { item: ListedBuffer; active: boolean; highlighted: boolean };

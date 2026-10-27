@@ -325,7 +325,11 @@ export class Session {
 
         // Scripts are not needed right away
         api.scripts().then(
-            (scripts) => this.set({ scripts }),
+            (scripts) => {
+                if (this.client === client) {
+                    this.set({ scripts });
+                }
+            },
             () => undefined,
         );
 
@@ -433,12 +437,15 @@ export class Session {
     }
 
     private async refreshHotlist(): Promise<void> {
-        if (!this.api) {
+        const api = this.api;
+        if (!api) {
             return;
         }
         try {
-            const hotlist = await this.api.hotlist();
-            this.update((s) => applyHotlist(s, hotlist));
+            const hotlist = await api.hotlist();
+            if (this.api === api) {
+                this.update((s) => applyHotlist(s, hotlist));
+            }
         } catch {
             // connection lost, the reconnection reloads it
         }
@@ -555,13 +562,17 @@ export class Session {
                 buffer.free ? undefined : -wanted,
                 'weechat',
             );
-            this.update((s) => applyLines(s, bufferId, lines, wanted, unreadHint));
+            if (this.api === api) {
+                this.update((s) => applyLines(s, bufferId, lines, wanted, unreadHint));
+            }
         } catch {
             // connection lost (the reconnection reloads them), or buffer closed
         } finally {
             if (this.fetching.get(bufferId) === api) {
                 this.fetching.delete(bufferId);
-                this.update((s) => setLoadingLines(s, bufferId, false));
+                if (this.api === api) {
+                    this.update((s) => setLoadingLines(s, bufferId, false));
+                }
             }
         }
     }
@@ -574,7 +585,9 @@ export class Session {
         this.loadingNicklist.set(bufferId, api);
         try {
             const root = await api.nicks(bufferId, 'weechat');
-            this.update((s) => applyNicklist(s, bufferId, root));
+            if (this.api === api) {
+                this.update((s) => applyNicklist(s, bufferId, root));
+            }
         } catch {
             // connection lost (the reconnection reloads it), or buffer closed
         } finally {

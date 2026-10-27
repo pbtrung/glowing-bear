@@ -326,16 +326,14 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
         }
         const state = scrollState.current;
         const firstKey = buffer.lines[0]?.key ?? '';
-        const showMarker = scrollToMarker;
         const fetched = buffer.linesFetched && !buffer.loadingLines;
         if (state.bufferId !== buffer.id) {
-            // Switched buffer: show the read marker, else the bottom (again
-            // when the lines are fetched: the marker is placed then)
-            markerPending.current = !fetched;
-            showMarker();
+            // Open at the latest messages; follow the initial history as it loads.
+            markerPending.current = false;
+            scrollToBottom();
         } else if (markerPending.current && fetched) {
             markerPending.current = false;
-            showMarker();
+            scrollToMarker();
         } else if (firstKey !== state.firstKey && !atBottom.current) {
             // Older lines loaded above: stay on the same lines
             el.scrollTop += el.scrollHeight - state.height;
@@ -349,7 +347,7 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
             height: el.scrollHeight,
         };
         updateIndicators();
-    }, [buffer, scrollToMarker, updateIndicators]);
+    }, [buffer, scrollToBottom, scrollToMarker, updateIndicators]);
 
     // Follow new lines; keep the bottom when the window is resized (keyboard)
     useEffect(() => {
@@ -535,7 +533,6 @@ export function BufferLines({ inert = false }: { inert?: boolean }) {
                     </button>
                 </div>
             )}
-            <span id="end-of-buffer" />
         </main>
     );
 }

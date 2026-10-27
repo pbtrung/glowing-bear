@@ -76,6 +76,31 @@ describe('Modal', () => {
         fireEvent.keyDown(getByText('first'), { key: 'Tab', shiftKey: true });
         expect(document.activeElement).toBe(getByText('last'));
     });
+
+    it('moves from the initially focused dialog into its controls in either direction', () => {
+        const { getByText } = render(dialog(true));
+        const focused = document.activeElement!;
+        fireEvent.keyDown(focused, { key: 'Tab', shiftKey: true });
+        expect(document.activeElement).toBe(getByText('last'));
+        (focused as HTMLElement).focus();
+        fireEvent.keyDown(focused, { key: 'Tab' });
+        expect(document.activeElement).toBe(getByText('first'));
+    });
+
+    it('includes expandable details in the tab order', () => {
+        const { getByText } = render(
+            <Modal id="m" open labelledBy="t">
+                <h2 id="t">Title</h2>
+                <details>
+                    <summary>Details</summary>More information
+                </details>
+                <button type="button">last</button>
+            </Modal>,
+        );
+        getByText('last').focus();
+        fireEvent.keyDown(getByText('last'), { key: 'Tab' });
+        expect(document.activeElement).toBe(getByText('Details'));
+    });
 });
 
 describe('ErrorBoundary', () => {

@@ -168,6 +168,11 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
         }
         const caret = el.selectionStart;
         const request = ++commandRequest.current;
+        const isCurrent = () =>
+            request === commandRequest.current &&
+            ref.current !== null &&
+            session.state.activeBufferId === buffer.id &&
+            completionKey(uiStore.getState().input, buffer.id) === key;
         const fallback = () => {
             if (!input.startsWith('/') && direction === 1) {
                 doCompleteNick();
@@ -177,10 +182,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
             .completion(buffer.id, input, caret)
             .then((completion) => {
                 // The input changed while waiting
-                if (
-                    request !== commandRequest.current ||
-                    completionKey(uiStore.getState().input, buffer.id) !== key
-                ) {
+                if (!isCurrent()) {
                     return;
                 }
                 if (completion.list.length === 0) {
@@ -198,7 +200,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                 cycleCommand(direction);
             })
             .catch(() => {
-                if (request === commandRequest.current) {
+                if (isCurrent()) {
                     fallback();
                 }
             });
@@ -346,7 +348,7 @@ export function InputBar({ buffer }: { buffer: Buffer }) {
                     autoCapitalize="sentences"
                     enterKeyHint="send"
                     aria-label="Message"
-                    placeholder={`Message ${buffer.shortName || buffer.fullName}${latency !== null ? ` (lag: ${latency} ms)` : ''}`}
+                    placeholder={`${buffer.shortName || buffer.fullName}${latency !== null ? ` (lag: ${latency} ms)` : ''}`}
                 />
                 <button
                     type="button"

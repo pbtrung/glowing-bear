@@ -1,6 +1,6 @@
 import { closeModal, session, useActiveBuffer, useUi } from '../chat';
-import { BufferIcon } from './BufferList';
-import { Modal } from './Modal';
+import { BufferIcon } from './BufferIcon';
+import { Modal, ModalHeader } from './Modal';
 import { RichText } from './RichText';
 
 export function TopicDialog() {
@@ -8,23 +8,12 @@ export function TopicDialog() {
     const buffer = useActiveBuffer();
     return (
         <Modal id="topicModal" open={open} labelledBy="topicTitle">
-            <div className="modal-header">
-                <h2
-                    className="modal-title d-flex align-items-center gap-2"
-                    id="topicTitle"
-                >
-                    {buffer && <BufferIcon buffer={buffer} />}
-                    <span className="buffer-name">
-                        {buffer?.shortName || buffer?.fullName}
-                    </span>
-                </h2>
-                <button
-                    type="button"
-                    className="btn-close"
-                    onClick={closeModal}
-                    aria-label="Close"
-                />
-            </div>
+            <ModalHeader id="topicTitle">
+                {buffer && <BufferIcon buffer={buffer} />}
+                <span className="buffer-name">
+                    {buffer?.shortName || buffer?.fullName}
+                </span>
+            </ModalHeader>
             {/* (not rendered closed: it would follow every line of the buffer) */}
             {open && buffer && (
                 <div className="modal-body">

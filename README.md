@@ -8,12 +8,16 @@ works on phones and tablets.
 
 ## Install
 
-Requires [Node.js](https://nodejs.org).
+Building and development require [Node.js](https://nodejs.org): 22.22.2 or later
+in the 22.x series, 24.15.0 or later in the 24.x series, or 26 or later.
+To use a release, download its ZIP from
+[GitHub Releases](https://github.com/pbtrung/glowing-bear/releases), extract it and
+serve the contents with a static web server; Node.js is not needed to host it.
 
 ```bash
 git clone https://github.com/pbtrung/glowing-bear.git
 cd glowing-bear
-npm install
+npm ci
 npm start        # development server on http://localhost:8000
 npm run build    # production build in build/
 ```
@@ -109,9 +113,25 @@ Pinned buffers stay visible with "Only buffers with unread messages": pin one wi
 To install Glowing Bear as an app, use your browser's "Install" or "Add to Home
 screen" option.
 
+### Navigation
+
+Channels open at the latest messages. Scroll up to read history; the scroll-position
+indicator shows `[lines below/lines loaded]`, and the down-arrow button returns to
+the bottom. The unread button jumps to the read marker when it is above the view.
+
+The left buffer pane starts hidden on screens narrower than 968 CSS pixels and
+visible on larger screens. Toggle it with the menu button on mobile or the Glowing
+Bear icon on desktop. On mobile, swipe right to open it and select a buffer to close
+it. The message placeholder shows the buffer name and relay latency, for example
+`#linux (lag: 60 ms)`.
+
 ## Development
 
 Glowing Bear is written in TypeScript with React, built with Vite.
+
+Dependencies use current stable releases. TypeScript stays on the latest 6.0.x
+release because `typescript-eslint` currently requires TypeScript below 6.1;
+TypeScript 7 is intentionally excluded. Run `npm ci` to use the checked-in lockfile.
 
 ```bash
 npm run format      # Prettier

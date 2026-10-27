@@ -150,7 +150,7 @@ function Chat() {
                 <BufferLines inert={behindPanel} />
             </ErrorBoundary>
             <footer className="footer" inert={behindPanel}>
-                {buffer && <InputBar buffer={buffer} />}
+                {buffer && <InputBar key={buffer.id} buffer={buffer} />}
             </footer>
         </div>
     );

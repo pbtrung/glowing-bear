@@ -6,12 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Glowing Bear is a browser-based frontend for the WeeChat IRC client. It speaks the WeeChat relay **`api` protocol** (JSON over HTTP + WebSocket) directly — there is **no backend service**. It is a React + TypeScript app built with Vite; the user's browser connects straight to their WeeChat instance.
 
-Requires WeeChat ≥ 4.10 with an `api` relay (`/relay add api <port>`). The target is **relay API 0.6.0**, the version of the WeeChat package in Alpine edge (4.10.1): the session refuses older relays (`MIN_RELAY_API` in `relay/client.ts`, `ConnectError` kind `version`), and nothing newer is used (no `/api/options`, no buffer `notify`/`prefix_displayed`/`day_change`, no `buffer_notify_changed`/`day_changed`… events). The binary `weechat` relay protocol is not supported. Protocol spec: https://weechat.org/files/doc/weechat/stable/weechat_relay_api.en.html
+Requires WeeChat ≥ 4.10 with an `api` relay (`/relay add api <port>`). The minimum is **relay API 0.6.0**: the session refuses older relays (`MIN_RELAY_API` in `relay/client.ts`, `ConnectError` kind `version`), and nothing newer is required (no `/api/options`, no buffer `notify`/`prefix_displayed`/`day_change`, no `buffer_notify_changed`/`day_changed`… events). Integration tests use Alpine edge's WeeChat package, whose version can change. The binary `weechat` relay protocol is not supported. Protocol spec: https://weechat.org/files/doc/weechat/stable/weechat_relay_api.en.html
 
 ## Common commands
 
 ```bash
-npm install
+npm ci                   # Node 22.22.2+, 24.15.0+, or 26+ (see package.json engines)
 npm start                # Vite dev server on http://localhost:8000 (same as npm run dev)
 npm run build            # production build into build/
 npm run preview          # serve build/
@@ -57,5 +57,5 @@ Single tests: `npx vitest run src/lib/state` or `npx vitest run -t "name"`.
 - **Never render message text, nicks or buffer data as HTML.** They come from IRC and other networks; the project had XSS bugs when it did. Render text as React elements (`RichText`); the only `dangerouslySetInnerHTML` is KaTeX's own output.
 - TypeScript is strict; prefer the pure functions in `src/lib/` (unit tested) for logic, and keep components thin.
 - Formatting is owned by Prettier (`.prettierrc.json`: 88 columns, 4-space indent, single quotes). Run `npm run format` rather than hand-formatting.
-- Dependencies are kept at their latest versions; TypeScript is pinned below 6.1 until typescript-eslint supports newer versions.
+- Dependencies use current stable releases; TypeScript stays on 6.0.x until typescript-eslint supports newer versions. Keep package.json and package-lock.json in sync.
 - Themes live in `public/css/themes/`. A theme sets the `--gb-*` palette on `:root` (defaults at the top of `src/app/glowingbear.css`, which Bootstrap's variables derive from) and styles the WeeChat color classes. `dark.css`, `light.css` and `base16-default.css` hold the full color tables; other themes `@import` one of them and override the palette (base16 variants only redefine `--base00`…`--base0F`). Register new themes in `THEMES` in `src/app/theme.ts` (with `light` for Bootstrap's color mode and preview colors).

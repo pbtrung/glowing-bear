@@ -113,15 +113,17 @@ export function TopBar({ showNicklist }: { showNicklist: boolean }) {
                 >
                     <Icon icon={Settings} />
                 </button>
-                <button
-                    type="button"
-                    className="btn btn-icon"
-                    title="Disconnect from WeeChat"
-                    aria-label="Disconnect"
-                    onClick={() => session.disconnect()}
-                >
-                    <Icon icon={Power} />
-                </button>
+                {buffer?.fullName === 'core.weechat' && (
+                    <button
+                        type="button"
+                        className="btn btn-icon"
+                        title="Disconnect from WeeChat"
+                        aria-label="Disconnect"
+                        onClick={() => session.disconnect()}
+                    >
+                        <Icon icon={Power} />
+                    </button>
+                )}
             </div>
         </header>
     );

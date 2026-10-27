@@ -1,10 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { Info, RefreshCw } from 'lucide-react';
 import {
-    isMobileUi,
     session,
     setUi,
-    uiStore,
     useActiveBuffer,
     useChat,
     useMobileUi,
@@ -122,14 +120,12 @@ function Chat() {
     // The chat behind the buffer list opened over it (mobile)
     const behindPanel = mobile && sidebarOpen;
 
-    // On mobile, start with the buffer list closed once a buffer is shown
-    useEffect(() => {
-        if (isMobileUi() && uiStore.getState().sidebarOpen && buffer) {
+    // Start closed on mobile, including when the viewport changes after startup.
+    useLayoutEffect(() => {
+        if (mobile) {
             setUi({ sidebarOpen: false });
         }
-        // only when the first buffer is shown
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [buffer?.id === undefined]);
+    }, [mobile]);
 
     return (
         <div
